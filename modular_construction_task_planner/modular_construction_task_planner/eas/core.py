@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Type
 
 type State = Dict['Variable', Optional[Any]]
 
@@ -46,6 +46,10 @@ class Variable:
         return f"{self._value!r} ∈ {VarDomains[self.domain]}"
 
 @dataclass
+class Action:
+    name: str
+
+@dataclass
 class Entity:
     name: str
 
@@ -62,3 +66,33 @@ class Entity:
 
     def __str__(self) -> str:
         return f"{self.name}({', '.join(f'{k}={v}' for k, v in zip(list(vars(self).keys())[1:], self.state.values()))})"
+
+@dataclass
+class Condition:
+    name: str
+    src_var_type: str
+
+    def __call__(self, src_entity: Entity, expected_val: Any) -> str:
+        variables = vars(src_entity)
+        var = variables.get(self.src_var_type)
+        if var is None:
+            return f"Condition {self.name} failed: {src_entity.name} has no variable of type {self.src_var_type}"
+        if var.value != expected_val:
+            return f"Condition {self.name} failed: {src_entity.name}_{self.src_var_type}={var.value} != {expected_val}"
+        return f"Condition {self.name} passed: {src_entity.name}_{self.src_var_type}={var.value} == {expected_val}"
+
+@dataclass
+class Effect:
+    name: str
+    target_var_type: str
+
+    def __call__(self, target_entity: Entity, new_val: Any) -> str:
+        variables = vars(target_entity)
+        var = variables.get(self.target_var_type)
+        if var is None:
+            return f"Effect {self.name} failed: {target_entity.name} has no variable of type {self.target_var_type}"
+        try:
+            var.value = new_val
+            return f"Effect {self.name} applied: {target_entity.name}_{self.target_var_type} set to {new_val}"
+        except ValueError as e:
+            return f"Effect {self.name} failed to apply: {e}"
