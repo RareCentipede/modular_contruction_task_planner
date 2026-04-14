@@ -71,7 +71,7 @@ class Condition:
     target: Any
     negate: bool = False
 
-    def __call__(self, src_entity: Entity, target_entity: Optional[Entity]) -> str:
+    def __call__(self, src_entity: Entity, target_entity: Optional[Entity] = None) -> str:
         variables = vars(src_entity)
         var = variables.get(self.src_var_type)
         if var is None:
@@ -104,6 +104,7 @@ class Action:
     params: Dict[str, Type[Entity]]
     preconditions: List[Condition]
     effects: List[Effect]
+    _checked: Optional[bool] = None
 
     def _type_check(self, entities: Dict[str, Entity]) -> bool:
         for ent_name, ent_type in self.params.items():
@@ -118,19 +119,25 @@ class Action:
 
         for cond in self.preconditions:
             src_entity = entities[cond.src_entity_name]
-            target = entities[cond.target] if isinstance(cond.target, str) else cond.target
+            target = entities[cond.target] if isinstance(cond.target, str) else None
 
             if not cond(src_entity, target):
                 return False
+        self._checked = True
         return True
 
     def execute(self, param_entities: Dict[str, Entity]) -> None:
+        if self._checked is None:
+            raise RuntimeError(f"Action {self.name} not checked before execution.")
+        elif not self._checked:
+            raise RuntimeError(f"Action {self.name} preconditions not satisfied. Cannot execute.")
+
         self._type_check(param_entities)
         entities = {ent_name: param_entities[ent_name] for ent_name in self.params}
 
         for eff in self.effects:
             src_entity = entities[eff.src_entity_name]
-            target_entity = entities.get(eff.target) if isinstance(eff.target, str) else eff.target
+            target_entity = entities.get(eff.target) if isinstance(eff.target, str) else None
             eff(src_entity, target_entity)
 
     def __str__(self) -> str:

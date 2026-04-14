@@ -1,7 +1,7 @@
-from modular_construction_task_planner.scripts.block_domain import PosEntity, Object, Robot
+from modular_construction_task_planner.scripts.block_domain import PosEntity, Object, Robot, pick_action, place_action, move_action
 from modular_construction_task_planner.eas.core import load_domains, Condition, Effect, Action
 
-POSE_VAR_DOMAIN = ("g", "p1", "p2", "p3", "")
+POSE_VAR_DOMAIN = ("g", "p1", "p2", "p3", "p4", "p5", "")
 BLOCK_VAR_DOMAIN = ("robot", "block1", "block2", "block3", "")
 BOOL_VAR_DOMAIN = (True, False)
 
@@ -10,32 +10,60 @@ VarDomains = {'pos': POSE_VAR_DOMAIN, 'block': BLOCK_VAR_DOMAIN, 'bool': BOOL_VA
 load_domains(VarDomains)
 
 block1 = Object('block1')
+block2 = Object('block2')
+block3 = Object('block3')
+robot = Robot('robot')
+g = PosEntity('g')
 p1 = PosEntity('p1')
-p1.occupied_by.value = 'robot'
 p2 = PosEntity('p2')
 p3 = PosEntity('p3')
-robot = Robot('robot')
-robot.at.value = 'p2'
-block1.at.value = 'p1'
+p4 = PosEntity('p4')
+p5 = PosEntity('p5')
 
-move_params = {
-    'robot': Robot,
-    'current_pose': PosEntity,
-    'target_pose': PosEntity
-}
-move_conditions = [
-    Condition('robot_at_src', 'robot', 'at', 'current_pose'),
-    Condition('robot_not_at_target', 'robot', 'at', 'target_pose', negate=True)
-]
-move_effects = [
-    Effect('move_robot', 'robot', 'at', 'target_pose'),
-    Effect('unset_pose_occupied', 'current_pose', 'occupied_by', None),
-    Effect('set_pose_occupied', 'target_pose', 'occupied_by', 'robot')
-]
-move_action = Action('move', move_params, move_conditions, move_effects)
-print(f"Robot at: {robot.at.value}")
-print(f"Checking robot move action: {move_action.check({'robot': robot, 'current_pose': p1, 'target_pose': p3})}")
-print(p1, p3)
-move_action.execute({'robot': robot, 'current_pose': p1, 'target_pose': p3})
-print(f"Robot new position: {robot.at.value}")
-print(p1, p3)
+block1.at.value = 'p1'
+p1.occupied_by.value = 'block1'
+block2.at.value = 'p3'
+p2.occupied_by.value = 'block2'
+block3.at.value = 'p5'
+p5.occupied_by.value = 'block3'
+
+robot.at.value = 'p2'
+p2.occupied_by.value = 'robot'
+
+# Print initial state
+print("Initial State:")
+for entity in [block1, block2, block3, robot, g, p1, p2, p3, p4, p5]:
+    print(f"  {entity}")
+
+# Move from p2 to p3
+move_params = {'robot': robot, 'start_pose': p2, 'target_pose': p3}
+# move_action.check(move_params)
+move_action.execute(move_params)
+print("\nAfter moving robot from p2 to p3:")
+print(f"  {robot}")
+print(f"  {p2}")
+print(f"  {p3}")
+
+# Pick block2 at p3
+pick_params = {'robot': robot, 'object': block2, 'object_pose': p3}
+pick_action.check(pick_params)
+pick_action.execute(pick_params)
+print("\nAfter picking block2 at p3:")
+for entity in [block2, robot]:
+    print(f"  {entity}")
+
+# Move from p3 to p4
+move_params = {'robot': robot, 'start_pose': p3, 'target_pose': p4}
+move_action.check(move_params)
+move_action.execute(move_params)
+print("\nAfter moving robot from p3 to p4:")
+for entity in [robot, p3, p4]:
+    print(f"  {entity}")
+
+# Place block2 at p4
+place_params = {'robot': robot, 'object': block2, 'target_pose': p4}
+place_action.check(place_params)
+place_action.execute(place_params)
+print("\nAfter placing block2 at p4:")
+for entity in [block2, robot, p4]:
+    print(f"  {entity}")

@@ -73,11 +73,18 @@ class PosEntity(Entity):
     on: OnPose = field(default_factory=OnPose)
     below: BelowPose = field(default_factory=BelowPose)
 
+    def __post_init__(self):
+        self.clear.value = True
+
 @dataclass
 class Robot(Entity):
     at: At = field(default_factory=At)
     gripper_empty: GripperEmpty = field(default_factory=GripperEmpty)
     holding: Holding = field(default_factory=Holding)
+
+    def __post_init__(self):
+        self.gripper_empty.value = True
+        self.holding.value = None
 
 # Action definitions
 move_parameters = {
