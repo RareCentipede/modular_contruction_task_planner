@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, List, Type
+from typing import Any, Dict, Optional, List, Type, Tuple
 
 type State = Dict['Variable', Optional[Any]]
 
@@ -66,58 +66,72 @@ class Entity:
 @dataclass
 class Condition:
     name: str
-    src_entity_type: Type[Entity]
+    src_entity_name: str
     src_var_type: str
+    target: Any
     negate: bool = False
 
-    def __call__(self, src_entity: Entity, expected_val: Any) -> str:
+    def __call__(self, src_entity: Entity, target_entity: Optional[Entity]) -> str:
         variables = vars(src_entity)
         var = variables.get(self.src_var_type)
         if var is None:
             return f"Condition {self.name} failed: {src_entity.name} has no variable of type {self.src_var_type}"
-        if var.value != expected_val:
-            return f"Condition {self.name} failed: {src_entity.name}_{self.src_var_type}={var.value} != {expected_val}"
-        return f"Condition {self.name} passed: {src_entity.name}_{self.src_var_type}={var.value} == {expected_val}"
+        if var.value != target_entity.name if target_entity else self.target:
+            return f"Condition {self.name} failed: {src_entity.name}_{self.src_var_type}={var.value} != {target_entity}"
+        return f"Condition {self.name} passed: {src_entity.name}_{self.src_var_type}={var.value} == {target_entity}"
 
 @dataclass
 class Effect:
     name: str
-    src_entity_type: Type[Entity]
-    target_var_type: str
+    src_entity_name: str
+    src_var_type: str
+    target: Any
 
-    def __call__(self, target_entity: Entity, new_val: Any) -> str:
-        variables = vars(target_entity)
-        var = variables.get(self.target_var_type)
+    def __call__(self, src_entity: Entity, target_entity: Optional[Entity] = None) -> str:
+        variables = vars(src_entity)
+        var = variables.get(self.src_var_type)
         if var is None:
-            return f"Effect {self.name} failed: {target_entity.name} has no variable of type {self.target_var_type}"
+            return f"Effect {self.name} failed: {src_entity.name} has no variable of type {self.src_var_type}"
         try:
-            var.value = new_val
-            return f"Effect {self.name} applied: {target_entity.name}_{self.target_var_type} set to {new_val}"
+            var.value = target_entity.name if target_entity else self.target
+            return f"Effect {self.name} applied: {src_entity.name}_{self.src_var_type} set to {var.value}"
         except ValueError as e:
             return f"Effect {self.name} failed to apply: {e}"
 
 @dataclass
 class Action:
     name: str
-    params: List[Type[Entity]]
+    params: Dict[str, Type[Entity]]
     preconditions: List[Condition]
     effects: List[Effect]
 
-    def check(self, param_entities: Dict[Type[Entity], Entity], target: Any) -> bool:
-        entities = {ent_type: param_entities[ent_type] for ent_type in self.params}
+    def _type_check(self, entities: Dict[str, Entity]) -> bool:
+        for ent_name, ent_type in self.params.items():
+            if type(entities[ent_name]) != ent_type:
+                raise TypeError(f"Parameter {ent_name} expected type {ent_type.__name__}, \
+                                  got {type(entities[ent_name]).__name__}")
+        return True
+
+    def check(self, param_entities: Dict[str, Entity]) -> bool:
+        self._type_check(param_entities)
+        entities = {ent_name: param_entities[ent_name] for ent_name in self.params}
 
         for cond in self.preconditions:
-            entity = entities[cond.src_entity_type]
-            if not cond(entity, target):
+            src_entity = entities[cond.src_entity_name]
+            target = entities[cond.target] if isinstance(cond.target, str) else cond.target
+
+            if not cond(src_entity, target):
                 return False
         return True
 
-    def execute(self, param_entities: Dict[Type[Entity], Entity], target: Any) -> None:
-        entities = {ent_type: param_entities[ent_type] for ent_type in self.params}
+    def execute(self, param_entities: Dict[str, Entity]) -> None:
+        self._type_check(param_entities)
+        entities = {ent_name: param_entities[ent_name] for ent_name in self.params}
 
         for eff in self.effects:
-            entity = entities[eff.src_entity_type]
-            eff(entity, target)
+            src_entity = entities[eff.src_entity_name]
+            target_entity = entities.get(eff.target) if isinstance(eff.target, str) else eff.target
+            eff(src_entity, target_entity)
 
     def __str__(self) -> str:
-        return f"Action({self.name})"
+        return f"({self.name}])"

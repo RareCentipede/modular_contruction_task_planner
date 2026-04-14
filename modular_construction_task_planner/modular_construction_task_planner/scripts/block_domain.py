@@ -1,6 +1,6 @@
 from typing import List, Tuple
 from dataclasses import dataclass, field
-from modular_construction_task_planner.eas.core import Variable, Entity, State
+from modular_construction_task_planner.eas.core import Variable, Entity, State, Condition, Effect, Action
 
 # Block variables
 @dataclass
@@ -67,7 +67,7 @@ class Object(Entity):
         self.supported.value = True
 
 @dataclass
-class Pose(Entity):
+class PosEntity(Entity):
     occupied_by: OccupiedBy = field(default_factory=OccupiedBy)
     clear: Clear = field(default_factory=Clear)
     on: OnPose = field(default_factory=OnPose)
@@ -78,3 +78,59 @@ class Robot(Entity):
     at: At = field(default_factory=At)
     gripper_empty: GripperEmpty = field(default_factory=GripperEmpty)
     holding: Holding = field(default_factory=Holding)
+
+# Action definitions
+move_parameters = {
+    'robot': Robot,
+    'start_pose': PosEntity,
+    'target_pose': PosEntity
+}
+move_conditions = [
+    Condition('robot_at_start', 'robot', 'at', 'start_pose')
+]
+move_effects = [
+    Effect('move_robot_to_target', 'robot', 'at', 'target_pose')
+]
+move_action = Action('move', move_parameters, move_conditions, move_effects)
+
+pick_parameters = {
+    'robot': Robot,
+    'object': Object,
+    'object_pose': PosEntity
+}
+pick_conditions = [
+    Condition('robot_at_object', 'robot', 'at', 'object_pose'),
+    Condition('object_at_pose', 'object', 'at', 'object_pose'),
+    Condition('gripper_empty', 'robot', 'gripper_empty', True),
+    Condition('holding_nothing', 'robot', 'holding', None),
+    Condition('object_at_top', 'object', 'at_top', True)
+]
+pick_effects = [
+    Effect('pick_object', 'robot', 'holding', 'object'),
+    Effect('gripper_not_empty', 'robot', 'gripper_empty', False),
+    Effect('object_no_longer_at_pose', 'object', 'at', None),
+    Effect('object_pose_clear', 'object_pose', 'clear', True),
+    Effect('object_pose_occupied_by_none', 'object_pose', 'occupied_by', None),
+    Effect('object_on_none', 'object', 'on', None),
+]
+pick_action = Action('pick', pick_parameters, pick_conditions, pick_effects)
+
+place_parameters = {
+    'robot': Robot,
+    'object': Object,
+    'target_pose': PosEntity
+}
+place_conditions = [
+    Condition('robot_at_target', 'robot', 'at', 'target_pose'),
+    Condition('gripper_holding_object', 'robot', 'holding', 'object'),
+    Condition('target_pose_clear', 'target_pose', 'clear', True),
+    Condition('object_supported', 'object', 'supported', True)
+]
+place_effects = [
+    Effect('place_object', 'robot', 'holding', None),
+    Effect('gripper_empty', 'robot', 'gripper_empty', True),
+    Effect('object_at_target', 'object', 'at', 'target_pose'),
+    Effect('target_pose_occupied_by_object', 'target_pose', 'occupied_by', 'object'),
+    Effect('target_pose_not_clear', 'target_pose', 'clear', False),
+]
+place_action = Action('place', place_parameters, place_conditions, place_effects)
