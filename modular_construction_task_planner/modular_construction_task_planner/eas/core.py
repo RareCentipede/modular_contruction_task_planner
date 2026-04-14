@@ -1,7 +1,9 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, List, Type, Tuple
+from enum import Enum
 
 type State = Dict['Variable', Optional[Any]]
+StateStatus = Enum('StateStatus', "ALIVE DEAD GOAL")
 
 VarDomains: Dict[str, List[Any]] = {}
 
@@ -142,3 +144,31 @@ class Action:
 
     def __str__(self) -> str:
         return f"({self.name}])"
+
+@dataclass
+class LinkedState:
+    state_id: int
+    state: State
+    state_type: StateStatus = StateStatus.ALIVE
+    parent: Optional[Tuple[str, 'LinkedState']] = None
+    branches_to_explore: List[Tuple[str, 'LinkedState']] = field(default_factory=list)
+    children: List[Tuple[str, 'LinkedState']] = field(default_factory=list)
+    cost: float = 0.0
+
+    def __hash__(self) -> int:
+        return self.state_id
+
+    def __str__(self) -> str:
+        return f"State {self.state_id} ({self.state_type.name}): {self.state}"
+
+@dataclass
+class Entities:
+    entities: Dict[str, Entity]
+
+@dataclass
+class World:
+    # Maybe create another dataclass that can query for entities with multiple keys, like EntityType and EntityName
+    # Entity name queries a single entity, while EntityType queries for all entities of that type
+    entities: Dict[str, Entity]
+    states: List[State] = field(default_factory=list)
+    goal_state: State = field(default_factory=dict)
