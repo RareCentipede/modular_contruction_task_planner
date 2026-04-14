@@ -1,10 +1,12 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 type State = Dict['Variable', Optional[Any]]
 
-BOOL_VAR_DOMAIN = (True, False)
-VarDomains = {'bool': BOOL_VAR_DOMAIN}
+VarDomains: Dict[str, List[Any]] = {}
+
+def load_domains(domains: Dict[str, List[Any]]) -> None:
+    VarDomains.update(domains)
 
 @dataclass
 class Variable:
@@ -21,6 +23,10 @@ class Variable:
 
     @value.setter
     def value(self, v: Optional[Any]) -> None:
+        if not VarDomains:
+            raise ValueError("VarDomains is not defined. Load domains using load_domains() before setting variable values.")
+        if self.domain not in VarDomains:
+            raise ValueError(f"Domain {self.domain!r} is not defined in VarDomains.")
         if v is not None and v not in VarDomains[self.domain]:
             raise ValueError(f"{v!r} not in domain {VarDomains[self.domain]}")
         self._value = v
