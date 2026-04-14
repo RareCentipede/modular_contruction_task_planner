@@ -75,5 +75,6 @@ class Pose(Entity):
 
 @dataclass
 class Robot(Entity):
+    at: At = field(default_factory=At)
     gripper_empty: GripperEmpty = field(default_factory=GripperEmpty)
     holding: Holding = field(default_factory=Holding)

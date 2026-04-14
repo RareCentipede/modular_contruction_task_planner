@@ -46,10 +46,6 @@ class Variable:
         return f"{self._value!r} ∈ {VarDomains[self.domain]}"
 
 @dataclass
-class Action:
-    name: str
-
-@dataclass
 class Entity:
     name: str
 
@@ -70,7 +66,9 @@ class Entity:
 @dataclass
 class Condition:
     name: str
+    src_entity_type: Type[Entity]
     src_var_type: str
+    negate: bool = False
 
     def __call__(self, src_entity: Entity, expected_val: Any) -> str:
         variables = vars(src_entity)
@@ -84,6 +82,7 @@ class Condition:
 @dataclass
 class Effect:
     name: str
+    src_entity_type: Type[Entity]
     target_var_type: str
 
     def __call__(self, target_entity: Entity, new_val: Any) -> str:
@@ -96,3 +95,29 @@ class Effect:
             return f"Effect {self.name} applied: {target_entity.name}_{self.target_var_type} set to {new_val}"
         except ValueError as e:
             return f"Effect {self.name} failed to apply: {e}"
+
+@dataclass
+class Action:
+    name: str
+    params: List[Type[Entity]]
+    preconditions: List[Condition]
+    effects: List[Effect]
+
+    def check(self, param_entities: Dict[Type[Entity], Entity], target: Any) -> bool:
+        entities = {ent_type: param_entities[ent_type] for ent_type in self.params}
+
+        for cond in self.preconditions:
+            entity = entities[cond.src_entity_type]
+            if not cond(entity, target):
+                return False
+        return True
+
+    def execute(self, param_entities: Dict[Type[Entity], Entity], target: Any) -> None:
+        entities = {ent_type: param_entities[ent_type] for ent_type in self.params}
+
+        for eff in self.effects:
+            entity = entities[eff.src_entity_type]
+            eff(entity, target)
+
+    def __str__(self) -> str:
+        return f"Action({self.name})"
