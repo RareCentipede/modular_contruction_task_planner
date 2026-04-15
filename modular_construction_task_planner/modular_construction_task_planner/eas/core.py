@@ -1,8 +1,13 @@
+from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, List, Type, Tuple
+from typing import Any, Dict, Optional, List, Type, Tuple, FrozenSet
 from enum import Enum
 
-type State = Dict['Variable', Optional[Any]]
+# State is a snapshot of all variable values for a given state id. It is immutable once created,
+# should be able to create new states from current entities' variables and set all variables based on a state snapshot.
+# TODO: Make state into a FrozenSet type to ensure immutability and hashability for use in sets and dicts.
+# TODO: I was too lazy to actually implement this lol, but it would be a great feature.
+type State = Dict[str, Optional[Any]]
 StateStatus = Enum('StateStatus', "ALIVE DEAD GOAL")
 
 VarDomains: Dict[str, List[Any]] = {}
@@ -64,6 +69,31 @@ class Entity:
 
     def __str__(self) -> str:
         return f"{self.name}({', '.join(f'{k}={v}' for k, v in zip(list(vars(self).keys())[1:], self.state.values()))})"
+
+@dataclass
+class Entities:
+    entities: List[Entity]
+    _entities_by_type: Dict[Type[Entity], List[Entity]] = field(init=False, repr=False)
+    _entities_by_name: Dict[str, Entity] = field(init=False, repr=False)
+
+    def __post_init__(self):
+        self._entities_by_type = {}
+        self._entities_by_name = {}
+
+        for ent in self.entities:
+            ent_type = type(ent)
+            if ent_type not in self._entities_by_type:
+                self._entities_by_type[ent_type] = []
+            self._entities_by_type[ent_type].append(ent)
+            self._entities_by_name[ent.name] = ent
+
+    def get_entities(self, key: str | Type[Entity]) -> Entity | List[Entity]:
+        if isinstance(key, str):
+            return self._entities_by_name[key]
+        elif isinstance(key, type) and issubclass(key, Entity):
+            return self._entities_by_type[key]
+        else:
+            raise KeyError(f"Invalid key type: {key}. Must be str or Type[Entity].")
 
 @dataclass
 class Condition:
@@ -155,20 +185,48 @@ class LinkedState:
     children: List[Tuple[str, 'LinkedState']] = field(default_factory=list)
     cost: float = 0.0
 
-    def __hash__(self) -> int:
-        return self.state_id
+    def __hash__(self) -> FrozenSet:
+        return frozenset(self.state.items())
+
+    def __eq__(self, other: 'LinkedState') -> bool:
+        return frozenset(self.state.items()) == frozenset(other.state.items())
 
     def __str__(self) -> str:
         return f"State {self.state_id} ({self.state_type.name}): {self.state}"
 
-@dataclass
-class Entities:
-    entities: Dict[str, Entity]
 
 @dataclass
 class World:
     # Maybe create another dataclass that can query for entities with multiple keys, like EntityType and EntityName
     # Entity name queries a single entity, while EntityType queries for all entities of that type
-    entities: Dict[str, Entity]
+    entities: Entities
     states: List[State] = field(default_factory=list)
     goal_state: State = field(default_factory=dict)
+
+    @property
+    def current_state(self) -> State:
+        return self.states[-1] if self.states else {}
+
+    def update_state(self) -> State:
+        if self.states != []:
+            new_state = deepcopy(self.current_state)
+        else:
+            new_state = {}
+
+        for ent in self.entities.entities:
+            new_state.update(ent.state)
+
+        self.states.append(new_state)
+        return new_state
+
+    def update_entities_from_state(self, state: State) -> None:
+        for ent in self.entities.entities:
+            for var_name, var in vars(ent).items():
+                var_key = f"{ent.name}_{var_name}"
+                if var_key in state:
+                    var_val = state[var_key]
+                    try:
+                        var.value = var_val
+                        setattr(ent, var_name, var)
+                    except ValueError as e:
+                        print(f"Failed to update {ent.name}'s variable {var_name} with value {var_val}: {e}")
