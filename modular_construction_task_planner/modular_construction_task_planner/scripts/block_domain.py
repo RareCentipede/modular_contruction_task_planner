@@ -98,7 +98,7 @@ move_conditions = [
 move_effects = [
     Effect('move_robot_to_target', 'robot', 'at', 'target_pose')
 ]
-move_action = Action('move', move_parameters, move_conditions, move_effects)
+MoveAction = Action('move', move_parameters, move_conditions, move_effects)
 
 pick_parameters = {
     'robot': Robot,
@@ -120,7 +120,7 @@ pick_effects = [
     Effect('object_pose_occupied_by_none', 'object_pose', 'occupied_by', None),
     Effect('object_on_none', 'object', 'on', None),
 ]
-pick_action = Action('pick', pick_parameters, pick_conditions, pick_effects)
+PickAction = Action('pick', pick_parameters, pick_conditions, pick_effects)
 
 place_parameters = {
     'robot': Robot,
@@ -140,4 +140,4 @@ place_effects = [
     Effect('target_pose_occupied_by_object', 'target_pose', 'occupied_by', 'object'),
     Effect('target_pose_not_clear', 'target_pose', 'clear', False),
 ]
-place_action = Action('place', place_parameters, place_conditions, place_effects)
+PlaceAction = Action('place', place_parameters, place_conditions, place_effects)
