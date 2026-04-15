@@ -16,6 +16,11 @@ def load_domains(domains: Dict[str, List[Any]]) -> None:
     VarDomains.update(domains)
 
 @dataclass
+class Pose:
+    position: List[float]
+    orientation: List[float]
+
+@dataclass
 class Variable:
     """
         A typed state variable with a finite domain.
@@ -49,7 +54,7 @@ class Variable:
 
     def __str__(self) -> Any:
         if not self._value:
-            return f"∅  ∈ {VarDomains[self.domain]}"
+            return f"∅ ∈ {VarDomains[self.domain]}"
         return f"{self._value!r} ∈ {VarDomains[self.domain]}"
 
 @dataclass
@@ -194,7 +199,6 @@ class LinkedState:
     def __str__(self) -> str:
         return f"State {self.state_id} ({self.state_type.name}): {self.state}"
 
-
 @dataclass
 class World:
     # Maybe create another dataclass that can query for entities with multiple keys, like EntityType and EntityName
@@ -206,6 +210,9 @@ class World:
     @property
     def current_state(self) -> State:
         return self.states[-1] if self.states else {}
+
+    def goal_reached(self) -> bool:
+        return frozenset(self.current_state.items()) == frozenset(self.goal_state.items())
 
     def update_state(self) -> State:
         if self.states != []:
