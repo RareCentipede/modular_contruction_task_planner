@@ -10,9 +10,9 @@ from enum import Enum
 type State = Dict[str, Optional[Any]]
 StateStatus = Enum('StateStatus', "ALIVE DEAD GOAL")
 
-VarDomains: Dict[str, List[Any]] = {}
+VarDomains: Dict[str, Tuple[Any, ...]] = {}
 
-def load_domains(domains: Dict[str, List[Any]]) -> None:
+def load_domains(domains: Dict[str, Tuple[Any, ...]]) -> None:
     VarDomains.update(domains)
 
 @dataclass
@@ -31,12 +31,12 @@ class Variable:
 
     @property
     def value(self) -> Optional[Any]:
+        if not VarDomains:
+            raise ValueError("VarDomains is not defined. Load domains using load_domains() before setting variable values.")
         return self._value
 
     @value.setter
     def value(self, v: Optional[Any]) -> None:
-        if not VarDomains:
-            raise ValueError("VarDomains is not defined. Load domains using load_domains() before setting variable values.")
         if self.domain not in VarDomains:
             raise ValueError(f"Domain {self.domain!r} is not defined in VarDomains.")
         if v is not None and v not in VarDomains[self.domain]:
