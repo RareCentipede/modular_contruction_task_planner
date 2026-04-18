@@ -204,6 +204,7 @@ class World:
     # Maybe create another dataclass that can query for entities with multiple keys, like EntityType and EntityName
     # Entity name queries a single entity, while EntityType queries for all entities of that type
     entities: Entities
+    pose_dict: Dict[str, Pose] = field(default_factory=dict)
     states: List[State] = field(default_factory=list)
     goal_state: State = field(default_factory=dict)
 

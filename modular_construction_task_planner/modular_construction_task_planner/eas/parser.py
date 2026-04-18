@@ -14,9 +14,9 @@ from modular_construction_task_planner.eas.core import (
     Pose
 )
 from modular_construction_task_planner.scripts.block_domain import (
-    Object, At, AtTop, OnBlock, BelowBlock, Supported, Goal,
-    PosEntity, Clear, OccupiedBy, OnPose, BelowPose,
-    Robot, GripperEmpty, Holding,
+    Object,
+    PosEntity,
+    Robot
 )
 
 def parse_configs_to_world(config_name: str, problem_config_path: str) -> World:
@@ -34,7 +34,8 @@ def parse_configs_to_world(config_name: str, problem_config_path: str) -> World:
     domains = create_domains(init_config, goal_config)
     load_domains(domains)
     entities = create_entities(domains)
-    world = create_world(init_config, goal_config, domains, entities)
+    pose_dict = assign_entities_variable_values_and_create_pose_dict(init_config, goal_config, entities)
+    world = World(entities, pose_dict=pose_dict)
 
     return world
 
@@ -72,6 +73,10 @@ def create_domains(init_config: Dict, goal_config: Dict) -> Dict[str, Tuple]:
         pos_var_domain.append(pos_name)
         idx += 1
 
+    pos_var_domain.append('g')
+    pos_var_domain.append('')
+    block_var_domain.append('g')
+    block_var_domain.append('')
     domains = {
         'pos': tuple(pos_var_domain),
         'block': tuple(block_var_domain),
@@ -90,19 +95,25 @@ def create_entities(domains: Dict[str, Tuple]) -> Entities:
 
     return Entities(entities)
 
-def create_world(init_config: Dict, goal_config: Dict, domains: Dict[str, Tuple], entities: Entities) -> World:
+def assign_entities_variable_values_and_create_pose_dict(init_config: Dict, goal_config: Dict, entities: Entities) \
+                                                                                                -> Dict[str, Pose]:
     pos_counter = 0
     init_pos_vals = []
     pose_dict = {}
 
     obj_entities = cast(List[Object], entities.get_entities(Object))
     pos_entities = cast(List[PosEntity], entities.get_entities(PosEntity))
+    gnd_pos_entity = cast(PosEntity, entities.get_entities('g'))
+    gnd_obj_entity = cast(Object, entities.get_entities('g'))
 
-    for info, obj_entity, pos_entity in zip(init_config.values(), obj_entities, pos_entities):
+    for info, obj_entity, pos_entity in zip(init_config.values(), obj_entities[:-2], pos_entities[:-2]):
         pose = Pose(info['position'], info['orientation'])
         pose_dict[pos_entity.name] = pose
         obj_entity.at.value = pos_entity.name
+        obj_entity.on.value = gnd_obj_entity.name
+
         pos_entity.occupied_by.value = obj_entity.name
+        pos_entity.on.value = gnd_pos_entity.name
         pos_entity.clear.value = False
 
         init_pos_vals.append(info['position'])
@@ -111,21 +122,20 @@ def create_world(init_config: Dict, goal_config: Dict, domains: Dict[str, Tuple]
     robot_entity = cast(Robot, entities.get_entities('robot'))
     robot_entity.at.value = pos_entities[pos_counter+1].name
 
-    for obj_name, info, pos_entity in zip(goal_config.keys(), goal_config.values(), pos_entities[pos_counter:]):
+    for obj_name, info, pos_entity in zip(goal_config.keys(), goal_config.values(), pos_entities[pos_counter:-2]):
         pos_val = info['position']
 
         if pos_val not in init_pos_vals:
             pose = Pose(info['position'], info['orientation'])
             pose_dict[pos_entity.name] = pose
             pos_entity.clear.value = True
+            pos_entity.on.value = gnd_pos_entity.name
 
             if obj_name != "robot":
                 obj_entity = cast(Object, entities.get_entities(obj_name))
                 obj_entity.goal.value = pos_entity.name
 
-    world = World(entities)
-
-    return world
+    return pose_dict
 
 problem_config_path = "src/object_rearrangement_ros2_sim/mpnp_simulation/config/problem_configs/"
 
