@@ -184,11 +184,33 @@ class Action:
 class LinkedState:
     state_id: int
     state: State
-    state_type: StateStatus = StateStatus.ALIVE
     parent: Optional[Tuple[str, 'LinkedState']] = None
-    branches_to_explore: List[Tuple[str, 'LinkedState']] = field(default_factory=list)
-    children: List[Tuple[str, 'LinkedState']] = field(default_factory=list)
+    children: List[Tuple[str, 'LinkedState']] = field(default_factory=list) # List of expanded (action_name, LinkedState) pairs
     cost: float = 0.0
+    goal: bool = False
+
+    _branches_to_explore: List[Tuple[Dict[str, Entity], float]] = field(default_factory=list) # List of potential (action_params, cost) pairs
+    _expanded: bool = False
+
+    @property
+    def branches_to_explore(self) -> List[Tuple[Dict[str, Entity], float]]:
+        return self._branches_to_explore
+
+    @branches_to_explore.setter
+    def branches_to_explore(self, branches: List[Tuple[Dict[str, Entity], float]]) -> None:
+        self._branches_to_explore = branches
+        self._expanded = True
+
+    @property
+    def status(self) -> StateStatus:
+        if not self._expanded:
+            return StateStatus.ALIVE
+        elif self.goal:
+            return StateStatus.GOAL
+        elif self.branches_to_explore:
+            return StateStatus.ALIVE
+        else:
+            return StateStatus.DEAD
 
     def __hash__(self) -> FrozenSet:
         return frozenset(self.state.items())
@@ -197,7 +219,7 @@ class LinkedState:
         return frozenset(self.state.items()) == frozenset(other.state.items())
 
     def __str__(self) -> str:
-        return f"State {self.state_id} ({self.state_type.name}): {self.state}"
+        return f"State {self.state_id} ({self.status.name}): {self.state}"
 
 @dataclass
 class World:
