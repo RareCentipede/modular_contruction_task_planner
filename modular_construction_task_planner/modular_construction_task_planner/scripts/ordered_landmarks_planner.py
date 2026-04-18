@@ -8,7 +8,7 @@ from modular_construction_task_planner.eas.core import (
     Entity, Entities, StateStatus, World
 )
 from modular_construction_task_planner.scripts.block_domain import (
-    Object, PosEntity, Robot,
+    Action, Object, PosEntity, Robot,
     MoveAction, PickAction, PlaceAction
 )
 
@@ -31,10 +31,10 @@ from modular_construction_task_planner.scripts.block_domain import (
 # Backtrack
 # 1. If parent is not None and ALIVE, set current state to parent and mark current state as DEAD.
 
-
 class OrderedLandmarksPlanner:
-    def __init__(self, world: World):
+    def __init__(self, world: World, action_dict: Dict[str, Action]) -> None:
         self.world: World = world
+        self.action_dict: Dict[str, Action] = action_dict
         self.state_counter: int = 0
 
         self.current_state: State = world.current_state
@@ -46,8 +46,36 @@ class OrderedLandmarksPlanner:
         self.robot = cast(Robot, robot)
 
     def run_optimal_planner(self) -> List[LinkedState]:
+        while self.current_linked_state.status == StateStatus.ALIVE:
+            self.branch_out(self.current_linked_state)
+            weighted_branch = self.current_linked_state.branches_to_explore.pop(0)
+
+            action_name, action_params, cost = weighted_branch
+            action = self.action_dict[action_name]
+            action.execute(action_params)
+            self.world.update_state()
+
+            new_state = self.world.current_state
+            self.state_counter += 1
+            new_linked_state = LinkedState(self.state_counter, new_state, parent=(action_name, self.current_linked_state),
+                                           cost=cost)
+            self.current_linked_state.children.append((action_name, new_linked_state))
+            self.current_linked_state = new_linked_state
+
+            if self.world.goal_reached():
+                self.current_linked_state.goal = True
+                self.goal_linked_states.append(self.current_linked_state)
+                self.backtrack()
 
         return self.goal_linked_states
+
+    def branch_out(self, linked_state: LinkedState) -> None:
+        """
+            Branch out from the current state by defining branches based on the preferred action and evaluating the branches.
+            Assigns the weighted branches to the linked state.
+        """
+        if linked_state.branches_to_explore:
+            return
 
     def get_preferred_action(self, state: State) -> Optional[str]:
         """
@@ -81,7 +109,7 @@ class OrderedLandmarksPlanner:
         """
         while not self.current_linked_state.branches_to_explore:
             parent_action_linked_state = self.current_linked_state.parent
-            if parent_action_linked_state is not None and parent_action_linked_state[1].state_type == StateStatus.ALIVE:
+            if parent_action_linked_state is not None and parent_action_linked_state[1].status == StateStatus.ALIVE:
                 self.current_linked_state = parent_action_linked_state[1]
                 self.current_state = self.current_linked_state.state
 
