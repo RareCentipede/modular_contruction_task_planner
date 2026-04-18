@@ -1,14 +1,10 @@
 import numpy as np
 
 from yaml import safe_load
-from copy import deepcopy
-from typing import Dict, List, Type, Tuple, Optional, cast
+from typing import Dict, List, Tuple, cast
 from scipy.spatial import cKDTree
 from modular_construction_task_planner.eas.core import (
     load_domains,
-    State,
-    LinkedState,
-    Entity,
     Entities,
     World,
     Pose

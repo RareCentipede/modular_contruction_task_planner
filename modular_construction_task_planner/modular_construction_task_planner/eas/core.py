@@ -189,15 +189,16 @@ class LinkedState:
     cost: float = 0.0
     goal: bool = False
 
-    _branches_to_explore: List[Tuple[Dict[str, Entity], float]] = field(default_factory=list) # List of potential (action_params, cost) pairs
+    # List of potential branches: (action_name, action_params, cost)
+    _branches_to_explore: List[Tuple[str, Dict[str, Entity], float]] = field(default_factory=list)
     _expanded: bool = False
 
     @property
-    def branches_to_explore(self) -> List[Tuple[Dict[str, Entity], float]]:
+    def branches_to_explore(self) -> List[Tuple[str, Dict[str, Entity], float]]:
         return self._branches_to_explore
 
     @branches_to_explore.setter
-    def branches_to_explore(self, branches: List[Tuple[Dict[str, Entity], float]]) -> None:
+    def branches_to_explore(self, branches: List[Tuple[str, Dict[str, Entity], float]]) -> None:
         self._branches_to_explore = branches
         self._expanded = True
 
@@ -238,10 +239,7 @@ class World:
         return frozenset(self.current_state.items()) == frozenset(self.goal_state.items())
 
     def update_state(self) -> State:
-        if self.states != []:
-            new_state = deepcopy(self.current_state)
-        else:
-            new_state = {}
+        new_state = deepcopy(self.current_state)
 
         for ent in self.entities.entities:
             new_state.update(ent.state)
