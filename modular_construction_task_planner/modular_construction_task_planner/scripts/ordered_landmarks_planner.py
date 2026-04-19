@@ -39,6 +39,7 @@ class OrderedLandmarksPlanner:
 
         self.current_state: State = world.current_state
         self.s0: LinkedState = LinkedState(self.state_counter, self.current_state)
+        print(f"Initial state: {self.current_state}")
         self.current_linked_state: LinkedState = self.s0
         self.goal_linked_states: List[LinkedState] = []
 
@@ -56,7 +57,9 @@ class OrderedLandmarksPlanner:
 
             action_name, action_params, cost = weighted_branch
             action = self.action_dict[action_name]
+            print(f"Executing: {action_name} with params {[str(param) + ': ' + str(ent.state) for param, ent in action_params.items()]} and cost {cost}")
             action.execute(action_params)
+
             self.world.update_state()
 
             new_state = self.world.current_state
@@ -68,6 +71,7 @@ class OrderedLandmarksPlanner:
             self.current_state = new_state
 
             if self.world.goal_reached:
+                print("GOAL REACHED!")
                 self.current_linked_state.goal = True
                 self.goal_linked_states.append(self.current_linked_state)
                 self.backtrack()
@@ -80,6 +84,11 @@ class OrderedLandmarksPlanner:
             Assigns the weighted branches to the linked state.
         """
         if linked_state.branches_to_explore:
+            # Need to check the branches again after backtacking, since the state of the world is different.
+            for branch in linked_state.branches_to_explore:
+                action_name, branch_params, _ = branch
+                if not self.action_dict[action_name].check(branch_params):
+                    linked_state.branches_to_explore.remove(branch)
             return
 
         preferred_action_name = self.get_preferred_action()
@@ -137,17 +146,21 @@ class OrderedLandmarksPlanner:
                         'object_pose': current_pos_entity
                     }
                     branches.append(branch_params)
+
             case "place":
                 current_pos_clear = current_pos_entity.clear.value
                 if current_pos_clear:
-                    obj_in_gripper = cast(Object, self.robot.holding.value)
-                    if obj_in_gripper.goal.value == current_pos_entity.name:
+                    obj_in_gripper = cast(str, self.robot.holding.value)
+                    obj_entity_in_gripper = cast(Object, self.world.entities.get_entities(obj_in_gripper))
+
+                    if obj_entity_in_gripper.goal.value == current_pos_entity.name:
                         branch_params = {
                             'robot': self.robot,
-                            'object': obj_in_gripper,
+                            'object': obj_entity_in_gripper,
                             'target_pose': current_pos_entity
                         }
                         branches.append(branch_params)
+
             case "transit":
                 potential_target_objs = cast(List[Object], self.world.not_at_goal_entities)
                 potential_target_pos_vals = [obj.at.value for obj in potential_target_objs]
@@ -164,8 +177,9 @@ class OrderedLandmarksPlanner:
                     branches.append(branch_params)
 
             case "transport":
-                obj_in_gripper = cast(Object, self.robot.holding.value)
-                target_pos_val = cast(str, obj_in_gripper.goal.value)
+                obj_in_gripper = cast(str, self.robot.holding.value)
+                obj_entity_in_gripper = cast(Object, self.world.entities.get_entities(obj_in_gripper))
+                target_pos_val = cast(str, obj_entity_in_gripper.goal.value)
                 target_pos_entity = cast(PosEntity, self.world.entities.get_entities(target_pos_val))
                 branch_params = {
                     'robot': self.robot,
@@ -189,6 +203,17 @@ class OrderedLandmarksPlanner:
             euclidean distance between the robot and the target. The branch with the lowest cost will be explored first.
         """
         evaluated_branches = []
+        if action_name == "pick" or action_name == "place":
+            evaluated_branches = [(action_name, branch, 0.0) for branch in branches]
+        elif action_name == "transit" or action_name == "transport":
+            for branch in branches:
+                start_pos = branch['start_pose'].name
+                target_pos = branch['target_pose'].name
+                start_pos = self.world.pose_dict[start_pos].position
+                target_pos = self.world.pose_dict[target_pos].position
+
+                cost = np.linalg.norm(np.array(start_pos) - np.array(target_pos))
+                evaluated_branches.append((action_name, branch, cost))
 
         return evaluated_branches
 
@@ -196,11 +221,21 @@ class OrderedLandmarksPlanner:
         """
             Backtrack until current state is alive and has branches to explore.
         """
+        print("----------Backtracking----------")
         while not self.current_linked_state.branches_to_explore:
             parent_action_linked_state = self.current_linked_state.parent
-            if parent_action_linked_state is not None and parent_action_linked_state[1].status == StateStatus.ALIVE:
+            parent = parent_action_linked_state[1] if parent_action_linked_state is not None else None
+
+            print(f"Querying parent: {(parent.state_id, parent.status) if parent else None} from current state: {(self.current_linked_state.state_id, self.current_linked_state.status)}")
+
+            if parent_action_linked_state is not None:
                 self.current_linked_state = parent_action_linked_state[1]
                 self.current_state = self.current_linked_state.state
+                print(f"Backtracking to state id: {self.current_linked_state.state_id}, with {len(self.current_linked_state.branches_to_explore)} branches to explore.")
+            else:
+                print("No parent to backtrack to, terminating.")
+                break
 
+        print("----------Finished----------")
         self.world.update_entities_from_state(self.current_state)
         self.world.update_state()
