@@ -1,35 +1,13 @@
 import numpy as np
 
-from typing import Tuple, Dict, cast, List, Optional
-from copy import deepcopy
-
+from typing import Tuple, Dict, cast, List
 from modular_construction_task_planner.eas.core import (
     State, LinkedState,
-    Entity, Entities, StateStatus, World
+    Entity, StateStatus, World
 )
 from modular_construction_task_planner.scripts.block_domain import (
     Action, Object, PosEntity, Robot,
-    MoveAction, PickAction, PlaceAction
 )
-
-# Outline of the planner:
-# First make the exhaustive optimal planner
-# 1. Initialize LinkedState with initial state
-# 2. While current state is alive:
-#    a. If no branches, define branches
-#    b. Pop a branch and branch out to get to the next state, if no more branches, mark state as dead
-#    c. Update current state to new state, and connect the new state to the current state with the action taken
-#    d. If goal reached, add goal state to goal list and backtrack to a previous alive state
-# 3. Return all goal states
-
-# Branching out:
-# 1. Find the preferred action at the current state
-# 2. Find potential targets for the action, and create branches for each target
-#    a. Assign euclidean distance as cost for each branch
-# 3. If no targets, mark state as dead and backtrack
-
-# Backtrack
-# 1. If parent is not None and ALIVE, set current state to parent and mark current state as DEAD.
 
 class OrderedLandmarksPlanner:
     def __init__(self, world: World, action_dict: Dict[str, Action]) -> None:

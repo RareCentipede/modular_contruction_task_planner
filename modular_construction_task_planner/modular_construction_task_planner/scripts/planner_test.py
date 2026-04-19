@@ -1,8 +1,6 @@
-from copy import deepcopy
-from typing import Dict, List, Type, Tuple, Optional
 from modular_construction_task_planner.scripts.ordered_landmarks_planner import OrderedLandmarksPlanner
 from modular_construction_task_planner.eas.parser import parse_configs_to_world
-from modular_construction_task_planner.scripts.block_domain import PosEntity, Object, Robot, PickAction, PlaceAction, MoveAction
+from modular_construction_task_planner.scripts.block_domain import PickAction, PlaceAction, MoveAction
 
 problem_config_path = "src/object_rearrangement_ros2_sim/mpnp_simulation/config/problem_configs/"
 world = parse_configs_to_world("basic", problem_config_path)

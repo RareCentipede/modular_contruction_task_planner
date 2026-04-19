@@ -1,11 +1,7 @@
 from copy import deepcopy
-from typing import Dict, List, Type, Tuple, Optional
 from modular_construction_task_planner.scripts.block_domain import PosEntity, Object, Robot, PickAction, PlaceAction, MoveAction
 from modular_construction_task_planner.eas.core import (
     load_domains,
-    State,
-    LinkedState,
-    Entity,
     Entities,
     World
 )
