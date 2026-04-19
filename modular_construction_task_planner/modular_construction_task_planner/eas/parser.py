@@ -7,7 +7,8 @@ from modular_construction_task_planner.eas.core import (
     load_domains,
     Entities,
     World,
-    Pose
+    Pose,
+    State
 )
 from modular_construction_task_planner.scripts.block_domain import (
     Object,
@@ -31,11 +32,8 @@ def parse_configs_to_world(config_name: str, problem_config_path: str) -> World:
     load_domains(domains)
     entities = create_entities(domains)
     pose_dict = assign_entities_variable_values_and_create_pose_dict(init_config, goal_config, entities)
-    world = World(entities, pose_dict=pose_dict)
-    goal_entities_dict = {
-        Object: ['at']
-    }
-    world.goal_entities_dict = goal_entities_dict
+    goal_state = define_goal_state(entities)
+    world = World(entities, pose_dict=pose_dict, goal_state=goal_state)
 
     return world
 
@@ -136,6 +134,20 @@ def assign_entities_variable_values_and_create_pose_dict(init_config: Dict, goal
                 obj_entity.goal.value = pos_entity.name
 
     return pose_dict
+
+def define_goal_state(entities: Entities) -> State:
+    goal_state = {}
+    obj_entities = cast(List[Object], entities.get_entities(Object))
+
+    for obj_entity in obj_entities:
+        if not obj_entity.goal.value:
+            continue
+
+        state_key = f"{obj_entity.name}_at"
+        state_val = obj_entity.goal.value
+        goal_state[state_key] = state_val
+
+    return goal_state
 
 problem_config_path = "src/object_rearrangement_ros2_sim/mpnp_simulation/config/problem_configs/"
 
