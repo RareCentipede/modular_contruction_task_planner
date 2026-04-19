@@ -35,15 +35,17 @@ class OrderedLandmarksPlanner:
 
             action_name, action_params, cost = weighted_branch
             action = self.action_dict[action_name]
-            print(f"Executing: {action_name} with params {[str(param) + ': ' + str(ent.state) for param, ent in action_params.items()]} and cost {cost}")
+            print(f"Executing: {action_name} with params {[str(param) + ': ' + str(ent.state) \
+                for param, ent in action_params.items()]} and cost {cost}")
             action.execute(action_params)
 
             self.world.update_state()
 
             new_state = self.world.current_state
             self.state_counter += 1
+            action_log = (action_name, tuple(f"{param}: {ent.name}" for param, ent in action_params.items()))
             new_linked_state = LinkedState(self.state_counter, new_state, parent=(action_name, self.current_linked_state),
-                                           cost=cost)
+                                           cost=cost, action_from_parent=action_log)
             self.current_linked_state.children.append((action_name, new_linked_state))
             self.current_linked_state = new_linked_state
             self.current_state = new_state
@@ -204,12 +206,18 @@ class OrderedLandmarksPlanner:
             parent_action_linked_state = self.current_linked_state.parent
             parent = parent_action_linked_state[1] if parent_action_linked_state is not None else None
 
-            print(f"Querying parent: {(parent.state_id, parent.status) if parent else None} from current state: {(self.current_linked_state.state_id, self.current_linked_state.status)}")
+            print(
+                f"Querying parent: {(parent.state_id, parent.status) if parent else None}"
+                f" from current state: {(self.current_linked_state.state_id, self.current_linked_state.status)}"
+            )
 
             if parent_action_linked_state is not None:
                 self.current_linked_state = parent_action_linked_state[1]
                 self.current_state = self.current_linked_state.state
-                print(f"Backtracking to state id: {self.current_linked_state.state_id}, with {len(self.current_linked_state.branches_to_explore)} branches to explore.")
+                print(
+                    f"Backtracking to state id: {self.current_linked_state.state_id},"
+                    f" with {len(self.current_linked_state.branches_to_explore)} branches to explore."
+                )
             else:
                 print("No parent to backtrack to, terminating.")
                 break

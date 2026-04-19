@@ -118,9 +118,11 @@ def assign_entities_variable_values_and_create_pose_dict(init_config: Dict, goal
         pos_counter += 1
 
     robot_entity = cast(Robot, entities.get_entities('robot'))
-    robot_entity.at.value = pos_entities[pos_counter+1].name
+    robot_entity.at.value = pos_entities[pos_counter].name
+    pose_dict[pos_entities[pos_counter].name] = Pose(init_config['robot']['position'],
+                                                     init_config['robot']['orientation'])
 
-    for obj_name, info, pos_entity in zip(goal_config.keys(), goal_config.values(), pos_entities[pos_counter:-2]):
+    for obj_name, info, pos_entity in zip(goal_config.keys(), goal_config.values(), pos_entities[pos_counter+1:-2]):
         pos_val = info['position']
 
         if pos_val not in init_pos_vals:

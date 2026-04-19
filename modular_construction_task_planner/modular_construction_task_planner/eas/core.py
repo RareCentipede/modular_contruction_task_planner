@@ -188,6 +188,7 @@ class LinkedState:
     children: List[Tuple[str, 'LinkedState']] = field(default_factory=list) # List of expanded (action_name, LinkedState) pairs
     cost: float = 0.0
     goal: bool = False
+    action_from_parent: Optional[Tuple[str, Tuple[str, ...]]] = None # (action_name, involved_entities) that led to this state from parent
 
     # List of potential branches: (action_name, action_params, cost)
     _branches_to_explore: List[Tuple[str, Dict[str, Entity], float]] = field(default_factory=list)
