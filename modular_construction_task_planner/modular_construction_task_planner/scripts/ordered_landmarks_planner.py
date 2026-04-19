@@ -45,6 +45,10 @@ class OrderedLandmarksPlanner:
         robot = self.world.entities.get_entities("robot")
         self.robot = cast(Robot, robot)
 
+        blocks = self.world.entities.get_entities(Object)
+        blocks = cast(List[Object], blocks)
+        self.goal_positions = [b.goal.value for b in blocks]
+
     def run_optimal_planner(self) -> List[LinkedState]:
         while self.current_linked_state.status == StateStatus.ALIVE:
             self.branch_out(self.current_linked_state)
@@ -61,8 +65,9 @@ class OrderedLandmarksPlanner:
                                            cost=cost)
             self.current_linked_state.children.append((action_name, new_linked_state))
             self.current_linked_state = new_linked_state
+            self.current_state = new_state
 
-            if self.world.goal_reached():
+            if self.world.goal_reached:
                 self.current_linked_state.goal = True
                 self.goal_linked_states.append(self.current_linked_state)
                 self.backtrack()
@@ -77,24 +82,108 @@ class OrderedLandmarksPlanner:
         if linked_state.branches_to_explore:
             return
 
-    def get_preferred_action(self, state: State) -> Optional[str]:
-        """
-            Find the preferred action to perform at the given state. None if no preferred action can be found.
-        """
-        
-        pass
+        preferred_action_name = self.get_preferred_action()
+        branches = self.define_branches_based_on_action(preferred_action_name, linked_state.state)
+        weighted_branches = self.evaluate_branches(branches, preferred_action_name)
+        linked_state.branches_to_explore = weighted_branches
 
-    def define_branches_based_on_action(self, action_name: str, state: State) -> Optional[List[Dict[str, Entity]]]:
+    def get_preferred_action(self) -> str:
+        """
+            Find the preferred action to perform at the given state.
+        """
+        robot_pos = self.robot.at.value
+        gripper_empty = self.robot.gripper_empty.value
+
+        blocks = self.world.entities.get_entities(Object)
+        blocks = cast(List[Object], blocks)
+        current_block_positions = [b.at.value for b in blocks]
+
+        if robot_pos in current_block_positions and gripper_empty and robot_pos not in self.goal_positions:
+            preferred_action_name = "pick"
+        elif robot_pos in self.goal_positions and not gripper_empty:
+            preferred_action_name = "place"
+        else:
+            # These two are just move actions, but it's good to disinguish these two cases to help with target selection.
+            if gripper_empty:
+                preferred_action_name = "transit"
+            else:
+                preferred_action_name = "transport"
+
+        return preferred_action_name
+
+    def define_branches_based_on_action(self, action_name: str, state: State) -> List[Dict[str, Entity]]:
         """
             Define branches based on the given action name and state. Returns a list of dictionaries of action parameters
             for the preferred action, with each element being a set of potential parameters for the action, or None if no
             branches can be defined. This is either no targets can be found or if all potential targets are not
             applicable.
         """
-        
-        pass
+        branches = []
+        robot_pos = self.robot.at.value
+        robot_pos = cast(str, robot_pos)
+        current_pos_entity = self.world.entities.get_entities(robot_pos)
+        current_pos_entity = cast(PosEntity, current_pos_entity)
 
-    def evaluate_branches(self, branches: List[Dict[str, Entity]], action_name: str) -> List[Tuple[Dict[str, Entity], float]]:
+        match action_name:
+            case "pick":
+                obj_at_pos = current_pos_entity.occupied_by.value
+                if obj_at_pos is not None:
+                    obj_entity = self.world.entities.get_entities(obj_at_pos)
+                    obj_entity = cast(Object, obj_entity)
+
+                    branch_params = {
+                        'robot': self.robot,
+                        'object': obj_entity,
+                        'object_pose': current_pos_entity
+                    }
+                    branches.append(branch_params)
+            case "place":
+                current_pos_clear = current_pos_entity.clear.value
+                if current_pos_clear:
+                    obj_in_gripper = cast(Object, self.robot.holding.value)
+                    if obj_in_gripper.goal.value == current_pos_entity.name:
+                        branch_params = {
+                            'robot': self.robot,
+                            'object': obj_in_gripper,
+                            'target_pose': current_pos_entity
+                        }
+                        branches.append(branch_params)
+            case "transit":
+                potential_target_objs = cast(List[Object], self.world.not_at_goal_entities)
+                potential_target_pos_vals = [obj.at.value for obj in potential_target_objs]
+                for target_pos in potential_target_pos_vals:
+                    if not target_pos:
+                        continue
+
+                    pos_entity = cast(PosEntity, self.world.entities.get_entities(target_pos))
+                    branch_params = {
+                        'robot': self.robot,
+                        'start_pose': current_pos_entity,
+                        'target_pose': pos_entity
+                    }
+                    branches.append(branch_params)
+
+            case "transport":
+                obj_in_gripper = cast(Object, self.robot.holding.value)
+                target_pos_val = cast(str, obj_in_gripper.goal.value)
+                target_pos_entity = cast(PosEntity, self.world.entities.get_entities(target_pos_val))
+                branch_params = {
+                    'robot': self.robot,
+                    'start_pose': current_pos_entity,
+                    'target_pose': target_pos_entity
+                }
+                branches.append(branch_params)
+
+            case _:
+                pass
+
+        for branch in branches:
+            if not self.action_dict[action_name].check(branch):
+                branches.remove(branch)
+
+        return branches
+
+    def evaluate_branches(self, branches: List[Dict[str, Entity]], action_name: str) -> List[Tuple[str, Dict[str, Entity], float]]:
         """
             Evaluate the given branches and return a list of tuples of the branch and its cost, which is defined as the
             euclidean distance between the robot and the target. The branch with the lowest cost will be explored first.
