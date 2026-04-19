@@ -231,26 +231,16 @@ class World:
     states: List[State] = field(default_factory=list)
     goal_state: State = field(default_factory=dict)
 
-    # Name of entity and goal-relevant variables for that entity.
-    goal_entities_dict: Dict[Type, List[str]] = field(default_factory=dict)
-
     @property
     def current_state(self) -> State:
         return self.states[-1] if self.states else {}
 
     @property
     def goal_reached(self) -> bool:
-        goal_entities = []
-
-        for ent_type in self.goal_entities_dict.keys():
-            goal_entities.append(self.entities.get_entities(ent_type))
-
-        for entities, var_names in zip(goal_entities, self.goal_entities_dict.values()):
-            for ent in entities:
-                for var_name in var_names:
-                    var_key = f"{ent.name}_{var_name}"
-                    if self.current_state.get(var_key) != getattr(ent, var_name).value:
-                        return False
+        for state_key, state_val in self.goal_state.items():
+            current_val = self.current_state.get(state_key)
+            if current_val != state_val:
+                return False
 
         return True
 
