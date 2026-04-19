@@ -231,6 +231,9 @@ class World:
     states: List[State] = field(default_factory=list)
     goal_state: State = field(default_factory=dict)
 
+    def __post_init__(self):
+        self.update_state()
+
     @property
     def current_state(self) -> State:
         return self.states[-1] if self.states else {}
