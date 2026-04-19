@@ -244,6 +244,18 @@ class World:
 
         return True
 
+    @property
+    def not_at_goal_entities(self) -> List[Entity]:
+        not_at_goal_entities = []
+        for state_key, state_val in self.goal_state.items():
+            current_val = self.current_state.get(state_key)
+            if current_val != state_val:
+                ent_name = state_key.split("_")[0]
+                entity = self.entities.get_entities(ent_name)
+                not_at_goal_entities.append(entity)
+
+        return not_at_goal_entities
+
     def update_state(self) -> State:
         new_state = deepcopy(self.current_state)
 
