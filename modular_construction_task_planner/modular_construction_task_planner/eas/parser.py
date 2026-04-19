@@ -32,6 +32,10 @@ def parse_configs_to_world(config_name: str, problem_config_path: str) -> World:
     entities = create_entities(domains)
     pose_dict = assign_entities_variable_values_and_create_pose_dict(init_config, goal_config, entities)
     world = World(entities, pose_dict=pose_dict)
+    goal_entities_dict = {
+        Object: ['at']
+    }
+    world.goal_entities_dict = goal_entities_dict
 
     return world
 
