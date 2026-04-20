@@ -1,3 +1,5 @@
+import rclpy
+
 from rclpy.node import Node
 from yaml import safe_load
 from typing import List, Tuple
@@ -86,3 +88,17 @@ class ModularConstructionTaskPlanner(Node):
 
         task_plan.actions = actions
         return task_plan
+
+def main():
+    rclpy.init()
+    task_planner_node = ModularConstructionTaskPlanner()
+    try:
+        rclpy.spin(task_planner_node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        task_planner_node.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()

@@ -24,6 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            "task_planner = modular_construction_task_planner.modular_construction_task_planner:main"
         ],
     },
 )
