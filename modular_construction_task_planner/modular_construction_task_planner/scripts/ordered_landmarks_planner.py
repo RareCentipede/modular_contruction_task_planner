@@ -43,7 +43,7 @@ class OrderedLandmarksPlanner:
 
             new_state = self.world.current_state
             self.state_counter += 1
-            action_log = (action_name, tuple(f"{param}: {ent.name}" for param, ent in action_params.items()))
+            action_log = (action_name, tuple(f"{ent.name}" for ent in action_params.values()))
             new_linked_state = LinkedState(self.state_counter, new_state, parent=(action_name, self.current_linked_state),
                                            cost=cost, action_from_parent=action_log)
             self.current_linked_state.children.append((action_name, new_linked_state))
