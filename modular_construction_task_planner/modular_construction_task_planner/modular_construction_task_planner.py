@@ -16,7 +16,7 @@ class ModularConstructionTaskPlanner(Node):
     def __init__(self):
         super().__init__('modular_construction_task_planner')
         self.srv = self.create_service(PlanConstructionTask,
-                                       'plan_construction_task',
+                                       '/tamp/plan_construction_task',
                                        self.plan_construction_task_service)
         self.action_dict = {
             'transit': MoveAction,
