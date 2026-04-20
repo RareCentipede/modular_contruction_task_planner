@@ -35,7 +35,7 @@ class OrderedLandmarksPlanner:
 
             action_name, action_params, cost = weighted_branch
             action = self.action_dict[action_name]
-            print(f"Executing: {action_name} with params {[str(param) + ': ' + str(ent.state) \
+            print(f"Executing: {action_name} with params {[str(param) + ': ' + str(ent.name) \
                 for param, ent in action_params.items()]} and cost {cost}")
             action.execute(action_params)
 
@@ -54,6 +54,8 @@ class OrderedLandmarksPlanner:
                 print("GOAL REACHED!")
                 self.current_linked_state.goal = True
                 self.goal_linked_states.append(self.current_linked_state)
+                print(f"{len(self.goal_linked_states)} goal linked states found so far.")
+
                 self.backtrack()
 
         return self.goal_linked_states
@@ -72,7 +74,7 @@ class OrderedLandmarksPlanner:
             return
 
         preferred_action_name = self.get_preferred_action()
-        branches = self.define_branches_based_on_action(preferred_action_name, linked_state.state)
+        branches = self.define_branches_based_on_action(preferred_action_name)
         weighted_branches = self.evaluate_branches(branches, preferred_action_name)
         linked_state.branches_to_explore = weighted_branches
 
@@ -100,7 +102,7 @@ class OrderedLandmarksPlanner:
 
         return preferred_action_name
 
-    def define_branches_based_on_action(self, action_name: str, state: State) -> List[Dict[str, Entity]]:
+    def define_branches_based_on_action(self, action_name: str) -> List[Dict[str, Entity]]:
         """
             Define branches based on the given action name and state. Returns a list of dictionaries of action parameters
             for the preferred action, with each element being a set of potential parameters for the action, or None if no
@@ -143,7 +145,7 @@ class OrderedLandmarksPlanner:
 
             case "transit":
                 potential_target_objs = cast(List[Object], self.world.not_at_goal_entities)
-                potential_target_pos_vals = [obj.at.value for obj in potential_target_objs]
+                potential_target_pos_vals = [obj.at.value for obj in potential_target_objs if obj.goal.value]
                 for target_pos in potential_target_pos_vals:
                     if not target_pos:
                         continue
