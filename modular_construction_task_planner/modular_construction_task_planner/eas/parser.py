@@ -15,6 +15,20 @@ from modular_construction_task_planner.scripts.block_domain import (
     PosEntity,
     Robot
 )
+from mpnp_interfaces.msg import Block
+
+def parse_block_list_to_world(block_list: List[Block]) -> World:
+    world = World(entities=Entities([]), pose_dict={})
+
+    # Since all poses are PoseStamped() now, the symbols can use the frame ids and values, which will be aligned with
+    # the world manager's pose dict
+
+    # Iterate through blocks and create entities and pose dict entries, with
+    # block_names as block.name and pose frame ids as pos names
+
+    # Further, create additional domains from block.base_positions
+
+    return world
 
 def parse_configs_to_world(config_name: str, problem_config_path: str) -> World:
     init_path = problem_config_path + config_name + "/init.yaml"
