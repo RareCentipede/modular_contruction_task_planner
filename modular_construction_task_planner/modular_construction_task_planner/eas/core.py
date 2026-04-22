@@ -40,7 +40,7 @@ class Variable:
         if self.domain not in VarDomains:
             raise ValueError(f"Domain {self.domain!r} is not defined in VarDomains.")
         if v is not None and v not in VarDomains[self.domain]:
-            raise ValueError(f"{v!r} not in domain {VarDomains[self.domain]}")
+            raise ValueError(f"{v!r} not in domain {self.domain}: {VarDomains[self.domain]}")
         self._value = v
 
     def __call__(self, index: Optional[int] = None) -> Optional[Any]:
@@ -108,14 +108,18 @@ class Condition:
     target: Any
     negate: bool = False
 
-    def __call__(self, src_entity: Entity, target_entity: Optional[Entity] = None) -> str:
+    def __call__(self, src_entity: Entity, target_entity: Optional[Entity] = None, verbose: bool = False) -> bool:
         variables = vars(src_entity)
         var = variables.get(self.src_var_type)
         if var is None:
-            return f"Condition {self.name} failed: {src_entity.name} has no variable of type {self.src_var_type}"
+            raise ValueError(f"Condition {self.name} failed: {src_entity.name} has no variable of type {self.src_var_type}")
         if var.value != target_entity.name if target_entity else self.target:
-            return f"Condition {self.name} failed: {src_entity.name}_{self.src_var_type}={var.value} != {target_entity}"
-        return f"Condition {self.name} passed: {src_entity.name}_{self.src_var_type}={var.value} == {target_entity}"
+            if verbose:
+                print(f"Condition {self.name} failed: {src_entity.name}_{self.src_var_type}={var.value} != {target_entity}")
+            return False
+        if verbose:
+            print(f"Condition {self.name} passed: {src_entity.name}_{self.src_var_type}={var.value} == {target_entity}")
+        return True
 
 @dataclass
 class Effect:
@@ -124,16 +128,20 @@ class Effect:
     src_var_type: str
     target: Any
 
-    def __call__(self, src_entity: Entity, target_entity: Optional[Entity] = None) -> str:
+    def __call__(self, src_entity: Entity, target_entity: Optional[Entity] = None, verbose: bool = False) -> bool:
         variables = vars(src_entity)
         var = variables.get(self.src_var_type)
         if var is None:
-            return f"Effect {self.name} failed: {src_entity.name} has no variable of type {self.src_var_type}"
+            if verbose:
+                print(f"Effect {self.name} failed: {src_entity.name} has no variable of type {self.src_var_type}")
+            return False
         try:
             var.value = target_entity.name if target_entity else self.target
-            return f"Effect {self.name} applied: {src_entity.name}_{self.src_var_type} set to {var.value}"
+            if verbose:
+                print(f"Effect {self.name} applied: {src_entity.name}_{self.src_var_type} set to {var.value}")
+            return True
         except ValueError as e:
-            return f"Effect {self.name} failed to apply: {e}"
+            raise RuntimeError(f"Effect {self.name} failed to apply: {e}")
 
 @dataclass
 class Action:
@@ -150,7 +158,7 @@ class Action:
                                   got {type(entities[ent_name]).__name__}")
         return True
 
-    def check(self, param_entities: Dict[str, Entity]) -> bool:
+    def check(self, param_entities: Dict[str, Entity], verbose: bool = False) -> bool:
         self._type_check(param_entities)
         entities = {ent_name: param_entities[ent_name] for ent_name in self.params}
 
@@ -158,12 +166,16 @@ class Action:
             src_entity = entities[cond.src_entity_name]
             target = entities[cond.target] if isinstance(cond.target, str) else None
 
-            if not cond(src_entity, target):
-                return False
+            try:
+                if not cond(src_entity, target, verbose=verbose):
+                    return False
+            except ValueError as e:
+                raise RuntimeError(f"Condition {cond.name} check failed with error: {e}")
+
         self._checked = True
         return True
 
-    def execute(self, param_entities: Dict[str, Entity]) -> None:
+    def execute(self, param_entities: Dict[str, Entity], verbose: bool = False) -> None:
         if self._checked is None:
             raise RuntimeError(f"Action {self.name} not checked before execution.")
         elif not self._checked:
@@ -175,7 +187,10 @@ class Action:
         for eff in self.effects:
             src_entity = entities[eff.src_entity_name]
             target_entity = entities.get(eff.target) if isinstance(eff.target, str) else None
-            eff(src_entity, target_entity)
+            try:
+                eff(src_entity, target_entity, verbose=verbose)
+            except ValueError as e:
+                raise RuntimeError(f"Effect {eff.name} failed to apply: {e}")
 
     def __str__(self) -> str:
         return f"({self.name}])"
