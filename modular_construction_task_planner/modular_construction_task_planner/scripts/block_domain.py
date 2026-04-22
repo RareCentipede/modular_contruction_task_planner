@@ -54,6 +54,10 @@ class Holding(Variable):
     domain: str = 'block'
 
 @dataclass
+class RobotAt(Variable):
+    domain: str = 'robo_pos'
+
+@dataclass
 class Object(Entity):
     at: At = field(default_factory=At)
     at_top: AtTop = field(default_factory=AtTop)
@@ -78,7 +82,7 @@ class PosEntity(Entity):
 
 @dataclass
 class Robot(Entity):
-    at: At = field(default_factory=At)
+    at: RobotAt = field(default_factory=RobotAt)
     gripper_empty: GripperEmpty = field(default_factory=GripperEmpty)
     holding: Holding = field(default_factory=Holding)
 

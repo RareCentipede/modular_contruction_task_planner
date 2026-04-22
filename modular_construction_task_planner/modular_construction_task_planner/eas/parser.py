@@ -18,15 +18,85 @@ from modular_construction_task_planner.scripts.block_domain import (
 from mpnp_interfaces.msg import Block
 
 def parse_block_list_to_world(block_list: List[Block]) -> World:
-    world = World(entities=Entities([]), pose_dict={})
+    block_var_domain = []
+    robo_pos_var_domain = []
+    pos_var_domain = []
+    bool_var_domain = (True, False)
 
-    # Since all poses are PoseStamped() now, the symbols can use the frame ids and values, which will be aligned with
-    # the world manager's pose dict
+    entities = []
+    pose_dict = {}
 
-    # Iterate through blocks and create entities and pose dict entries, with
-    # block_names as block.name and pose frame ids as pos names
+    for block in block_list:
+        block_var_domain.append(block.name)
+        pos_var_domain.append(block.init_pose.header.frame_id)
+        pos_var_domain.append(block.goal_pose.header.frame_id)
 
-    # Further, create additional domains from block.base_positions
+        init_pose = Pose(
+            position=[block.init_pose.pose.position.x,
+                      block.init_pose.pose.position.y,
+                      block.init_pose.pose.position.z],
+            orientation=[block.init_pose.pose.orientation.x,
+                         block.init_pose.pose.orientation.y,
+                         block.init_pose.pose.orientation.z,
+                         block.init_pose.pose.orientation.w]
+        )
+        pose_dict[block.init_pose.header.frame_id] = init_pose
+
+        if block.goal_pose.header.frame_id != '':
+            goal_pose = Pose(
+                position=[block.goal_pose.pose.position.x,
+                          block.goal_pose.pose.position.y,
+                          block.goal_pose.pose.position.z],
+                orientation=[block.goal_pose.pose.orientation.x,
+                             block.goal_pose.pose.orientation.y,
+                             block.goal_pose.pose.orientation.z,
+                             block.goal_pose.pose.orientation.w]
+            )
+            pose_dict[block.goal_pose.header.frame_id] = goal_pose
+
+        for base_pos in block.base_positions:
+            robo_pos_var_domain.append(base_pos.header.frame_id)
+            base_pose = Pose(
+                position=[base_pos.pose.position.x,
+                          base_pos.pose.position.y,
+                          base_pos.pose.position.z],
+                orientation=[base_pos.pose.orientation.x,
+                             base_pos.pose.orientation.y,
+                             base_pos.pose.orientation.z,
+                             base_pos.pose.orientation.w]
+            )
+            pose_dict[base_pos.header.frame_id] = base_pose
+
+    pos_var_domain.append('g')
+    pos_var_domain.append('')
+    block_var_domain.append('g')
+    block_var_domain.append('')
+
+    domains = {
+        'pos': tuple(pos_var_domain),
+        'robo_pos': tuple(robo_pos_var_domain),
+        'block': tuple(block_var_domain),
+        'bool': bool_var_domain
+    }
+    load_domains(domains)
+    entities = create_entities(domains)
+
+    for block in block_list:
+        block_name = block.name
+        block_entity = cast(Object, entities.get_entities(block_name))
+
+        init_pose_name = block.init_pose.header.frame_id
+        block_entity.at.value = init_pose_name
+        block_entity.goal.value = block.goal_pose.header.frame_id if not block.goal_pose.header.frame_id == '' else None
+        block_entity.on.value = cast(PosEntity, entities.get_entities('g')).name
+
+        init_pos_entity = cast(PosEntity, entities.get_entities(init_pose_name))
+        init_pos_entity.occupied_by.value = block_entity.name
+        init_pos_entity.on.value = cast(PosEntity, entities.get_entities('g')).name
+        init_pos_entity.clear.value = False
+
+    goal_state = define_goal_state(entities)
+    world = World(entities, pose_dict, goal_state=goal_state)
 
     return world
 
@@ -165,9 +235,13 @@ def define_goal_state(entities: Entities) -> State:
 
     return goal_state
 
-problem_config_path = "src/object_rearrangement_ros2_sim/mpnp_simulation/config/problem_configs/"
+def main():
+    problem_config_path = "src/object_rearrangement_ros2_sim/mpnp_simulation/config/problem_configs/"
 
-world = parse_configs_to_world("basic", problem_config_path)
+    world = parse_configs_to_world("basic", problem_config_path)
 
-for ent in world.entities.entities:
-    print(ent.state)
+    for ent in world.entities.entities:
+        print(ent.state)
+
+if __name__ == "__main__":
+    main()
