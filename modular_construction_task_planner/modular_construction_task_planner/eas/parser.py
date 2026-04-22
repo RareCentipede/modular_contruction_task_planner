@@ -27,8 +27,11 @@ def parse_block_list_to_world(block_list: List[Block], robot_init_pose: PoseStam
 
     entities = []
     pose_dict = {}
+    place_pose_dict = {}
 
     robo_pos_var_domain.append(robot_init_pose.header.frame_id)
+    pos_var_domain.append(robot_init_pose.header.frame_id)
+
     pose_dict[robot_init_pose.header.frame_id] = Pose(
         position=[robot_init_pose.pose.position.x,
                   robot_init_pose.pose.position.y,
@@ -66,8 +69,16 @@ def parse_block_list_to_world(block_list: List[Block], robot_init_pose: PoseStam
             )
             pose_dict[block.goal_pose.header.frame_id] = goal_pose
 
-        for base_pos in block.base_positions:
-            robo_pos_var_domain.append(base_pos.header.frame_id)
+        target_base_names = []
+        for i, base_pos in enumerate(block.base_positions):
+            base_pos_name = base_pos.header.frame_id
+            target_base_name = f"{block.name}_place_pose{i}"
+            target_base_names.append(target_base_name)
+
+            robo_pos_var_domain.append(base_pos_name)
+            robo_pos_var_domain.append(target_base_name)
+
+            # Also add place poses to the domain as placeholders
             base_pose = Pose(
                 position=[base_pos.pose.position.x,
                           base_pos.pose.position.y,
@@ -77,7 +88,8 @@ def parse_block_list_to_world(block_list: List[Block], robot_init_pose: PoseStam
                              base_pos.pose.orientation.z,
                              base_pos.pose.orientation.w]
             )
-            pose_dict[base_pos.header.frame_id] = base_pose
+            pose_dict[base_pos_name] = base_pose
+        place_pose_dict[block.name] = target_base_names
 
     pos_var_domain.append('g')
     pos_var_domain.append('')
@@ -99,14 +111,16 @@ def parse_block_list_to_world(block_list: List[Block], robot_init_pose: PoseStam
         init_pose_name = block.init_pose.header.frame_id
         init_pos_entity = cast(PosEntity, entities.get_entities(init_pose_name))
         init_pos_entity.on.value = cast(PosEntity, entities.get_entities('g')).name
+        init_pos_entity.clear.value = False
+        init_pos_entity.occupied_by.value = block_name
 
         block_entity = cast(Object, entities.get_entities(block_name))
         block_entity.goal.value = block.goal_pose.header.frame_id if not block.goal_pose.header.frame_id == '' else None
         block_entity.on.value = cast(PosEntity, entities.get_entities('g')).name
-        init_pos_entity.clear.value = False
-        init_pos_entity.occupied_by.value = block_entity.name
-
         block_entity.at.value = init_pose_name
+        bps = [base_pos.header.frame_id for base_pos in block.base_positions]
+        block_entity.reachable_from = bps
+        block_entity.placeable_from = place_pose_dict[block_name]
 
     robot_entity = cast(Robot, entities.get_entities('robot'))
     robot_entity.at.value = robot_init_pose.header.frame_id
@@ -194,6 +208,9 @@ def create_entities(domains: Dict[str, Tuple]) -> Entities:
         entities.append(Object(block))
     for pos in domains['pos']:
         entities.append(PosEntity(pos))
+    for robo_pos in domains['robo_pos']:
+        if robo_pos not in domains['pos']:
+            entities.append(PosEntity(robo_pos))
     entities.append(Robot('robot'))
 
     return Entities(entities)
