@@ -1,3 +1,6 @@
+import numpy as np
+
+from scipy.spatial.transform import Rotation as R
 from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, List, Type, Tuple, FrozenSet
@@ -19,6 +22,19 @@ def load_domains(domains: Dict[str, Tuple[Any, ...]]) -> None:
 class Pose:
     position: List[float]
     orientation: List[float]
+
+    @property
+    def homogeneous(self) -> np.ndarray:
+        T = np.eye(4)
+        rotation = R.from_euler('xyz', self.orientation)
+        T[:3, :3] = rotation.as_matrix()
+        T[:3, 3] = self.position
+        return T
+
+    def transform_to_frame(self, from_pose: 'Pose', to_pose: 'Pose') -> np.ndarray:
+        from_frame = from_pose.homogeneous
+        to_frame = to_pose.homogeneous
+        return np.linalg.inv(to_frame) @ from_frame @ self.homogeneous
 
 @dataclass
 class Variable:
@@ -42,6 +58,11 @@ class Variable:
         if v is not None and v not in VarDomains[self.domain]:
             raise ValueError(f"{v!r} not in domain {self.domain}: {VarDomains[self.domain]}")
         self._value = v
+
+    def get_domain(self) -> Tuple[Any, ...]:
+        if self.domain not in VarDomains:
+            raise ValueError(f"Domain {self.domain!r} is not defined in VarDomains.")
+        return VarDomains[self.domain]
 
     def __call__(self, index: Optional[int] = None) -> Optional[Any]:
         """
@@ -92,11 +113,11 @@ class Entities:
             self._entities_by_type[ent_type].append(ent)
             self._entities_by_name[ent.name] = ent
 
-    def get_entities(self, key: str | Type[Entity]) -> Entity | List[Entity]:
+    def get_entities(self, key: str | Type[Entity]) -> Optional[Entity | List[Entity]]:
         if isinstance(key, str):
-            return self._entities_by_name[key]
+            return self._entities_by_name.get(key)
         elif isinstance(key, type) and issubclass(key, Entity):
-            return self._entities_by_type[key]
+            return self._entities_by_type.get(key)
         else:
             raise KeyError(f"Invalid key type: {key}. Must be str or Type[Entity].")
 
