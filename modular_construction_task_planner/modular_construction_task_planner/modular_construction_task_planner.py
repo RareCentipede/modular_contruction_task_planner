@@ -9,7 +9,7 @@ from mpnp_interfaces.srv import PlanConstructionTask
 
 from modular_construction_task_planner.scripts.ordered_landmarks_planner import OrderedLandmarksPlanner
 from modular_construction_task_planner.eas.core import LinkedState
-from modular_construction_task_planner.eas.parser import parse_configs_to_world
+from modular_construction_task_planner.eas.parser import parse_configs_to_world, parse_block_list_to_world
 from modular_construction_task_planner.scripts.block_domain import PickAction, PlaceAction, MoveAction
 
 class ModularConstructionTaskPlanner(Node):
@@ -27,7 +27,15 @@ class ModularConstructionTaskPlanner(Node):
 
     def plan_construction_task_service(self, request, response):
         try:
-            world = parse_configs_to_world(request.config_name, request.problem_config_path)
+            if request.blocks:
+                self.get_logger().info("Parsing block list from request to create world representation.")
+                world = parse_block_list_to_world(request.blocks)
+                for entity in world.entities.entities:
+                    self.get_logger().info(f"Entity: {entity.name}, State: {entity.state}")
+                self.get_logger().info(f"Pose dict names: {list(world.pose_dict.keys())}")
+            else:
+                self.get_logger().info("Parsing configuration files to create world representation.")
+                world = parse_configs_to_world(request.config_name, request.problem_config_path)
         except Exception as e:
             self.get_logger().error(f"Failed to parse configuration: {e}")
             response.success = False
