@@ -29,7 +29,7 @@ class ModularConstructionTaskPlanner(Node):
         try:
             if request.blocks:
                 self.get_logger().info("Parsing block list from request to create world representation.")
-                world = parse_block_list_to_world(request.blocks)
+                world = parse_block_list_to_world(request.blocks, request.robot_init_pose)
                 for entity in world.entities.entities:
                     self.get_logger().info(f"Entity: {entity.name}, State: {entity.state}")
                 self.get_logger().info(f"Pose dict names: {list(world.pose_dict.keys())}")

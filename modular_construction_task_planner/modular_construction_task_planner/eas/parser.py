@@ -3,6 +3,8 @@ import numpy as np
 from yaml import safe_load
 from typing import Dict, List, Tuple, cast
 from scipy.spatial import cKDTree
+
+from geometry_msgs.msg import PoseStamped
 from modular_construction_task_planner.eas.core import (
     load_domains,
     Entities,
@@ -17,7 +19,7 @@ from modular_construction_task_planner.scripts.block_domain import (
 )
 from mpnp_interfaces.msg import Block
 
-def parse_block_list_to_world(block_list: List[Block]) -> World:
+def parse_block_list_to_world(block_list: List[Block], robot_init_pose: PoseStamped) -> World:
     block_var_domain = []
     robo_pos_var_domain = []
     pos_var_domain = []
@@ -25,6 +27,16 @@ def parse_block_list_to_world(block_list: List[Block]) -> World:
 
     entities = []
     pose_dict = {}
+
+    robo_pos_var_domain.append(robot_init_pose.header.frame_id)
+    pose_dict[robot_init_pose.header.frame_id] = Pose(
+        position=[robot_init_pose.pose.position.x,
+                  robot_init_pose.pose.position.y,
+                  robot_init_pose.pose.position.z],
+        orientation=[robot_init_pose.pose.orientation.x,
+                     robot_init_pose.pose.orientation.y,
+                     robot_init_pose.pose.orientation.z]
+    )
 
     for block in block_list:
         block_var_domain.append(block.name)
@@ -83,17 +95,26 @@ def parse_block_list_to_world(block_list: List[Block]) -> World:
 
     for block in block_list:
         block_name = block.name
-        block_entity = cast(Object, entities.get_entities(block_name))
 
         init_pose_name = block.init_pose.header.frame_id
-        block_entity.at.value = init_pose_name
+        init_pos_entity = cast(PosEntity, entities.get_entities(init_pose_name))
+        init_pos_entity.on.value = cast(PosEntity, entities.get_entities('g')).name
+
+        block_entity = cast(Object, entities.get_entities(block_name))
         block_entity.goal.value = block.goal_pose.header.frame_id if not block.goal_pose.header.frame_id == '' else None
         block_entity.on.value = cast(PosEntity, entities.get_entities('g')).name
-
-        init_pos_entity = cast(PosEntity, entities.get_entities(init_pose_name))
-        init_pos_entity.occupied_by.value = block_entity.name
-        init_pos_entity.on.value = cast(PosEntity, entities.get_entities('g')).name
         init_pos_entity.clear.value = False
+        init_pos_entity.occupied_by.value = block_entity.name
+
+        block_entity.at.value = init_pose_name
+
+    robot_entity = cast(Robot, entities.get_entities('robot'))
+    robot_entity.at.value = robot_init_pose.header.frame_id
+
+    print(f"Domains:\n{domains}\n")
+
+    for ent in entities.entities:
+        print(ent.state)
 
     goal_state = define_goal_state(entities)
     world = World(entities, pose_dict, goal_state=goal_state)
