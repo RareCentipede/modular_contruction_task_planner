@@ -1,8 +1,9 @@
+import glob
 import numpy as np
 
 from typing import Tuple, Dict, cast, List
 from modular_construction_task_planner.eas.core import (
-    State, LinkedState,
+    Pose, State, LinkedState,
     Entity, StateStatus, World
 )
 from modular_construction_task_planner.scripts.block_domain import (
@@ -17,7 +18,6 @@ class OrderedLandmarksPlanner:
 
         self.current_state: State = world.current_state
         self.s0: LinkedState = LinkedState(self.state_counter, self.current_state)
-        print(f"Initial state: {self.current_state}")
         self.current_linked_state: LinkedState = self.s0
         self.goal_linked_states: List[LinkedState] = []
 
@@ -26,7 +26,10 @@ class OrderedLandmarksPlanner:
 
         blocks = self.world.entities.get_entities(Object)
         blocks = cast(List[Object], blocks)
+
         self.goal_positions = [b.goal.value for b in blocks]
+        self.pick_positions = [b.reachable_from for b in blocks if b.goal.value]
+        self.pick_positions = [pos for sublist in self.pick_positions for pos in sublist]
 
     def run_optimal_planner(self) -> List[LinkedState]:
         while self.current_linked_state.status == StateStatus.ALIVE:
@@ -85,13 +88,11 @@ class OrderedLandmarksPlanner:
         robot_pos = self.robot.at.value
         gripper_empty = self.robot.gripper_empty.value
 
-        blocks = self.world.entities.get_entities(Object)
-        blocks = cast(List[Object], blocks)
-        current_block_positions = [b.at.value for b in blocks]
-
-        if robot_pos in current_block_positions and gripper_empty and robot_pos not in self.goal_positions:
+        # Since now there are many options for picking and placing positions for each object,
+        # we need to perform preferred action selection differently.
+        if robot_pos in self.pick_positions and gripper_empty:
             preferred_action_name = "pick"
-        elif robot_pos in self.goal_positions and not gripper_empty:
+        elif self.robot.at_goal.value and not gripper_empty:
             preferred_action_name = "place"
         else:
             # These two are just move actions, but it's good to disinguish these two cases to help with target selection.
@@ -114,20 +115,21 @@ class OrderedLandmarksPlanner:
         robot_pos = cast(str, robot_pos)
         current_pos_entity = self.world.entities.get_entities(robot_pos)
         current_pos_entity = cast(PosEntity, current_pos_entity)
-
+        print(f"Defining branches for action: {action_name} at robot position: {robot_pos}")
         match action_name:
             case "pick":
-                obj_at_pos = current_pos_entity.occupied_by.value
-                if obj_at_pos is not None:
-                    obj_entity = self.world.entities.get_entities(obj_at_pos)
-                    obj_entity = cast(Object, obj_entity)
-
-                    branch_params = {
-                        'robot': self.robot,
-                        'object': obj_entity,
-                        'object_pose': current_pos_entity
-                    }
-                    branches.append(branch_params)
+                potential_target_objs = cast(List[Object], self.world.not_at_goal_entities)
+                for potential_obj in potential_target_objs:
+                    if robot_pos in potential_obj.reachable_from:
+                        obj_pos = cast(str, potential_obj.at.value)
+                        obj_pos_entity = cast(PosEntity, self.world.entities.get_entities(obj_pos))
+                        branch_params = {
+                            'robot': self.robot,
+                            'object': potential_obj,
+                            'object_pose': obj_pos_entity
+                        }
+                        branches.append(branch_params)
+                print(f"Branches defined for pick: {branches}")
 
             case "place":
                 current_pos_clear = current_pos_entity.clear.value
@@ -145,7 +147,9 @@ class OrderedLandmarksPlanner:
 
             case "transit":
                 potential_target_objs = cast(List[Object], self.world.not_at_goal_entities)
-                potential_target_pos_vals = [obj.at.value for obj in potential_target_objs if obj.goal.value]
+                potential_target_pos_vals = [obj.reachable_from for obj in potential_target_objs if obj.goal.value]
+                potential_target_pos_vals = [pos for sublist in potential_target_pos_vals for pos in sublist]
+
                 for target_pos in potential_target_pos_vals:
                     if not target_pos:
                         continue
@@ -162,11 +166,34 @@ class OrderedLandmarksPlanner:
                 obj_in_gripper = cast(str, self.robot.holding.value)
                 obj_entity_in_gripper = cast(Object, self.world.entities.get_entities(obj_in_gripper))
                 target_pos_val = cast(str, obj_entity_in_gripper.goal.value)
-                target_pos_entity = cast(PosEntity, self.world.entities.get_entities(target_pos_val))
+
+                obj_current_pose_name = cast(str, obj_entity_in_gripper.at.value)
+                obj_current_pose = self.world.pose_dict[obj_current_pose_name]
+                target_pose = self.world.pose_dict[target_pos_val]
+
+                # Compute transformation matrix and apply it to the robot's current pose to get the target pose for the robot.
+                robot_current_pose_name = cast(str, self.robot.at.value)
+                robot_current_pose = self.world.pose_dict[robot_current_pose_name]
+                robot_place_pose = robot_current_pose.transform_to_frame(obj_current_pose, target_pose)
+
+                obj_in_gripper_entity = cast(Object, self.world.entities.get_entities(obj_in_gripper))
+                placeable_pose_names = obj_in_gripper_entity.placeable_from
+
+                for placeable_pose_name in placeable_pose_names:
+                    placeable_pos_entity = self.world.entities.get_entities(placeable_pose_name)
+                    if not placeable_pos_entity:
+                        place_pos_entity = PosEntity(placeable_pose_name)
+                        self.world.pose_dict[placeable_pose_name] = Pose(
+                            position=robot_place_pose.tolist(),
+                            orientation=[0, 0, 0]
+                        )
+                if not place_pos_entity:
+                    raise ValueError(f"Placeable pose {placeable_pose_name} not found in entities and somehow not created.")
+
                 branch_params = {
                     'robot': self.robot,
                     'start_pose': current_pos_entity,
-                    'target_pose': target_pos_entity
+                    'target_pose': placeable_pos_entity
                 }
                 branches.append(branch_params)
 
@@ -174,7 +201,7 @@ class OrderedLandmarksPlanner:
                 pass
 
         for branch in branches:
-            if not self.action_dict[action_name].check(branch):
+            if not self.action_dict[action_name].check(branch, verbose=True):
                 branches.remove(branch)
 
         return branches
