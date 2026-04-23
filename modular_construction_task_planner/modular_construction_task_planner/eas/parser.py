@@ -38,7 +38,8 @@ def parse_block_list_to_world(block_list: List[Block], robot_init_pose: PoseStam
                   robot_init_pose.pose.position.z],
         orientation=[robot_init_pose.pose.orientation.x,
                      robot_init_pose.pose.orientation.y,
-                     robot_init_pose.pose.orientation.z]
+                     robot_init_pose.pose.orientation.z,
+                     robot_init_pose.pose.orientation.w]
     )
 
     for block in block_list:
