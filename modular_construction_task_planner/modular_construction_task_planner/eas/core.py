@@ -26,7 +26,7 @@ class Pose:
     @property
     def homogeneous(self) -> np.ndarray:
         T = np.eye(4)
-        rotation = R.from_euler('xyz', self.orientation)
+        rotation = R.from_quat(self.orientation)
         T[:3, :3] = rotation.as_matrix()
         T[:3, 3] = self.position
         return T
@@ -134,12 +134,14 @@ class Condition:
         var = variables.get(self.src_var_type)
         if var is None:
             raise ValueError(f"Condition {self.name} failed: {src_entity.name} has no variable of type {self.src_var_type}")
-        if var.value != target_entity.name if target_entity else self.target:
+
+        target_val = target_entity.name if target_entity is not None else self.target
+        if var.value != target_val:
             if verbose:
-                print(f"Condition {self.name} failed: {src_entity.name}_{self.src_var_type}={var.value} != {target_entity}")
+                print(f"Condition {self.name} failed: {src_entity.name}_{self.src_var_type}={var.value} != {target_val}")
             return False
         if verbose:
-            print(f"Condition {self.name} passed: {src_entity.name}_{self.src_var_type}={var.value} == {target_entity}")
+            print(f"Condition {self.name} passed: {src_entity.name}_{self.src_var_type}={var.value} == {target_val}")
         return True
 
 @dataclass
@@ -157,7 +159,7 @@ class Effect:
                 print(f"Effect {self.name} failed: {src_entity.name} has no variable of type {self.src_var_type}")
             return False
         try:
-            var.value = target_entity.name if target_entity else self.target
+            var.value = target_entity.name if target_entity is not None else self.target
             if verbose:
                 print(f"Effect {self.name} applied: {src_entity.name}_{self.src_var_type} set to {var.value}")
             return True
