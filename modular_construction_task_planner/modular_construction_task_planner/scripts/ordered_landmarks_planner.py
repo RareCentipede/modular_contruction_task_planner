@@ -1,6 +1,6 @@
-import glob
 import numpy as np
 
+from math import factorial
 from typing import Tuple, Dict, cast, List
 from modular_construction_task_planner.eas.core import (
     Pose, State, LinkedState,
@@ -30,6 +30,18 @@ class OrderedLandmarksPlanner:
         self.goal_positions = [b.goal.value for b in blocks]
         self.pick_positions = [b.reachable_from for b in blocks if b.goal.value]
         self.pick_positions = [pos for sublist in self.pick_positions for pos in sublist]
+        self.place_positions = [b.placeable_from for b in blocks if b.goal.value]
+        self.place_positions = [pos for sublist in self.place_positions for pos in sublist]
+
+        self.num_potential_solutions = factorial(len(blocks)-3)
+        print(f"Blocks: {[block.name for block in blocks]}")
+        print(f"Number of blocks: {len(blocks)}-3")
+        for block in blocks:
+            if not block.goal.value:
+                continue
+            print(f"Block {block.name} can be reached from {len(block.reachable_from)} positions")
+            self.num_potential_solutions *= len(block.reachable_from)
+        print(f"Number of potential solutions: {self.num_potential_solutions}")
 
     def run_optimal_planner(self) -> List[LinkedState]:
         while self.current_linked_state.status == StateStatus.ALIVE:
@@ -38,8 +50,8 @@ class OrderedLandmarksPlanner:
 
             action_name, action_params, cost = weighted_branch
             action = self.action_dict[action_name]
-            print(f"Executing: {action_name} with params {[str(param) + ': ' + str(ent.name) \
-                for param, ent in action_params.items()]} and cost {cost}")
+            # print(f"Executing: {action_name} with params {[str(param) + ': ' + str(ent.name) \
+            #     for param, ent in action_params.items()]} and cost {cost}")
             action.execute(action_params)
 
             self.world.update_state()
@@ -57,7 +69,7 @@ class OrderedLandmarksPlanner:
                 print("GOAL REACHED!")
                 self.current_linked_state.goal = True
                 self.goal_linked_states.append(self.current_linked_state)
-                print(f"{len(self.goal_linked_states)} goal linked states found so far.")
+                print(f"{len(self.goal_linked_states)} goal linked states found so far. {len(self.goal_linked_states)}/{self.num_potential_solutions} potential solutions explored.")
 
                 self.backtrack()
 
@@ -92,7 +104,7 @@ class OrderedLandmarksPlanner:
         # we need to perform preferred action selection differently.
         if robot_pos in self.pick_positions and gripper_empty:
             preferred_action_name = "pick"
-        elif self.robot.at_goal.value and not gripper_empty:
+        elif robot_pos in self.place_positions and not gripper_empty:
             preferred_action_name = "place"
         else:
             # These two are just move actions, but it's good to disinguish these two cases to help with target selection.
@@ -115,7 +127,12 @@ class OrderedLandmarksPlanner:
         robot_pos = cast(str, robot_pos)
         current_pos_entity = self.world.entities.get_entities(robot_pos)
         current_pos_entity = cast(PosEntity, current_pos_entity)
-        print(f"Defining branches for action: {action_name} at robot position: {robot_pos}")
+        # print(f"Defining branches for action: {action_name} at robot position: {robot_pos}")
+
+        # Think about if these checks for pick and place are necessary, since:
+        # 1. Preferred action selection should have already filtered out some states
+        # 2. The condition check at the end should be responsible for filtering out invalid branches.
+        # For now just keep doing hacky solutions lol
         match action_name:
             case "pick":
                 potential_target_objs = cast(List[Object], self.world.not_at_goal_entities)
@@ -129,19 +146,20 @@ class OrderedLandmarksPlanner:
                             'object_pose': obj_pos_entity
                         }
                         branches.append(branch_params)
-                print(f"Branches defined for pick: {branches}")
 
             case "place":
                 current_pos_clear = current_pos_entity.clear.value
                 if current_pos_clear:
                     obj_in_gripper = cast(str, self.robot.holding.value)
                     obj_entity_in_gripper = cast(Object, self.world.entities.get_entities(obj_in_gripper))
+                    obj_goal_pos = cast(str, obj_entity_in_gripper.goal.value)
+                    obj_goal_pos_entity = cast(PosEntity, self.world.entities.get_entities(obj_goal_pos))
 
-                    if obj_entity_in_gripper.goal.value == current_pos_entity.name:
+                    if current_pos_entity.name in obj_entity_in_gripper.placeable_from:
                         branch_params = {
                             'robot': self.robot,
                             'object': obj_entity_in_gripper,
-                            'target_pose': current_pos_entity
+                            'target_pose': obj_goal_pos_entity
                         }
                         branches.append(branch_params)
 
@@ -179,16 +197,19 @@ class OrderedLandmarksPlanner:
                 obj_in_gripper_entity = cast(Object, self.world.entities.get_entities(obj_in_gripper))
                 placeable_pose_names = obj_in_gripper_entity.placeable_from
 
+                # IMPORTANT: Need to publish these new tfs to the world, otherwise motion planning cannot be done.
+                # Might be easier to calculate and publish all of them in WorldManager, and make sure the name is consistent
+                # with pick placement poses, so I can just find the matching name to get the corresponding place pose.
+                placeable_pos_entity = None
                 for placeable_pose_name in placeable_pose_names:
+                    placeable_pose = self.world.pose_dict.get(placeable_pose_name)
                     placeable_pos_entity = self.world.entities.get_entities(placeable_pose_name)
-                    if not placeable_pos_entity:
-                        place_pos_entity = PosEntity(placeable_pose_name)
+                    if not placeable_pose:
                         self.world.pose_dict[placeable_pose_name] = Pose(
-                            position=robot_place_pose.tolist(),
-                            orientation=[0, 0, 0]
+                            position=robot_place_pose[:3, 3].tolist(),
+                            orientation=[0, 0, 0, 1]
                         )
-                if not place_pos_entity:
-                    raise ValueError(f"Placeable pose {placeable_pose_name} not found in entities and somehow not created.")
+                        break
 
                 branch_params = {
                     'robot': self.robot,
@@ -201,7 +222,7 @@ class OrderedLandmarksPlanner:
                 pass
 
         for branch in branches:
-            if not self.action_dict[action_name].check(branch, verbose=True):
+            if not self.action_dict[action_name].check(branch):
                 branches.remove(branch)
 
         return branches
@@ -230,27 +251,27 @@ class OrderedLandmarksPlanner:
         """
             Backtrack until current state is alive and has branches to explore.
         """
-        print("----------Backtracking----------")
+        # print("----------Backtracking----------")
         while not self.current_linked_state.branches_to_explore:
             parent_action_linked_state = self.current_linked_state.parent
             parent = parent_action_linked_state[1] if parent_action_linked_state is not None else None
 
-            print(
-                f"Querying parent: {(parent.state_id, parent.status) if parent else None}"
-                f" from current state: {(self.current_linked_state.state_id, self.current_linked_state.status)}"
-            )
+            # print(
+            #     f"Querying parent: {(parent.state_id, parent.status) if parent else None}"
+            #     f" from current state: {(self.current_linked_state.state_id, self.current_linked_state.status)}"
+            # )
 
             if parent_action_linked_state is not None:
                 self.current_linked_state = parent_action_linked_state[1]
                 self.current_state = self.current_linked_state.state
-                print(
-                    f"Backtracking to state id: {self.current_linked_state.state_id},"
-                    f" with {len(self.current_linked_state.branches_to_explore)} branches to explore."
-                )
+                # print(
+                #     f"Backtracking to state id: {self.current_linked_state.state_id},"
+                #     f" with {len(self.current_linked_state.branches_to_explore)} branches to explore."
+                # )
             else:
                 print("No parent to backtrack to, terminating.")
                 break
 
-        print("----------Finished----------")
+        # print("----------Finished----------")
         self.world.update_entities_from_state(self.current_state)
         self.world.update_state()
