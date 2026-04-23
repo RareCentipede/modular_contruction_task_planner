@@ -124,7 +124,7 @@ pick_parameters = {
     'object_pose': PosEntity
 }
 pick_conditions = [
-    Condition('robot_at_object', 'robot', 'at', 'object_pose'),
+    # Condition('robot_at_object', 'robot', 'at', 'object_pose'),
     Condition('object_at_pose', 'object', 'at', 'object_pose'),
     Condition('gripper_empty', 'robot', 'gripper_empty', True),
     Condition('holding_nothing', 'robot', 'holding', None),
@@ -133,10 +133,10 @@ pick_conditions = [
 pick_effects = [
     Effect('pick_object', 'robot', 'holding', 'object'),
     Effect('gripper_not_empty', 'robot', 'gripper_empty', False),
-    Effect('object_no_longer_at_pose', 'object', 'at', None),
+    # Effect('object_no_longer_at_pose', 'object', 'at', None),
     Effect('object_pose_clear', 'object_pose', 'clear', True),
     Effect('object_pose_occupied_by_none', 'object_pose', 'occupied_by', None),
-    Effect('object_on_none', 'object', 'on', None),
+    # Effect('object_on_none', 'object', 'on', None),
 ]
 PickAction = Action('pick', pick_parameters, pick_conditions, pick_effects)
 
@@ -166,7 +166,7 @@ place_parameters = {
     'target_pose': PosEntity
 }
 place_conditions = [
-    Condition('robot_at_target', 'robot', 'at', 'target_pose'),
+    # Condition('robot_at_target', 'robot', 'at', 'target_pose'),
     Condition('gripper_holding_object', 'robot', 'holding', 'object'),
     Condition('target_pose_clear', 'target_pose', 'clear', True),
     Condition('object_supported', 'object', 'supported', True)
