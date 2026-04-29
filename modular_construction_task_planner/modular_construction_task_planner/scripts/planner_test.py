@@ -1,6 +1,6 @@
 from modular_construction_task_planner.scripts.ordered_landmarks_planner import OrderedLandmarksPlanner
-from modular_construction_task_planner.eas.parser import parse_configs_to_world
-from modular_construction_task_planner.scripts.block_domain import PickAction, PlaceAction, MoveAction, PosEntity
+from modular_construction_task_planner.eas.config_parser_world_basic import parse_configs_to_world
+from modular_construction_task_planner.scripts.block_domain import PickAction, PlaceAction, MoveAction
 
 problem_config_path = "src/object_rearrangement_ros2_sim/mpnp_simulation/config/problem_configs/"
 world = parse_configs_to_world("basic", problem_config_path)
