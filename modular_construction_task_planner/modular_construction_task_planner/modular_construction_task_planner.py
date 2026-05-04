@@ -9,7 +9,8 @@ from mpnp_interfaces.srv import PlanConstructionTask
 
 from modular_construction_task_planner.scripts.ordered_landmarks_planner import OrderedLandmarksPlanner
 from modular_construction_task_planner.eas.core import LinkedState
-from modular_construction_task_planner.eas.parser import parse_configs_to_world, parse_block_list_to_world
+from modular_construction_task_planner.eas.config_parser_world_basic import parse_configs_to_world
+from modular_construction_task_planner.eas.block_list_parser_world import parse_block_list_to_world
 from modular_construction_task_planner.scripts.block_domain import PickAction, PlaceAction, MoveAction
 
 class ModularConstructionTaskPlanner(Node):
