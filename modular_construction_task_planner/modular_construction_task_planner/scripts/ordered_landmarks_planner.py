@@ -69,7 +69,8 @@ class OrderedLandmarksPlanner:
                 print("GOAL REACHED!")
                 self.current_linked_state.goal = True
                 self.goal_linked_states.append(self.current_linked_state)
-                print(f"{len(self.goal_linked_states)} goal linked states found so far. {len(self.goal_linked_states)}/{self.num_potential_solutions} potential solutions explored.")
+                print(f"{len(self.goal_linked_states)} goal linked states found so far. {len(self.goal_linked_states)}/"
+                      f"{self.num_potential_solutions} potential solutions explored.")
 
                 self.backtrack()
 
