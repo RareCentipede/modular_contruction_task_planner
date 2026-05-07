@@ -1,5 +1,6 @@
 import numpy as np
 
+from enum import Enum
 from math import factorial
 from typing import Tuple, Dict, cast, List
 from modular_construction_task_planner.eas.core import (
@@ -9,6 +10,8 @@ from modular_construction_task_planner.eas.core import (
 from modular_construction_task_planner.scripts.block_domain import (
     Action, Object, PosEntity, Robot,
 )
+
+HEURISTIC = Enum('HEURISTIC', 'LAZY_GREEDY GREEDY DILIGENT_GREEDY')
 
 class OrderedLandmarksPlanner:
     def __init__(self, world: World, action_dict: Dict[str, Action]) -> None:
@@ -76,7 +79,44 @@ class OrderedLandmarksPlanner:
 
         return self.goal_linked_states
 
-    def branch_out(self, linked_state: LinkedState) -> None:
+    def run_heuristic_planner(self, heuristic: HEURISTIC = HEURISTIC.LAZY_GREEDY) -> List[LinkedState]:
+        while self.current_linked_state.status == StateStatus.ALIVE:
+            self.branch_out(self.current_linked_state, heuristic)
+            if not self.current_linked_state.branches_to_explore:
+                print("No branches to explore, backtracking...")
+                self.backtrack()
+                continue
+
+            weighted_branch = min(self.current_linked_state.branches_to_explore, key=lambda x: x[2])
+
+            action_name, action_params, cost = weighted_branch
+            action = self.action_dict[action_name]
+            # print(f"Executing: {action_name} with params {[str(param) + ': ' + str(ent.name) \
+                # for param, ent in action_params.items()]} and cost {cost}")
+            action.execute(action_params)
+
+            self.world.update_state()
+
+            new_state = self.world.current_state
+            self.state_counter += 1
+            action_log = (action_name, tuple(f"{ent.name}" for ent in action_params.values()))
+            new_linked_state = LinkedState(self.state_counter, new_state, parent=(action_name, self.current_linked_state),
+                                           cost=cost, action_from_parent=action_log)
+            self.current_linked_state.children.append((action_name, new_linked_state))
+            self.current_linked_state = new_linked_state
+            self.current_state = new_state
+
+            if self.world.goal_reached:
+                print("GOAL REACHED using lazy heuristic!")
+                self.current_linked_state.goal = True
+                self.goal_linked_states.append(self.current_linked_state)
+                print(f"{len(self.goal_linked_states)} goal linked states found so far. {len(self.goal_linked_states)}/"
+                      f"{self.num_potential_solutions} potential solutions explored.")
+                break
+
+        return self.goal_linked_states
+
+    def branch_out(self, linked_state: LinkedState, heuristic: HEURISTIC = HEURISTIC.LAZY_GREEDY) -> None:
         """
             Branch out from the current state by defining branches based on the preferred action and evaluating the branches.
             Assigns the weighted branches to the linked state.
@@ -91,7 +131,7 @@ class OrderedLandmarksPlanner:
 
         preferred_action_name = self.get_preferred_action()
         branches = self.define_branches_based_on_action(preferred_action_name)
-        weighted_branches = self.evaluate_branches(branches, preferred_action_name)
+        weighted_branches = self.evaluate_branches(branches, preferred_action_name, heuristic)
         linked_state.branches_to_explore = weighted_branches
 
     def get_preferred_action(self) -> str:
@@ -198,7 +238,8 @@ class OrderedLandmarksPlanner:
 
         return branches
 
-    def evaluate_branches(self, branches: List[Dict[str, Entity]], action_name: str) -> List[Tuple[str, Dict[str, Entity], float]]:
+    def evaluate_branches(self, branches: List[Dict[str, Entity]], action_name: str,
+                          heuristic: HEURISTIC = HEURISTIC.LAZY_GREEDY) -> List[Tuple[str, Dict[str, Entity], float]]:
         """
             Evaluate the given branches and return a list of tuples of the branch and its cost, which is defined as the
             euclidean distance between the robot and the target. The branch with the lowest cost will be explored first.

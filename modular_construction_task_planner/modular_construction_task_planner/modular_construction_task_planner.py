@@ -1,5 +1,6 @@
 import rclpy
 
+from copy import deepcopy
 from rclpy.node import Node
 from yaml import safe_load
 from typing import List, Tuple
@@ -32,12 +33,15 @@ class ModularConstructionTaskPlanner(Node):
                 self.get_logger().info("Parsing block list from request to create world representation.")
                 self.get_logger().info(f"Robot initial pose:\n{request.robot_init_pose}")
                 world = parse_block_list_to_world(request.blocks, request.robot_init_pose)
+                original_world = deepcopy(world)  # Keep a copy of the original world for logging
+
                 for entity in world.entities.entities:
                     self.get_logger().info(f"Entity: {entity.name}, State: {entity.state}")
                 self.get_logger().info(f"Pose dict names: {list(world.pose_dict.keys())}")
             else:
                 self.get_logger().info("Parsing configuration files to create world representation.")
                 world = parse_configs_to_world(request.config_name, request.problem_config_path)
+
         except Exception as e:
             self.get_logger().error(f"Failed to parse configuration: {e}")
             response.success = False
@@ -46,19 +50,25 @@ class ModularConstructionTaskPlanner(Node):
             return response
 
         planner = OrderedLandmarksPlanner(world, self.action_dict)
-        goal_linked_states = planner.run_optimal_planner()
+        # goal_linked_states = planner.run_optimal_planner()
 
-        if len(goal_linked_states) == 0:
-            self.get_logger().warn("No plan found for the given configuration.")
-            response.success = False
-            response.result = PlanConstructionTask.Response.PLANNING_FAILED
-            response.msg = "No plan found for the given configuration."
-            return response
+        # if len(goal_linked_states) == 0:
+        #     self.get_logger().warn("No plan found for the given configuration.")
+        #     response.success = False
+        #     response.result = PlanConstructionTask.Response.PLANNING_FAILED
+        #     response.msg = "No plan found for the given configuration."
+        #     return response
 
-        self.get_logger().info(f"{len(goal_linked_states)} goal linked states found.")
+        # self.get_logger().info(f"{len(goal_linked_states)} goal linked states found.")
 
-        best_plan, total_cost = self.retract_best_plan(goal_linked_states)
-        self.get_logger().info(f"Best plan with total cost {total_cost} found.")
+        # best_plan, total_cost = self.retract_best_plan(goal_linked_states)
+        # self.get_logger().info(f"Best plan with total cost {total_cost} found.")
+
+        # planner.world = original_world  # Reset the planner's world to the original for heuristic planning
+        heuristic_goal_linked_state = planner.run_heuristic_planner()
+        heuristic_plan, heuristic_cost = self.retract_best_plan(heuristic_goal_linked_state)
+        self.get_logger().info(f"Heuristic plan with total cost {heuristic_cost} found.")
+        best_plan = heuristic_plan
 
         response.plan = self.format_plan(best_plan)
         response.success = True
