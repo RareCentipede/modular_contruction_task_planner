@@ -11,7 +11,16 @@ from modular_construction_task_planner.scripts.block_domain import (
     Action, Object, PosEntity, Robot,
 )
 
-HEURISTIC = Enum('HEURISTIC', 'LAZY_GREEDY GREEDY DILIGENT_GREEDY')
+HEURISTIC = Enum('HEURISTIC', 'LAZY_GREEDY SIMPLE_GREEDY DILIGENT_GREEDY ANTICIPATORY_GREEDY')
+"""
+    LAZY_GREEDY: Only considers the euclidean distance to the target for the preferred action.
+    SIMPLE_GREEDY: Checks for collisions and adds lazy collision cost if applicable. Lazy collision cost is the arc length
+                   the robot needs to travel around the obstacle. The radius will be the the radius of the obstacle + the
+                   half with of the robot base.
+    DILIGENT_GREEDY: Runs full path planning for evaluation.
+    ANTICIPATORY_GREEDY: Considers the hindrance the current action places onto future actions.
+"""
+
 
 class OrderedLandmarksPlanner:
     def __init__(self, world: World, action_dict: Dict[str, Action]) -> None:
