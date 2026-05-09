@@ -66,17 +66,17 @@ class ModularConstructionTaskPlanner(Node):
 
         # planner.world = original_world  # Reset the planner's world to the original for heuristic planning
         h = HEURISTIC.SIMPLE_GREEDY
-        heuristic_goal_linked_state = planner.run_heuristic_planner(heuristic=h)
-        heuristic_plan, heuristic_cost = self.retract_best_plan(heuristic_goal_linked_state)
+        simple_greedy_heuristic_goal_state = planner.run_heuristic_planner(heuristic=h)
+        simple_greedy_plan, heuristic_cost = self.retract_best_plan(simple_greedy_heuristic_goal_state)
         self.get_logger().info(f"Heuristic {h.name} plan with total cost {heuristic_cost} found.")
-        best_plan = heuristic_plan
+        best_plan = simple_greedy_plan
 
         planner.world = original_world  # Reset the planner's world to the original for heuristic planning
         h = HEURISTIC.LAZY_GREEDY
-        heuristic_goal_linked_state = planner.run_heuristic_planner(heuristic=h)
-        heuristic_plan, heuristic_cost = self.retract_best_plan(heuristic_goal_linked_state)
+        lazy_greedy_heuristic_goal_state = planner.run_heuristic_planner(heuristic=h)
+        lazy_greedy_plan, heuristic_cost = self.retract_best_plan(lazy_greedy_heuristic_goal_state)
         self.get_logger().info(f"Heuristic {h.name} plan with total cost {heuristic_cost} found.")
-        best_plan = heuristic_plan
+        best_plan = lazy_greedy_plan
 
         response.plan = self.format_plan(best_plan)
         response.success = True

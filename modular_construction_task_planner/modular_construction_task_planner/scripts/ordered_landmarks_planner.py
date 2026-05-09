@@ -306,7 +306,7 @@ class OrderedLandmarksPlanner:
             if dist <= col_radius:
                 additional_cost = compute_arc_length(start_pos, target_pos, obstacle_positions[obj_idx], col_radius)
                 collision_cost += additional_cost
-                print(f"Potential collision detected with obstacle at distance {dist}. Adding collision cost {additional_cost}, total cost now {collision_cost}.")
+                # print(f"Potential collision detected with obstacle at distance {dist}. Adding collision cost {additional_cost}, total cost now {collision_cost}.")
 
         return collision_cost
 
