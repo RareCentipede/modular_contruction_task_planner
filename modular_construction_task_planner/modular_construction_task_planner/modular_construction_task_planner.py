@@ -8,7 +8,7 @@ from typing import List, Tuple
 from mpnp_interfaces.msg import Plan, TaskAction
 from mpnp_interfaces.srv import PlanConstructionTask
 
-from modular_construction_task_planner.scripts.ordered_landmarks_planner import OrderedLandmarksPlanner
+from modular_construction_task_planner.scripts.ordered_landmarks_planner import OrderedLandmarksPlanner, HEURISTIC
 from modular_construction_task_planner.eas.core import LinkedState
 from modular_construction_task_planner.eas.config_parser_world_basic import parse_configs_to_world
 from modular_construction_task_planner.eas.block_list_parser_world import parse_block_list_to_world
@@ -65,9 +65,17 @@ class ModularConstructionTaskPlanner(Node):
         # self.get_logger().info(f"Best plan with total cost {total_cost} found.")
 
         # planner.world = original_world  # Reset the planner's world to the original for heuristic planning
-        heuristic_goal_linked_state = planner.run_heuristic_planner()
+        h = HEURISTIC.SIMPLE_GREEDY
+        heuristic_goal_linked_state = planner.run_heuristic_planner(heuristic=h)
         heuristic_plan, heuristic_cost = self.retract_best_plan(heuristic_goal_linked_state)
-        self.get_logger().info(f"Heuristic plan with total cost {heuristic_cost} found.")
+        self.get_logger().info(f"Heuristic {h.name} plan with total cost {heuristic_cost} found.")
+        best_plan = heuristic_plan
+
+        planner.world = original_world  # Reset the planner's world to the original for heuristic planning
+        h = HEURISTIC.LAZY_GREEDY
+        heuristic_goal_linked_state = planner.run_heuristic_planner(heuristic=h)
+        heuristic_plan, heuristic_cost = self.retract_best_plan(heuristic_goal_linked_state)
+        self.get_logger().info(f"Heuristic {h.name} plan with total cost {heuristic_cost} found.")
         best_plan = heuristic_plan
 
         response.plan = self.format_plan(best_plan)

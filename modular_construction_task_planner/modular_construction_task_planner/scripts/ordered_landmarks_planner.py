@@ -263,10 +263,52 @@ class OrderedLandmarksPlanner:
                 start_pos = self.world.pose_dict[start_pos].position
                 target_pos = self.world.pose_dict[target_pos].position
 
-                cost = np.linalg.norm(np.array(start_pos) - np.array(target_pos))
+                match heuristic:
+                    case HEURISTIC.LAZY_GREEDY:
+                        cost = np.linalg.norm(np.array(start_pos) - np.array(target_pos))
+                    case HEURISTIC.SIMPLE_GREEDY:
+                        cost = self.simple_collision_heuristic(start_pos, target_pos)
+                    case HEURISTIC.DILIGENT_GREEDY:
+                        pass
+                    case HEURISTIC.ANTICIPATORY_GREEDY:
+                        pass
+                    case _:
+                        print(f"Unknown heuristic: {heuristic}, defaulting to lazy greedy.")
+                        cost = np.linalg.norm(np.array(start_pos) - np.array(target_pos))
+
+                # print(f"Evaluated branch for action {action_name} with target position {branch['target_pose'].name} has cost {cost}")
+
                 evaluated_branches.append((action_name, branch, cost))
 
         return evaluated_branches
+
+    def simple_collision_heuristic(self, start_pos: List[float], target_pos: List[float]) -> float:
+        """
+            Simple heuristic to check for potential collisions along the path from start_pos to target_pos. If there are
+            potential collisions, adds a cost based on the distance the robot needs to travel around the obstacle, which is
+            defined as the radius of the obstacle + half the width of the robot base.
+        """
+        start_target_vec = np.array(target_pos) - np.array(start_pos)
+
+        obstacle_entities = self.world.entities.get_entities(Object)
+        obstacle_entities = cast(List[Object], obstacle_entities)
+        obstacle_positions = [self.world.pose_dict[obs.at.value].position for obs in obstacle_entities if obs.at.value]
+
+        robot_radius = 0.6 / 2.0
+        block_radius = 0.15
+        col_radius = robot_radius + block_radius
+        collision_cost = np.linalg.norm(start_target_vec).item()
+
+        dists, scalings = compute_dists_from_points_to_vector(np.array(obstacle_positions), start_target_vec, np.array(start_pos))
+        dists = dists[(scalings >= 0) & (scalings <= 1)]
+
+        for obj_idx, dist in enumerate(dists):
+            if dist <= col_radius:
+                additional_cost = compute_arc_length(start_pos, target_pos, obstacle_positions[obj_idx], col_radius)
+                collision_cost += additional_cost
+                print(f"Potential collision detected with obstacle at distance {dist}. Adding collision cost {additional_cost}, total cost now {collision_cost}.")
+
+        return collision_cost
 
     def backtrack(self) -> None:
         """
@@ -296,3 +338,66 @@ class OrderedLandmarksPlanner:
         # print("----------Finished----------")
         self.world.update_entities_from_state(self.current_state)
         self.world.update_state()
+
+def compute_dists_from_points_to_vector(points: np.ndarray, vector: np.ndarray, start_point: np.ndarray, 
+                                        verbose: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+    """
+        Compute the shortest distances from a set of points to a vector.
+        1. Project each point onto the vector
+        2. Scale the original vector based on the projection.
+        3. Compute the difference between the vector to the point and the scaled vector on the original vector.
+        4. Compute the norm of the resultant vectors as the distance.
+    """
+    init_to_other_blocks_vecs = [np.array(other_pos) - np.array(start_point) for other_pos in points]
+    vecs_projected_on_init_goal_vec = np.array([np.dot(vec, vector) for vec in init_to_other_blocks_vecs])
+
+    vector_mag = np.linalg.norm(vector)
+    if vector_mag <= 1e-6:
+        projected_vecs_scaling_factors = np.zeros(len(init_to_other_blocks_vecs))
+    else:
+        projected_vecs_scaling_factors = vecs_projected_on_init_goal_vec / (vector_mag**2)
+
+    for i in range(len(projected_vecs_scaling_factors)):
+        projection = vecs_projected_on_init_goal_vec[i]
+
+        if abs(projection) <= 1e-6:
+            projected_vecs_scaling_factors[i] = np.linalg.norm(init_to_other_blocks_vecs[i]) / vector_mag \
+                                                                                               if vector_mag > 1e-6 \
+                                                                                               else 0.0
+
+    # If scaling == 0, need to do something different
+    scaled_projected_vecs = [scaling * vector for scaling in projected_vecs_scaling_factors]
+    dists = [np.linalg.norm(vec - proj_vec) if np.linalg.norm(proj_vec) > 1e-6 else 0.0 
+             for vec, proj_vec in zip(init_to_other_blocks_vecs, scaled_projected_vecs)]
+
+    if verbose:
+        print(f"Vector: {vector}, Start point: {start_point}")
+        for i, point in enumerate(points):
+            print(f"Point: {point}, Vector to point: {init_to_other_blocks_vecs[i]}, "
+                  f"Projected vector: {scaled_projected_vecs[i]}, Distance: {dists[i]}")
+
+    return np.array(dists), np.array(projected_vecs_scaling_factors)
+
+def compute_arc_length(start_pos: List[float], target_pos: List[float], obj_pos: List[float], col_radius: float) -> float:
+    """
+        Compute the arc length the robot needs to travel around the obstacle, which is defined as the radius of the
+        obstacle + half the width of the robot base.
+    """
+    start_target_vec = np.array(target_pos) - np.array(start_pos)
+    start_obj_vec = np.array(obj_pos) - np.array(start_pos)
+    target_obj_vec = np.array(obj_pos) - np.array(target_pos)
+
+    start_target_dist = np.linalg.norm(start_target_vec)
+    if start_target_dist <= 1e-6:
+        return 0.0
+
+    start_obj_dist = np.linalg.norm(start_obj_vec)
+    target_obj_dist = np.linalg.norm(target_obj_vec)
+
+    if start_obj_dist <= 1e-6 or target_obj_dist <= 1e-6:
+        return 0.0
+
+    angle_at_obstacle = np.arccos(np.clip(np.dot(start_obj_vec, target_obj_vec) / (start_obj_dist * target_obj_dist), -1.0, 1.0))
+    arc_length = angle_at_obstacle * col_radius
+
+    return arc_length
