@@ -11,14 +11,14 @@ from modular_construction_task_planner.scripts.block_domain import (
     Action, Object, PosEntity, Robot,
 )
 
-HEURISTIC = Enum('HEURISTIC', 'LAZY_GREEDY SIMPLE_GREEDY DILIGENT_GREEDY ANTICIPATORY_GREEDY')
+HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT ANTICIPATORY')
 """
-    LAZY_GREEDY: Only considers the euclidean distance to the target for the preferred action.
-    SIMPLE_GREEDY: Checks for collisions and adds lazy collision cost if applicable. Lazy collision cost is the arc length
-                   the robot needs to travel around the obstacle. The radius will be the the radius of the obstacle + the
-                   half with of the robot base.
-    DILIGENT_GREEDY: Runs full path planning for evaluation.
-    ANTICIPATORY_GREEDY: Considers the hindrance the current action places onto future actions.
+    LAZY: Only considers the euclidean distance to the target for the preferred action.
+    SIMPLE_COLLISION: Checks for collisions and adds lazy collision cost if applicable. Lazy collision cost is the arc length
+                       the robot needs to travel around the obstacle. The radius will be the the radius of the obstacle + the
+                       half with of the robot base.
+    DILIGENT: Runs full path planning for evaluation.
+    ANTICIPATORY: Considers the hindrance the current action places onto future actions.
 """
 
 
@@ -55,7 +55,7 @@ class OrderedLandmarksPlanner:
             self.num_potential_solutions *= len(block.reachable_from)
         print(f"Number of potential solutions: {self.num_potential_solutions}")
 
-    def run_optimal_planner(self) -> List[LinkedState]:
+    def run_bfs_planner(self) -> List[LinkedState]:
         while self.current_linked_state.status == StateStatus.ALIVE:
             self.branch_out(self.current_linked_state)
             weighted_branch = self.current_linked_state.branches_to_explore.pop(0)
@@ -88,7 +88,7 @@ class OrderedLandmarksPlanner:
 
         return self.goal_linked_states
 
-    def run_heuristic_planner(self, heuristic: HEURISTIC = HEURISTIC.LAZY_GREEDY) -> List[LinkedState]:
+    def run_heuristic_planner(self, heuristic: HEURISTIC = HEURISTIC.LAZY) -> List[LinkedState]:
         while self.current_linked_state.status == StateStatus.ALIVE:
             self.branch_out(self.current_linked_state, heuristic)
             if not self.current_linked_state.branches_to_explore:
@@ -125,7 +125,7 @@ class OrderedLandmarksPlanner:
 
         return self.goal_linked_states
 
-    def branch_out(self, linked_state: LinkedState, heuristic: HEURISTIC = HEURISTIC.LAZY_GREEDY) -> None:
+    def branch_out(self, linked_state: LinkedState, heuristic: HEURISTIC = HEURISTIC.LAZY) -> None:
         """
             Branch out from the current state by defining branches based on the preferred action and evaluating the branches.
             Assigns the weighted branches to the linked state.
@@ -248,7 +248,7 @@ class OrderedLandmarksPlanner:
         return branches
 
     def evaluate_branches(self, branches: List[Dict[str, Entity]], action_name: str,
-                          heuristic: HEURISTIC = HEURISTIC.LAZY_GREEDY) -> List[Tuple[str, Dict[str, Entity], float]]:
+                          heuristic: HEURISTIC = HEURISTIC.LAZY) -> List[Tuple[str, Dict[str, Entity], float]]:
         """
             Evaluate the given branches and return a list of tuples of the branch and its cost, which is defined as the
             euclidean distance between the robot and the target. The branch with the lowest cost will be explored first.
@@ -264,16 +264,16 @@ class OrderedLandmarksPlanner:
                 target_pos = self.world.pose_dict[target_pos].position
 
                 match heuristic:
-                    case HEURISTIC.LAZY_GREEDY:
+                    case HEURISTIC.LAZY:
                         cost = np.linalg.norm(np.array(start_pos) - np.array(target_pos))
-                    case HEURISTIC.SIMPLE_GREEDY:
+                    case HEURISTIC.SIMPLE_COLLISION:
                         cost = self.simple_collision_heuristic(start_pos, target_pos)
-                    case HEURISTIC.DILIGENT_GREEDY:
+                    case HEURISTIC.DILIGENT:
                         pass
-                    case HEURISTIC.ANTICIPATORY_GREEDY:
+                    case HEURISTIC.ANTICIPATORY:
                         pass
                     case _:
-                        print(f"Unknown heuristic: {heuristic}, defaulting to lazy greedy.")
+                        print(f"Unknown heuristic: {heuristic}, defaulting to lazy.")
                         cost = np.linalg.norm(np.array(start_pos) - np.array(target_pos))
 
                 # print(f"Evaluated branch for action {action_name} with target position {branch['target_pose'].name} has cost {cost}")

@@ -1,9 +1,10 @@
 import rclpy
+import numpy as np
 
 from copy import deepcopy
 from rclpy.node import Node
 from yaml import safe_load
-from typing import List, Tuple
+from typing import List, Tuple, cast
 
 from mpnp_interfaces.msg import Plan, TaskAction
 from mpnp_interfaces.srv import PlanConstructionTask
@@ -13,6 +14,7 @@ from modular_construction_task_planner.eas.core import LinkedState
 from modular_construction_task_planner.eas.config_parser_world_basic import parse_configs_to_world
 from modular_construction_task_planner.eas.block_list_parser_world import parse_block_list_to_world
 from modular_construction_task_planner.scripts.block_domain import PickAction, PlaceAction, MoveAction
+from path_planner.path_planner_node import GridGraph, OCCUPANCY
 
 class ModularConstructionTaskPlanner(Node):
     def __init__(self):
@@ -26,6 +28,7 @@ class ModularConstructionTaskPlanner(Node):
             'pick': PickAction,
             'place': PlaceAction
         }
+        self.gg: GridGraph | None = None
 
     def plan_construction_task_service(self, request, response):
         try:
@@ -34,6 +37,7 @@ class ModularConstructionTaskPlanner(Node):
                 self.get_logger().info(f"Robot initial pose:\n{request.robot_init_pose}")
                 world = parse_block_list_to_world(request.blocks, request.robot_init_pose)
                 original_world = deepcopy(world)  # Keep a copy of the original world for logging
+                self.gg = GridGraph(list(request.blocks), block_size=0.3)
 
                 for entity in world.entities.entities:
                     self.get_logger().info(f"Entity: {entity.name}, State: {entity.state}")
@@ -50,26 +54,14 @@ class ModularConstructionTaskPlanner(Node):
             return response
 
         planner = OrderedLandmarksPlanner(world, self.action_dict)
-        # goal_linked_states = planner.run_optimal_planner()
-
-        # if len(goal_linked_states) == 0:
-        #     self.get_logger().warn("No plan found for the given configuration.")
-        #     response.success = False
-        #     response.result = PlanConstructionTask.Response.PLANNING_FAILED
-        #     response.msg = "No plan found for the given configuration."
-        #     return response
-
-        # self.get_logger().info(f"{len(goal_linked_states)} goal linked states found.")
-
-        # best_plan, total_cost = self.retract_best_plan(goal_linked_states)
-        # self.get_logger().info(f"Best plan with total cost {total_cost} found.")
-
-        # planner.world = original_world  # Reset the planner's world to the original for heuristic planning
-        h = HEURISTIC.LAZY_GREEDY
+        h = HEURISTIC.LAZY
         lazy_greedy_heuristic_goal_state = planner.run_heuristic_planner(heuristic=h)
         lazy_greedy_plan, heuristic_cost = self.retract_best_plan(lazy_greedy_heuristic_goal_state)
         self.get_logger().info(f"Heuristic {h.name} plan with total cost {heuristic_cost} found.")
         best_plan = lazy_greedy_plan
+
+        full_nav_cost = self.compute_full_nav_cost(best_plan, planner)
+        self.get_logger().info(f"Total path planning cost for the plan: {full_nav_cost:.2f}")
 
         response.plan = self.format_plan(best_plan)
         response.success = True
@@ -109,6 +101,34 @@ class ModularConstructionTaskPlanner(Node):
 
         task_plan.actions = actions
         return task_plan
+
+    def compute_full_nav_cost(self, plan: List[Tuple[str, Tuple[str, ...]]], planner: OrderedLandmarksPlanner) -> float:
+        self.gg = cast(GridGraph, self.gg)  # Type hint for better code completion
+        pp_cost = 0.0
+        for action_name, params in plan:
+            match action_name:
+                case 'pick':
+                    obj_pos = planner.world.pose_dict[params[2]].position[:2]
+                    self.gg.update_block_move(obj_pos, OCCUPANCY.FREE)
+                case 'place':
+                    obj_pos = planner.world.pose_dict[params[2]].position[:2]
+                    self.gg.update_block_move(obj_pos, OCCUPANCY.OCCUPIED)
+                case 'transit' | 'transport':
+                    start_pos = planner.world.pose_dict[params[1]].position[:2]
+                    target_pos = planner.world.pose_dict[params[2]].position[:2]
+                    path = self.gg.plan(start_pos, target_pos)
+                    if path.size == 0:
+                        self.get_logger().error(f"No path found for action {action_name} from {start_pos} to {target_pos}.")
+                    else:
+                        path_length = np.sum(np.linalg.norm(np.diff(path, axis=0), axis=1))
+                        pp_cost += path_length
+                        self.get_logger().info(f"Path found for action {action_name} from {start_pos} to {target_pos} "
+                                               f"with length {path_length:.2f}.")
+                        # Optionally, visualize the path here using RViz or another tool
+                case _:
+                    self.get_logger().warning(f"Unknown action {action_name} in plan. Skipping...")
+
+        return pp_cost
 
 def main():
     rclpy.init()
