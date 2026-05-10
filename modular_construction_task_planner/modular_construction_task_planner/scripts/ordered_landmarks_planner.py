@@ -246,6 +246,10 @@ class OrderedLandmarksPlanner:
             if not self.action_dict[action_name].check(branch):
                 branches.remove(branch)
 
+            # Placeholder for stability computation. If not stable, prune the branch.
+            if action_name == "place":
+                stability = compute_placement_stability(branch['object'], self.world)
+
         return branches
 
     def evaluate_branches(self, branches: List[Dict[str, Entity]], action_name: str,
@@ -402,3 +406,9 @@ def compute_arc_length(start_pos: List[float], target_pos: List[float], obj_pos:
     arc_length = angle_at_obstacle * col_radius
 
     return arc_length
+
+def compute_placement_stability(object: Object, world: World) -> float:
+    """
+        Compute the stability of placing the object at its goal position based on the surfaces of the object and the normal of the surface it is being placed on. The more aligned the surface normal and the gravity vector, the more stable the placement is.
+    """
+    return 0.0
