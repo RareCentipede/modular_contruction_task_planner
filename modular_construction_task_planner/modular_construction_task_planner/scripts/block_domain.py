@@ -1,6 +1,6 @@
-from typing import List, Tuple
+from typing import List, Tuple, Callable
 from dataclasses import dataclass, field
-from modular_construction_task_planner.eas.core import Variable, Entity, State, Condition, Effect, Action
+from modular_construction_task_planner.eas.core import Variable, Entity, State, Condition, ComputedCondition, Effect, Action
 
 # Block variables
 @dataclass
@@ -98,6 +98,12 @@ class Robot(Entity):
         self.holding.value = None
         self.at_goal.value = False
 
+def robot_can_reach_object_grasp(robot: Robot, obj: Object) -> bool:
+    return robot.at.value in obj.reachable_from
+
+def robot_can_reach_object_place(robot: Robot, obj: Object) -> bool:
+    return robot.at.value in obj.placeable_from
+
 # Action definitions
 transit_parameters = {
     'robot': Robot,
@@ -106,17 +112,13 @@ transit_parameters = {
 }
 transit_conditions = [
     Condition('robot_at_start', 'robot', 'at', 'start_pose'),
-    Condition('robot_not_at_goal', 'robot', 'at_goal', False),
-    Condition('target_pose_clear', 'target_pose', 'clear', True),
-    # Condition('target_pose_reachable', 'target_object', 'reachable_from', 'target_pose') This needs to be different,
-    # it should be a computed predicate since we need to check if target_pose is in target_object.reachable_from
 ]
 transit_effects = [
     Effect('move_robot_to_target', 'robot', 'at', 'target_pose'),
-    Effect('robot_not_at_start', 'start_pose', 'occupied_by', None),
-    Effect('target_pose_occupied_by_robot', 'target_pose', 'occupied_by', 'robot'),
+    Effect('start_pose_clear', 'start_pose', 'clear', True),
     Effect('target_pose_not_clear', 'target_pose', 'clear', False),
 ]
+TransitAction = Action('transit', transit_parameters, transit_conditions, transit_effects)
 
 pick_parameters = {
     'robot': Robot,
@@ -124,7 +126,7 @@ pick_parameters = {
     'object_pose': PosEntity
 }
 pick_conditions = [
-    # Condition('robot_at_object', 'robot', 'at', 'object_pose'),
+    ComputedCondition('robot_can_reach_object', robot_can_reach_object_grasp, ('robot', 'object')),
     Condition('object_at_pose', 'object', 'at', 'object_pose'),
     Condition('gripper_empty', 'robot', 'gripper_empty', True),
     Condition('holding_nothing', 'robot', 'holding', None),
@@ -133,7 +135,7 @@ pick_conditions = [
 pick_effects = [
     Effect('pick_object', 'robot', 'holding', 'object'),
     Effect('gripper_not_empty', 'robot', 'gripper_empty', False),
-    # Effect('object_no_longer_at_pose', 'object', 'at', None),
+    Effect('object_no_longer_at_pose', 'object', 'at', None),
     Effect('object_pose_clear', 'object_pose', 'clear', True),
     Effect('object_pose_occupied_by_none', 'object_pose', 'occupied_by', None),
     # Effect('object_on_none', 'object', 'on', None),
@@ -142,23 +144,22 @@ PickAction = Action('pick', pick_parameters, pick_conditions, pick_effects)
 
 transport_parameters = {
     'robot': Robot,
-    'start_pos': PosEntity,
-    'target_pose': PosEntity
+    'start_pose': PosEntity,
+    'target_pose': PosEntity,
+    'object': Object
 }
 transport_conditions = [
-    Condition('robot_at_start', 'robot', 'at', 'start_pos'),
-    Condition('robot_not_at_goal', 'robot', 'at_goal', False),
+    Condition('robot_at_start', 'robot', 'at', 'start_pose'),
     Condition('gripper_not_empty', 'robot', 'gripper_empty', False),
     Condition('holding_object', 'robot', 'holding', 'object'),
     Condition('target_pos_clear', 'target_pose', 'clear', True)
 ]
 transport_effects = [
     Effect('move_robot_to_goal', 'robot', 'at', 'target_pose'),
-    Effect('target_pose_occupied_by_robot', 'target_pose', 'occupied_by', 'robot'),
+    Effect('start_pose_clear', 'start_pose', 'clear', True),
     Effect('target_pose_not_clear', 'target_pose', 'clear', False),
-    Effect('robot_not_at_start', 'start_pos', 'occupied_by', None),
-    Effect('robot_at_goal', 'robot', 'at_goal', True),
 ]
+TransportAction = Action('transport', transport_parameters, transport_conditions, transport_effects)
 
 place_parameters = {
     'robot': Robot,
@@ -166,7 +167,7 @@ place_parameters = {
     'target_pose': PosEntity
 }
 place_conditions = [
-    # Condition('robot_at_target', 'robot', 'at', 'target_pose'),
+    ComputedCondition('robot_can_reach_object', robot_can_reach_object_place, ('robot', 'object')),
     Condition('gripper_holding_object', 'robot', 'holding', 'object'),
     Condition('target_pose_clear', 'target_pose', 'clear', True),
     Condition('object_supported', 'object', 'supported', True)

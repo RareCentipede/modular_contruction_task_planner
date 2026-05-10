@@ -234,7 +234,8 @@ class OrderedLandmarksPlanner:
                 branch_params = {
                     'robot': self.robot,
                     'start_pose': current_pos_entity,
-                    'target_pose': placeable_pos_entity
+                    'target_pose': placeable_pos_entity,
+                    'object': obj_entity_in_gripper
                 }
                 branches.append(branch_params)
 

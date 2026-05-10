@@ -13,7 +13,7 @@ from modular_construction_task_planner.scripts.ordered_landmarks_planner import 
 from modular_construction_task_planner.eas.core import LinkedState
 from modular_construction_task_planner.eas.config_parser_world_basic import parse_configs_to_world
 from modular_construction_task_planner.eas.block_list_parser_world import parse_block_list_to_world
-from modular_construction_task_planner.scripts.block_domain import PickAction, PlaceAction, MoveAction
+from modular_construction_task_planner.scripts.block_domain import PickAction, PlaceAction, TransitAction, TransportAction
 from path_planner.path_planner_node import GridGraph, OCCUPANCY
 
 class ModularConstructionTaskPlanner(Node):
@@ -23,8 +23,8 @@ class ModularConstructionTaskPlanner(Node):
                                        '/tamp/plan_construction_task',
                                        self.plan_construction_task_service)
         self.action_dict = {
-            'transit': MoveAction,
-            'transport': MoveAction,
+            'transit': TransitAction,
+            'transport': TransportAction,
             'pick': PickAction,
             'place': PlaceAction
         }
@@ -96,7 +96,7 @@ class ModularConstructionTaskPlanner(Node):
         for action_name, params in plan:
             task_action = TaskAction()
             task_action.action_name = action_name
-            task_action.host, task_action.source, task_action.target = params
+            task_action.host, task_action.source, task_action.target = params[0], params[1], params[2]
             actions.append(task_action)
 
         task_plan.actions = actions

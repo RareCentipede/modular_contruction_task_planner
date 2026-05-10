@@ -3,7 +3,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, List, Type, Tuple, FrozenSet
+from typing import Any, Dict, Optional, List, Type, Tuple, FrozenSet, Callable, Union
 from enum import Enum
 
 # State is a snapshot of all variable values for a given state id. It is immutable once created,
@@ -145,6 +145,21 @@ class Condition:
         return True
 
 @dataclass
+class ComputedCondition:
+    name: str
+    computer: Callable[..., bool]
+    arg_names: Tuple[str, ...]
+
+    def __call__(self, args: Tuple[Any, ...], verbose: bool = False) -> bool:
+        try:
+            result = self.computer(*args)
+            if verbose:
+                print(f"ComputedCondition {self.name} evaluated to {result}")
+            return result
+        except Exception as e:
+            raise RuntimeError(f"ComputedCondition {self.name} computer function raised an error: {e}")
+
+@dataclass
 class Effect:
     name: str
     src_entity_name: str
@@ -170,7 +185,7 @@ class Effect:
 class Action:
     name: str
     params: Dict[str, Type[Entity]]
-    preconditions: List[Condition]
+    preconditions: Union[List[Condition|ComputedCondition], List[Condition], List[ComputedCondition]]
     effects: List[Effect]
     _checked: Optional[bool] = None
 
@@ -186,14 +201,22 @@ class Action:
         entities = {ent_name: param_entities[ent_name] for ent_name in self.params}
 
         for cond in self.preconditions:
-            src_entity = entities[cond.src_entity_name]
-            target = entities[cond.target] if isinstance(cond.target, str) else None
+            if isinstance(cond, Condition):
+                src_entity = entities[cond.src_entity_name]
+                target = entities[cond.target] if isinstance(cond.target, str) else None
 
-            try:
-                if not cond(src_entity, target, verbose=verbose):
-                    return False
-            except ValueError as e:
-                raise RuntimeError(f"Condition {cond.name} check failed with error: {e}")
+                try:
+                    if not cond(src_entity, target, verbose=verbose):
+                        return False
+                except ValueError as e:
+                    raise RuntimeError(f"Condition {cond.name} check failed with error: {e}")
+            elif isinstance(cond, ComputedCondition):
+                args = tuple(entities[arg_name] for arg_name in cond.arg_names)
+                try:
+                    if not cond(args, verbose=verbose):
+                        return False
+                except Exception as e:
+                    raise RuntimeError(f"ComputedCondition {cond.name} check failed with error: {e}")
 
         self._checked = True
         return True
