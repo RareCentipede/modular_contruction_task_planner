@@ -62,6 +62,11 @@ class RobotAt(Variable):
     domain: str = 'robo_pos'
 
 @dataclass
+class Surface:
+    center: List[float]
+    normal: List[float]
+
+@dataclass
 class Object(Entity):
     at: At = field(default_factory=At)
     at_top: AtTop = field(default_factory=AtTop)
@@ -71,6 +76,7 @@ class Object(Entity):
     goal: Goal = field(default_factory=Goal)
     reachable_from: List[str] = field(default_factory=list)
     placeable_from: List[str] = field(default_factory=list)
+    surfaces: List[Surface] = field(default_factory=list)
 
     def __post_init__(self):
         self.at_top.value = True

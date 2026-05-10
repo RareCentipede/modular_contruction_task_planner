@@ -9,6 +9,7 @@ from modular_construction_task_planner.eas.core import (
 )
 from modular_construction_task_planner.scripts.block_domain import (
     Object,
+    Surface,
     PosEntity,
     Robot
 )
@@ -109,6 +110,7 @@ def define_poses_in_domain(block_list: List[Block], pose_dict: Dict[str, Pose],
 
 def define_base_and_place_poses(block_list: List[Block], entities: Entities):
     for block in block_list:
+        surfaces = []
         block_name = block.name
 
         init_pose_name = block.init_pose.header.frame_id
@@ -121,6 +123,14 @@ def define_base_and_place_poses(block_list: List[Block], entities: Entities):
         block_entity.goal.value = block.goal_pose.header.frame_id if not block.goal_pose.header.frame_id == '' else None
         block_entity.on.value = cast(PosEntity, entities.get_entities('g')).name
         block_entity.at.value = init_pose_name
+
+        for surface_msg in block.surfaces:
+            surface = Surface(
+                center=[surface_msg.center.x, surface_msg.center.y, surface_msg.center.z],
+                normal=[surface_msg.normal.x, surface_msg.normal.y, surface_msg.normal.z]
+            )
+            surfaces.append(surface)
+        block_entity.surfaces = surfaces
 
         bps = [base_pos.header.frame_id for base_pos in block.base_positions]
         pps = [place_pos.header.frame_id for place_pos in block.place_positions]
