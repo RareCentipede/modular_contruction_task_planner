@@ -55,8 +55,16 @@ class ModularConstructionTaskPlanner(Node):
 
         planner = OrderedLandmarksPlanner(world, self.action_dict, self.gg)
         h = HEURISTIC.DILIGENT
-        lazy_greedy_heuristic_goal_state = planner.run_heuristic_planner(heuristic=h)
-        lazy_greedy_plan, heuristic_cost = self.retract_best_plan(lazy_greedy_heuristic_goal_state)
+        lazy_greedy_heuristic_goal_state = planner.run_multi_bound_planner()
+
+        if not lazy_greedy_heuristic_goal_state:
+            self.get_logger().error("No plan found with the given heuristic.")
+            response.success = False
+            response.result = PlanConstructionTask.Response.PLANNING_FAILED
+            response.msg = "No plan found with the given heuristic."
+            return response
+
+        lazy_greedy_plan, heuristic_cost = self.retrace_best_plan(lazy_greedy_heuristic_goal_state)
         self.get_logger().info(f"Heuristic {h.name} plan with total cost {heuristic_cost} found.")
         best_plan = lazy_greedy_plan
 
@@ -70,9 +78,12 @@ class ModularConstructionTaskPlanner(Node):
 
         return response
 
-    def retract_best_plan(self, goal_linked_states: List[LinkedState]) -> Tuple[List[Tuple[str, Tuple[str, ...]]], float]:
+    def retrace_best_plan(self, goal_linked_states: List[LinkedState] | LinkedState) -> Tuple[List[Tuple[str, Tuple[str, ...]]], float]:
         # Backtrack to get all the plans with total costs
         plans = []
+        if isinstance(goal_linked_states, LinkedState):
+            goal_linked_states = [goal_linked_states]
+
         for goal_linked_state in goal_linked_states:
             plan = []
             total_cost = 0.0
