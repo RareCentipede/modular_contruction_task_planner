@@ -4,12 +4,13 @@ from enum import Enum
 from math import factorial
 from typing import Tuple, Dict, cast, List
 from modular_construction_task_planner.eas.core import (
-    Pose, State, LinkedState,
+    Optional, Pose, State, LinkedState,
     Entity, StateStatus, World
 )
 from modular_construction_task_planner.scripts.block_domain import (
     Action, Object, PosEntity, Robot,
 )
+from path_planner.path_planner_node import GridGraph, OCCUPANCY
 
 HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT ANTICIPATORY')
 """
@@ -23,9 +24,10 @@ HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT ANTICIPATORY')
 
 
 class OrderedLandmarksPlanner:
-    def __init__(self, world: World, action_dict: Dict[str, Action]) -> None:
+    def __init__(self, world: World, action_dict: Dict[str, Action], gg: Optional[GridGraph]) -> None:
         self.world: World = world
         self.action_dict: Dict[str, Action] = action_dict
+        self.gg: Optional[GridGraph] = gg
         self.state_counter: int = 0
 
         self.current_state: State = world.current_state
@@ -103,6 +105,13 @@ class OrderedLandmarksPlanner:
             # print(f"Executing: {action_name} with params {[str(param) + ': ' + str(ent.name) \
                 # for param, ent in action_params.items()]} and cost {cost}")
             action.execute(action_params)
+            if self.gg:
+                if action_name == 'pick':
+                    obj_pos = self.world.pose_dict[action_params['target_pose'].name].position[:2]
+                    self.gg.update_block_move(obj_pos, OCCUPANCY.FREE)
+                elif action_name == 'place':
+                    obj_pos = self.world.pose_dict[action_params['target_pose'].name].position[:2]
+                    self.gg.update_block_move(obj_pos, OCCUPANCY.OCCUPIED)
 
             self.world.update_state()
 
@@ -189,7 +198,7 @@ class OrderedLandmarksPlanner:
                         branch_params = {
                             'robot': self.robot,
                             'object': potential_obj,
-                            'object_pose': obj_pos_entity
+                            'target_pose': obj_pos_entity
                         }
                         branches.append(branch_params)
 
@@ -274,7 +283,14 @@ class OrderedLandmarksPlanner:
                     case HEURISTIC.SIMPLE_COLLISION:
                         cost = self.simple_collision_heuristic(start_pos, target_pos)
                     case HEURISTIC.DILIGENT:
-                        pass
+                        if not self.gg:
+                            raise ValueError("GridGraph is not initialized for diligent heuristic.")
+                        path = self.gg.plan(start_pos[:2], target_pos[:2])
+                        if path.size == 0:
+                            cost = float('inf')
+                        else:
+                            path_length = np.sum(np.linalg.norm(np.diff(path, axis=0), axis=1))
+                            cost = path_length
                     case HEURISTIC.ANTICIPATORY:
                         pass
                     case _:

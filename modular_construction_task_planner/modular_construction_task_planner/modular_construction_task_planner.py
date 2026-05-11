@@ -53,8 +53,8 @@ class ModularConstructionTaskPlanner(Node):
             response.msg = f"Failed to parse configuration: {e}"
             return response
 
-        planner = OrderedLandmarksPlanner(world, self.action_dict)
-        h = HEURISTIC.LAZY
+        planner = OrderedLandmarksPlanner(world, self.action_dict, self.gg)
+        h = HEURISTIC.DILIGENT
         lazy_greedy_heuristic_goal_state = planner.run_heuristic_planner(heuristic=h)
         lazy_greedy_plan, heuristic_cost = self.retract_best_plan(lazy_greedy_heuristic_goal_state)
         self.get_logger().info(f"Heuristic {h.name} plan with total cost {heuristic_cost} found.")
