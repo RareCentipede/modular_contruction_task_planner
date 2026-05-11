@@ -129,11 +129,11 @@ TransitAction = Action('transit', transit_parameters, transit_conditions, transi
 pick_parameters = {
     'robot': Robot,
     'object': Object,
-    'object_pose': PosEntity
+    'target_pose': PosEntity
 }
 pick_conditions = [
     ComputedCondition('robot_can_reach_object', robot_can_reach_object_grasp, ('robot', 'object')),
-    Condition('object_at_pose', 'object', 'at', 'object_pose'),
+    Condition('object_at_pose', 'object', 'at', 'target_pose'),
     Condition('gripper_empty', 'robot', 'gripper_empty', True),
     Condition('holding_nothing', 'robot', 'holding', None),
     Condition('object_at_top', 'object', 'at_top', True)
@@ -142,8 +142,8 @@ pick_effects = [
     Effect('pick_object', 'robot', 'holding', 'object'),
     Effect('gripper_not_empty', 'robot', 'gripper_empty', False),
     Effect('object_no_longer_at_pose', 'object', 'at', None),
-    Effect('object_pose_clear', 'object_pose', 'clear', True),
-    Effect('object_pose_occupied_by_none', 'object_pose', 'occupied_by', None),
+    Effect('target_pose_clear', 'target_pose', 'clear', True),
+    Effect('target_pose_occupied_by_none', 'target_pose', 'occupied_by', None),
     # Effect('object_on_none', 'object', 'on', None),
 ]
 PickAction = Action('pick', pick_parameters, pick_conditions, pick_effects)
