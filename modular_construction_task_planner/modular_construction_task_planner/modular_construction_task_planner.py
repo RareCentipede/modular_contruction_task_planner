@@ -54,7 +54,6 @@ class ModularConstructionTaskPlanner(Node):
             return response
 
         planner = OrderedLandmarksPlanner(world, self.action_dict, self.gg)
-        h = HEURISTIC.DILIGENT
         multi_bound_goal_state = planner.run_multi_bound_planner()
 
         if not multi_bound_goal_state:
@@ -72,15 +71,19 @@ class ModularConstructionTaskPlanner(Node):
         full_nav_cost = self.compute_full_nav_cost(best_plan, planner)
         self.get_logger().info(f"Total path planning cost for the plan: {full_nav_cost:.2f}")
 
+        planner = OrderedLandmarksPlanner(original_world, self.action_dict, None)
+        h = HEURISTIC.LAZY
         greedy_goal_state = planner.run_heuristic_planner(h)
         greedy_plan, greedy_cost = self.retrace_best_plan(greedy_goal_state)
         self.get_logger().info(f"Greedy plan with heuristic cost {greedy_cost} found.")
         self.gg = GridGraph(list(request.blocks), block_size=0.3)  # Reinitialize the grid graph for accurate path planning
         greedy_full_nav_cost = self.compute_full_nav_cost(greedy_plan, planner)
+
         self.get_logger().info(f"Total path planning cost for the greedy plan: {greedy_full_nav_cost:.2f}")
         self.get_logger().info(f"Multi-bound cost: {heuristic_cost:.2f}, Greedy cost: {greedy_cost:.2f}, "
                                f"Multi-bound full nav cost: {full_nav_cost:.2f}, Greedy full nav cost: {greedy_full_nav_cost:.2f}")
 
+        best_plan = greedy_plan
         response.plan = self.format_plan(best_plan)
         response.success = True
         response.result = PlanConstructionTask.Response.SUCCESS

@@ -22,7 +22,6 @@ HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT ANTICIPATORY')
     ANTICIPATORY: Considers the hindrance the current action places onto future actions.
 """
 
-
 class OrderedLandmarksPlanner:
     def __init__(self, world: World, action_dict: Dict[str, Action], gg: Optional[GridGraph]) -> None:
         self.world: World = world
@@ -163,13 +162,7 @@ class OrderedLandmarksPlanner:
                 goal_state = self.current_linked_state
                 nav_cost = self.nav_cost_from_home_to_target(home_state, goal_state)
 
-                # Consider adding a home_state_cost to represent the cost up to the home_state.
-                # Reaching the goal, current_cost represents the full plan cost, so adding it to upper bound does
-                # not make sense. home_state_cost should be added to upper_bound.
-                # Additionally, keep lazy cost, diligent cost, and upper bound separate for better logging and analysis.
                 upper_bound = nav_cost + home_state.cost
-                # print(f"Nav cost for the plan: {nav_cost:.2f}, current cost: {self.current_cost:.2f}, "
-                    #   f"best cost: {best_cost:.2f}, new bound: {upper_bound:.2f}.")
                 if upper_bound < best_cost:
                     best_cost = upper_bound
                     self.goal_linked_state = self.current_linked_state
@@ -183,11 +176,6 @@ class OrderedLandmarksPlanner:
                 if self.solution_count <= 0:
                     print("Solution count limit reached, terminating search.")
                     break
-
-            # if self.current_cost < 0.0:
-            #     print(f"Current cost is negative: {self.current_cost} at state {self.current_linked_state.state_id}."
-            #           f"Last action, cost, nav_cost: {action_name}, {cost}, {nav_cost}.")
-            #     break
 
         return self.goal_linked_state
 
