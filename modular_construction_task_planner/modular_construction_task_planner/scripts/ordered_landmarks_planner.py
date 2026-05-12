@@ -36,6 +36,7 @@ class OrderedLandmarksPlanner:
         self.goal_linked_state: Optional[LinkedState] = None
         self.goal_linked_states: List[LinkedState] = []
         self.current_cost = 0.0
+        self.solution_count = 100
 
         robot = self.world.entities.get_entities("robot")
         self.robot = cast(Robot, robot)
@@ -93,6 +94,7 @@ class OrderedLandmarksPlanner:
 
             weighted_branch = min(self.current_linked_state.branches_to_explore, key=lambda x: x[2])
             action_name, action_params, cost = weighted_branch
+            self.current_cost += cost
             action = self.action_dict[action_name]
             # print(f"Executing: {action_name} with params {[str(param) + ': ' + str(ent.name) \
                 # for param, ent in action_params.items()]} and cost {cost}")
@@ -106,7 +108,7 @@ class OrderedLandmarksPlanner:
                     self.gg.update_block_move(obj_pos, OCCUPANCY.OCCUPIED)
 
             self.world.update_state()
-            self.generate_new_linked_state(action_name, action_params, cost)
+            self.generate_new_linked_state(action_name, action_params, self.current_cost)
 
             if self.world.goal_reached:
                 print("GOAL REACHED using lazy heuristic!")
@@ -121,7 +123,6 @@ class OrderedLandmarksPlanner:
     def run_multi_bound_planner(self) -> Optional[LinkedState]:
         best_cost = float('inf')
         home_state = self.s0
-        home_state_cost = 0.0
         while self.current_linked_state.status == StateStatus.ALIVE:
             self.branch_out(self.current_linked_state, HEURISTIC.LAZY)
             if not self.current_linked_state.branches_to_explore:
@@ -136,8 +137,8 @@ class OrderedLandmarksPlanner:
             action = self.action_dict[action_name]
             self.current_cost += cost
             if self.current_cost > best_cost:
-                print(f"Current cost {self.current_cost} exceeds best cost {best_cost}, skipping action {action_name}, "
-                      f"removing cost {cost} and backtracking...")
+                # print(f"Current cost {self.current_cost} exceeds best cost {best_cost}, skipping action {action_name}, "
+                    #   f"removing cost {cost} and backtracking...")
                 self.current_cost -= cost
                 self.backtrack()
                 home_state = self.current_linked_state
@@ -154,36 +155,39 @@ class OrderedLandmarksPlanner:
                     self.gg.update_block_move(obj_pos, OCCUPANCY.OCCUPIED)
 
             self.world.update_state()
-            self.generate_new_linked_state(action_name, action_params, cost)
+            self.generate_new_linked_state(action_name, action_params, self.current_cost)
 
             if self.world.goal_reached:
                 print(f"GOAL REACHED using lazy heuristic in {self.current_linked_state.state_id} steps!")
                 self.current_linked_state.goal = True
                 goal_state = self.current_linked_state
-                upper_bound = self.nav_cost_from_home_to_target(home_state, goal_state)
+                nav_cost = self.nav_cost_from_home_to_target(home_state, goal_state)
 
                 # Consider adding a home_state_cost to represent the cost up to the home_state.
                 # Reaching the goal, current_cost represents the full plan cost, so adding it to upper bound does
                 # not make sense. home_state_cost should be added to upper_bound.
                 # Additionally, keep lazy cost, diligent cost, and upper bound separate for better logging and analysis.
-                print(f"Upper bound for the plan: {upper_bound:.2f}, current cost: {self.current_cost:.2f}, best cost: {best_cost:.2f}")
-                if best_cost != float('inf'):
-                    upper_bound += self.current_cost
+                upper_bound = nav_cost + home_state.cost
+                # print(f"Nav cost for the plan: {nav_cost:.2f}, current cost: {self.current_cost:.2f}, "
+                    #   f"best cost: {best_cost:.2f}, new bound: {upper_bound:.2f}.")
                 if upper_bound < best_cost:
                     best_cost = upper_bound
-                    self.current_cost = upper_bound
                     self.goal_linked_state = self.current_linked_state
                     print(f"New best cost found: {best_cost}.")
                 else:
-                    print(f"Cost {upper_bound} is not better than current best cost {best_cost}.")
+                    print(f"New bound {upper_bound} is not better than current best cost {best_cost}.")
 
                 self.backtrack()
                 home_state = self.current_linked_state
+                self.solution_count -= 1
+                if self.solution_count <= 0:
+                    print("Solution count limit reached, terminating search.")
+                    break
 
-            if self.current_cost < 0.0:
-                print(f"Current cost is negative: {self.current_cost} at state {self.current_linked_state.state_id}."
-                      f"Last action, cost, upper_bound: {action_name}, {cost}, {upper_bound}.")
-                break
+            # if self.current_cost < 0.0:
+            #     print(f"Current cost is negative: {self.current_cost} at state {self.current_linked_state.state_id}."
+            #           f"Last action, cost, nav_cost: {action_name}, {cost}, {nav_cost}.")
+            #     break
 
         return self.goal_linked_state
 
@@ -409,8 +413,8 @@ class OrderedLandmarksPlanner:
             # )
 
             if parent is not None:
-                self.current_cost -= self.current_linked_state.cost
                 self.current_linked_state = parent
+                self.current_cost = parent.cost
                 self.current_state = self.current_linked_state.state
 
                 if self.gg:
@@ -421,10 +425,10 @@ class OrderedLandmarksPlanner:
                     action_name, action_params = action_from_parent
                     if action_name == 'pick':
                         obj_pos = self.world.pose_dict[action_params[2]].position[:2]
-                        self.gg.update_block_move(obj_pos, OCCUPANCY.FREE)
+                        self.gg.update_block_move(obj_pos, OCCUPANCY.OCCUPIED)
                     elif action_name == 'place':
                         obj_pos = self.world.pose_dict[action_params[2]].position[:2]
-                        self.gg.update_block_move(obj_pos, OCCUPANCY.OCCUPIED)
+                        self.gg.update_block_move(obj_pos, OCCUPANCY.FREE)
 
                 # print(
                 #     f"Backtracking to state id: {self.current_linked_state.state_id},"
@@ -440,7 +444,7 @@ class OrderedLandmarksPlanner:
 
     def nav_cost_from_home_to_target(self, home_linked_state: LinkedState, target_linked_state: LinkedState) -> float:
         self.gg = cast(GridGraph, self.gg)  # Type hint for better code completion
-        cost = 0.0
+        cost = home_linked_state.cost
         current_linked_state = target_linked_state
         parent = current_linked_state.parent
         state_id_path = [current_linked_state.state_id]
@@ -471,11 +475,11 @@ class OrderedLandmarksPlanner:
                     target_pos = self.world.pose_dict[action_params[2]].position
                     path = self.gg.plan(start_pos[:2], target_pos[:2])
                     if path.size == 0:
-                        cost += float('inf')
+                        cost = float('inf')
                     else:
                         path_length = np.sum(np.linalg.norm(np.diff(path, axis=0), axis=1))
                         cost += path_length
-                        child_linked_state[1].cost = path_length
+                        child_linked_state[1].cost = cost
 
                 parent = child_linked_state[1]
 

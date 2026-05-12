@@ -55,21 +55,31 @@ class ModularConstructionTaskPlanner(Node):
 
         planner = OrderedLandmarksPlanner(world, self.action_dict, self.gg)
         h = HEURISTIC.DILIGENT
-        lazy_greedy_heuristic_goal_state = planner.run_multi_bound_planner()
+        multi_bound_goal_state = planner.run_multi_bound_planner()
 
-        if not lazy_greedy_heuristic_goal_state:
+        if not multi_bound_goal_state:
             self.get_logger().error("No plan found with the given heuristic.")
             response.success = False
             response.result = PlanConstructionTask.Response.PLANNING_FAILED
             response.msg = "No plan found with the given heuristic."
             return response
 
-        lazy_greedy_plan, heuristic_cost = self.retrace_best_plan(lazy_greedy_heuristic_goal_state)
-        self.get_logger().info(f"Heuristic {h.name} plan with total cost {heuristic_cost} found.")
-        best_plan = lazy_greedy_plan
+        mb_plan, heuristic_cost = self.retrace_best_plan(multi_bound_goal_state)
+        self.get_logger().info(f"Multi-bound plan with total cost {heuristic_cost} found.")
+        best_plan = mb_plan
 
+        self.gg = GridGraph(list(request.blocks), block_size=0.3)  # Reinitialize the grid graph for accurate path planning
         full_nav_cost = self.compute_full_nav_cost(best_plan, planner)
         self.get_logger().info(f"Total path planning cost for the plan: {full_nav_cost:.2f}")
+
+        greedy_goal_state = planner.run_heuristic_planner(h)
+        greedy_plan, greedy_cost = self.retrace_best_plan(greedy_goal_state)
+        self.get_logger().info(f"Greedy plan with heuristic cost {greedy_cost} found.")
+        self.gg = GridGraph(list(request.blocks), block_size=0.3)  # Reinitialize the grid graph for accurate path planning
+        greedy_full_nav_cost = self.compute_full_nav_cost(greedy_plan, planner)
+        self.get_logger().info(f"Total path planning cost for the greedy plan: {greedy_full_nav_cost:.2f}")
+        self.get_logger().info(f"Multi-bound cost: {heuristic_cost:.2f}, Greedy cost: {greedy_cost:.2f}, "
+                               f"Multi-bound full nav cost: {full_nav_cost:.2f}, Greedy full nav cost: {greedy_full_nav_cost:.2f}")
 
         response.plan = self.format_plan(best_plan)
         response.success = True
@@ -92,9 +102,9 @@ class ModularConstructionTaskPlanner(Node):
             while parent is not None:
                 plan.append(current_linked_state.action_from_parent)  # (action_name, involved_entities)
                 current_linked_state = parent[1]
-                total_cost += current_linked_state.cost
                 parent = current_linked_state.parent
 
+            total_cost = goal_linked_state.cost
             plan.reverse()  # Reverse to get the correct order from initial state to goal
             plans.append((plan, total_cost))
 
