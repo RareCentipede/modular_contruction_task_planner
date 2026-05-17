@@ -1,11 +1,11 @@
 import numpy as np
 
 from scipy.spatial import cKDTree, ConvexHull
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, cast
 from dataclasses import dataclass, field
 from enum import Enum
 
-from modular_construction_task_planner.eas.core import World
+from modular_construction_task_planner.eas.core import Pose, World
 from modular_construction_task_planner.scripts.block_domain import Object
 
 @dataclass
@@ -31,14 +31,29 @@ def create_support_relation_graph(world: World) -> Dict[str, SupportNode]:
         The area of support is calculated based on the contact area between objects.
     """
     support_graph = {}
+    goal_pos_dict = {}
     # For each object in the world, determine which other objects it is supporting and which objects are supporting it
     # Calculate the contact area between objects to determine the strength of support relationships
     # Store this information in a graph structure (e.g., adjacency list or matrix) for later analysis
 
+    objs = world.entities.get_entities(Object)
+    objs = cast(List[Object], objs)
+    obj_with_goals = [obj for obj in objs if obj.goal.value]
+    for obj in obj_with_goals:
+        goal_pos = world.pose_dict.get(obj.goal.value) #type: ignore
+        goal_pos_dict[obj.name] = goal_pos
+
+    goal_poses = np.array([goal_pose.position for goal_pose in goal_pos_dict.values()])
+    goal_positions = np.array([[g[0], g[1], g[2]] for g in goal_poses])
+    world_tree = cKDTree(goal_positions)
+
+    for obj in obj_with_goals:
+        support_data, overall_support_area_ratio = compute_placement_stability(world, goal_pos_dict, world_tree, obj)
+
     return support_graph
 
 def compute_placement_stability(world: World,
-                                goal_pos_dict: Dict[str, List[float]],
+                                goal_pos_dict: Dict[str, Pose],
                                 world_tree: cKDTree, 
                                 object: Object,
                                 support_ratio_threshold: float = 0.7) -> Tuple[Dict[str, float], float]:
