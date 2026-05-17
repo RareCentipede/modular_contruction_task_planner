@@ -63,6 +63,7 @@ class RobotAt(Variable):
 
 @dataclass
 class Surface:
+    vertices: List[List[float]] # List of vertices that define the surface, a vertex is a list of 3 floats [x, y, z]
     center: List[float]
     normal: List[float]
 

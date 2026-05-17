@@ -3,6 +3,7 @@ import numpy as np
 from enum import Enum
 from math import factorial
 from typing import Tuple, Dict, cast, List
+from scipy.spatial import cKDTree
 from modular_construction_task_planner.eas.core import (
     Optional, Pose, State, LinkedState,
     Entity, StateStatus, World
@@ -310,9 +311,9 @@ class OrderedLandmarksPlanner:
             if not self.action_dict[action_name].check(branch):
                 branches.remove(branch)
 
-            # Placeholder for stability computation. If not stable, prune the branch.
-            if action_name == "place":
-                stability = compute_placement_stability(branch['object'], self.world)
+            # # Placeholder for stability computation. If not stable, prune the branch.
+            # if action_name == "place":
+            #     stability = compute_placement_stability(self.world, cKDTree, branch['object'])
 
         return branches
 
@@ -535,9 +536,3 @@ def compute_arc_length(start_pos: List[float], target_pos: List[float], obj_pos:
     arc_length = angle_at_obstacle * col_radius
 
     return arc_length
-
-def compute_placement_stability(object: Object, world: World) -> float:
-    """
-        Compute the stability of placing the object at its goal position based on the surfaces of the object and the normal of the surface it is being placed on. The more aligned the surface normal and the gravity vector, the more stable the placement is.
-    """
-    return 0.0

@@ -126,6 +126,7 @@ def define_base_and_place_poses(block_list: List[Block], entities: Entities):
 
         for surface_msg in block.surfaces:
             surface = Surface(
+                vertices=[[vert.x, vert.y, vert.z] for vert in surface_msg.vertices],
                 center=[surface_msg.center.x, surface_msg.center.y, surface_msg.center.z],
                 normal=[surface_msg.normal.x, surface_msg.normal.y, surface_msg.normal.z]
             )
