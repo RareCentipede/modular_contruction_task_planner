@@ -27,6 +27,10 @@ class Supported(Variable):
 class Goal(Variable):
     domain: str = 'pos'
 
+@dataclass
+class Host(Variable):
+    domain: str = 'block'
+
 # Pose variables
 @dataclass
 class Clear(Variable):
@@ -78,10 +82,16 @@ class Object(Entity):
     reachable_from: List[str] = field(default_factory=list)
     placeable_from: List[str] = field(default_factory=list)
     surfaces: List[Surface] = field(default_factory=list)
+    propagated_cost: float = 0.0
 
     def __post_init__(self):
         self.at_top.value = True
         self.supported.value = True
+
+@dataclass
+class ShadowBox(Entity):
+    host: Host = field(default_factory=Host)
+    at: At = field(default_factory=At)
 
 @dataclass
 class PosEntity(Entity):
