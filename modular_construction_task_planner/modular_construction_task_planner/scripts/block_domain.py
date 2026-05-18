@@ -1,6 +1,11 @@
+import numpy as np
+
+from trimesh import Trimesh
 from typing import List, Tuple, Callable
 from dataclasses import dataclass, field
-from modular_construction_task_planner.eas.core import Variable, Entity, State, Condition, ComputedCondition, Effect, Action
+from modular_construction_task_planner.eas.core import (
+    Variable, Entity, State, Condition, ComputedCondition, Effect, Action, Pose
+)
 
 # Block variables
 @dataclass
@@ -83,6 +88,31 @@ class Object(Entity):
     placeable_from: List[str] = field(default_factory=list)
     surfaces: List[Surface] = field(default_factory=list)
     propagated_cost: float = 0.0
+    _mesh: Trimesh | None = None
+
+    @property
+    def mesh(self) -> Trimesh:
+        if self._mesh:
+            return self._mesh
+
+        all_verts, all_faces = [], []
+        offset = 0
+
+        for surface in self.surfaces:
+            verts = np.array(surface.vertices)
+            # Triangulate the face (assumes convex polygon)
+            faces = [[0, i, i+1] for i in range(1, len(verts)-1)]
+            all_verts.append(verts)
+            all_faces.extend([[f[0]+offset, f[1]+offset, f[2]+offset]
+                            for f in faces])
+            offset += len(verts)
+
+        mesh = Trimesh(
+            vertices=np.vstack(all_verts),
+            faces=np.array(all_faces)
+        )
+        self._mesh = mesh
+        return mesh
 
     def __post_init__(self):
         self.at_top.value = True
