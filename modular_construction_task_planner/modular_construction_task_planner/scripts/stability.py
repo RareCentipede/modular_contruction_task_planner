@@ -1,5 +1,8 @@
+import trimesh
 import numpy as np
+import matplotlib.pyplot as plt
 
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from trimesh import Trimesh
 from shapely.geometry import Polygon
 from shapely.ops import unary_union
@@ -152,3 +155,91 @@ def get_contact_polygon(mesh_above: Trimesh, mesh_below: Trimesh, contact_z_tole
         return None
 
     return intersection_poly
+
+
+def make_box_mesh(size: list, position: list) -> trimesh.Trimesh:
+    """Helper to generate a transformed Trimesh box given size and position."""
+    mesh = trimesh.creation.box(extents=size)
+    # The size[2] / 2 translation is skipped if your position coordinates 
+    # are already absolute centers rather than bottom-centers.
+    mesh.apply_translation(position)
+    return mesh
+
+def visualize_goal_structure(goal_data: dict, title: str = "Target Goal Structure Layout"):
+    """
+        Visualizes the parsed goal.yaml structure in 3D.
+        
+        Args:
+            goal_data: A dictionary mapping block names to their properties:
+                    { 'block1': {'position': [...], 'size': [l, w, h], 'color': [...]}, ... }
+            title: Title of the generated plot
+    """
+    fig = plt.figure(figsize=(12, 9))
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_title(title, fontsize=14, fontweight='bold', pad=20)
+
+    all_vertices = []
+    
+    # Track unique colors for the legend if needed
+    legend_patches = []
+
+    # Iterate and draw each block
+    for name, data in goal_data.items():
+        if name == 'robot' or 'position' not in data:
+            continue
+            
+        pos = data['position']
+        size = data['size']
+        # Default to a nice slate blue if color isn't provided in the goal dict
+        color = data.get('color', [0.2, 0.5, 0.8]) 
+        
+        # Ensure alpha/transparency channel is attached for clear overlay overlapping
+        if len(color) == 3:
+            color = list(color) + [0.6]
+
+        # Generate mesh representation
+        mesh = make_box_mesh(size, pos)
+        all_vertices.append(mesh.vertices)
+
+        # Convert Trimesh faces into matplotlib Poly3DCollection elements
+        tris = mesh.vertices[mesh.faces]
+        poly3d = Poly3DCollection(tris, alpha=color[3])
+        poly3d.set_facecolor(color[:3])
+        poly3d.set_edgecolor([0.1, 0.1, 0.1]) # Crisp dark edges
+        poly3d.set_linewidth(0.6)
+        
+        ax.add_collection3d(poly3d)
+
+    # Compile vertices to set appropriate axis bounds dynamically
+    if all_vertices:
+        flat_verts = np.vstack(all_vertices)
+        max_x, min_x = flat_verts[:, 0].max(), flat_verts[:, 0].min()
+        max_y, min_y = flat_verts[:, 1].max(), flat_verts[:, 1].min()
+        max_z = flat_verts[:, 2].max()
+        
+        margin = 1.0
+        ax.set_xlim(min_x - margin, max_x + margin)
+        ax.set_ylim(min_y - margin, max_y + margin)
+        ax.set_zlim(0, max_z + margin)
+
+        # Draw an explicit light grey ground grid at Z = 0
+        extent_x = max(abs(min_x), abs(max_x)) + margin
+        extent_y = max(abs(min_y), abs(max_y)) + margin
+        gx, gy = np.meshgrid(np.linspace(-extent_x, extent_x, 10), np.linspace(-extent_y, extent_y, 10))
+        gz = np.zeros_like(gx)
+        ax.plot_wireframe(gx, gy, gz, color=(0.7, 0.7, 0.7, 0.2), linewidth=0.8)
+    else:
+        ax.set_xlim(-5, 5)
+        ax.set_ylim(-5, 5)
+        ax.set_zlim(0, 5)
+
+    # Clean up axes layouts
+    ax.set_xlabel('X (Width)', fontweight='bold')
+    ax.set_ylabel('Y (Depth)', fontweight='bold')
+    ax.set_zlabel('Z (Height)', fontweight='bold')
+    
+    # Initial camera view angle (isometric-leaning bird's-eye perspective)
+    ax.view_init(elev=22, azim=-55)
+    
+    plt.tight_layout()
+    plt.show()
