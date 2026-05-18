@@ -2,6 +2,7 @@ import numpy as np
 
 from trimesh import Trimesh
 from shapely.geometry import Polygon
+from shapely.ops import unary_union
 from typing import Dict, List, Tuple, cast, Optional
 from dataclasses import dataclass, field
 
@@ -77,71 +78,79 @@ def create_support_relation_graph(world: World, support_ratio_threshold: float =
 
     return support_graph
 
-def compute_placement_stability(object: Object,
-                                candidate_support_objs: List[Object],
-                                ground_plane: Trimesh,) -> Tuple[Dict[str, float], float]:
+import numpy as np
+from trimesh import Trimesh
+from shapely.geometry import Polygon
+from typing import Dict, List, Tuple, Optional, cast
+
+def compute_placement_stability(object: Object | Trimesh,
+                                candidate_support_objs: List[Object] | List[Trimesh],
+                                supp_names: List[str],
+                                ground_plane: Trimesh) -> Tuple[Dict[str, float], float]:
     """
-        Compute the stability of placing the object at its goal position based on support area analysis.
+    Compute the stability of placing the object at its goal position based on support area analysis.
     """
     support_data = {}
     support_polys = []
-    support_vertices = []
     overall_support_area_ratio = 0.0
 
-    footprint = Polygon(object.mesh.vertices[:, :2]).convex_hull
-    ground_contact_polygon = get_contact_polygon(object.mesh, ground_plane)
+    # Handle object type extraction
+    mesh_above = object.mesh if isinstance(object, Object) else object
+    footprint = Polygon(mesh_above.vertices[:, :2]).convex_hull
     support_data['area'] = footprint.area
 
-    if ground_contact_polygon:
-        support_data['g'] = 1.0 # Ground provides full support
+    # 1. Ground contact check
+    ground_contact_polygon = get_contact_polygon(mesh_above, ground_plane)
+    if ground_contact_polygon and not ground_contact_polygon.is_empty:
+        support_data['g'] = 1.0  # Ground provides full support
         overall_support_area_ratio = ground_contact_polygon.area / footprint.area
         return support_data, overall_support_area_ratio
 
-    for supp in candidate_support_objs:
-        contact_polygon = get_contact_polygon(object.mesh, supp.mesh)
-        if not contact_polygon:
+    # 2. Candidate objects check
+    for i, supp in enumerate(candidate_support_objs):
+        mesh_below = supp.mesh if isinstance(supp, Object) else supp
+        supp_name = supp.name if isinstance(supp, Object) else supp_names[i]
+
+        contact_polygon = get_contact_polygon(mesh_above, mesh_below)
+        if not contact_polygon or contact_polygon.is_empty:
             continue
 
         support_polygon = contact_polygon.convex_hull
         support_score = support_polygon.area / footprint.area
-        support_data[supp.name] = support_score
+        support_data[supp_name] = support_score
         support_polys.append(support_polygon)
 
+    # 3. Aggregate total support
     if support_polys:
-        support_vertices = np.vstack([np.array(poly.exterior.coords) for poly in support_polys])
-        overall_support_polygon = Polygon(support_vertices).convex_hull
-        overall_support_area_ratio = overall_support_polygon.area / footprint.area
+        # Combine all supporting polygons using shapely union to handle overlaps safely
+        combined_support = unary_union(support_polys).convex_hull
+        # Intersect with object footprint so we don't count "phantom support" outside the block
+        actual_support = combined_support.intersection(footprint)
+        overall_support_area_ratio = actual_support.area / footprint.area
 
     return support_data, overall_support_area_ratio
 
-def get_contact_polygon(mesh_above: Trimesh, mesh_below: Trimesh,
-                        contact_z_tolerance: float = 0.02) -> Optional[Polygon]:
+def get_contact_polygon(mesh_above: Trimesh, mesh_below: Trimesh, contact_z_tolerance: float = 0.05):
     """
-        Given two meshes already transformed to world frame,
-        find their contact polygon in the XY plane.
+    Finds the contact polygon in the XY plane by projecting overlapping 
+    features, resolving floating-point vulnerabilities found in direct slicing.
     """
-    # Find the contact Z — bottom of upper mesh
-    contact_z = mesh_above.bounds[0][2] - contact_z_tolerance  # min Z of upper mesh
-
-    # Slice both meshes at contact Z
-    slice_above = mesh_above.section(
-        plane_origin=[0, 0, contact_z],
-        plane_normal=[0, 0, 1]
-    )
-    slice_below = mesh_below.section(
-        plane_origin=[0, 0, contact_z],
-        plane_normal=[0, 0, 1]
-    )
-
-    if slice_above is None or slice_below is None:
+    # Verify vertical proximity
+    z_above_min = mesh_above.bounds[0][2]
+    z_below_max = mesh_below.bounds[1][2]
+    
+    gap = abs(z_above_min - z_below_max)
+    if gap > contact_z_tolerance:
         return None
 
-    # Convert cross-sections to 2D polygons
-    poly_above, _ = slice_above.to_planar()
-    poly_below, _ = slice_below.to_planar()
+    # Get 2D footprints of both items in the XY plane
+    poly_above = Polygon(mesh_above.vertices[:, :2]).convex_hull
+    poly_below = Polygon(mesh_below.vertices[:, :2]).convex_hull
 
-    # Shapely intersection
-    contact = poly_above.polygons_full[0].intersection(
-                poly_below.polygons_full[0])
+    # Calculate their overlapping footprint 
+    intersection_poly = poly_above.intersection(poly_below)
+    
+    if intersection_poly.is_empty:
+        return None
 
-    return contact if not contact.is_empty else None
+    return intersection_poly
