@@ -13,18 +13,18 @@ class SupportNode:
     name: str
     area: float
     support_threshold: float
-    total_support_area: float = 0.0
+    total_support_ratio: float = 0.0
     current_support_score: float = 0.0
-    supporting_objects: List[Tuple[str, bool]] = field(default_factory=list) # Objects that support THIS object.
-    # True if the supporting object is placed, False otherwise.
-    supported_objects: List[str] = field(default_factory=list) # Objects that this object SUPPORTS
+    supporting_objects: List[Tuple[str, float, bool]] = field(default_factory=list) # Objects that support THIS object.
+    # (name, support_score, is_placed)
+    supported_objects: List[Tuple[str, float, bool]] = field(default_factory=list) # Objects that this object SUPPORTS
 
     @property
     def supported(self) -> bool:
         return self.current_support_score >= self.support_threshold
 
 # Assume cubes
-def create_support_relation_graph(world: World) -> Dict[str, SupportNode]:
+def create_support_relation_graph(world: World, support_ratio_threshold: float = 0.7) -> Dict[str, SupportNode]:
     """
         Create a support relation graph based on the current world state.
         Each node represents an object, and edges represent support relationships.
@@ -58,14 +58,28 @@ def create_support_relation_graph(world: World) -> Dict[str, SupportNode]:
         goal_pos = goal_positions[i]
         candidate_position_idx = goal_positions[goal_positions[:, 2] < goal_pos[2]] # Objects below the current object
         candidate_objs = obj_with_goals[candidate_position_idx]
+
         support_data, overall_support_area_ratio = compute_placement_stability(obj, candidate_objs, ground_mesh) # type: ignore
+        supporting_objs = [(name, score, False) for name, score in support_data.items() if name != 'area' and name != 'g']
+        support_node = SupportNode(
+            name=obj.name,
+            area=support_data['area'],
+            total_support_ratio=overall_support_area_ratio,
+            support_threshold=support_ratio_threshold,
+            supporting_objects=supporting_objs
+        )
+        support_graph[obj.name] = support_node
+
+    for support_node in support_graph.values():
+        for name, score, _ in support_node.supporting_objects:
+            if name in support_graph:
+                support_graph[name].supported_objects.append((support_node.name, score, False))
 
     return support_graph
 
 def compute_placement_stability(object: Object,
                                 candidate_support_objs: List[Object],
-                                ground_plane: Trimesh,
-                                support_ratio_threshold: float = 0.7) -> Tuple[Dict[str, float], float]:
+                                ground_plane: Trimesh,) -> Tuple[Dict[str, float], float]:
     """
         Compute the stability of placing the object at its goal position based on support area analysis.
     """
@@ -76,6 +90,7 @@ def compute_placement_stability(object: Object,
 
     footprint = Polygon(object.mesh.vertices[:, :2]).convex_hull
     ground_contact_polygon = get_contact_polygon(object.mesh, ground_plane)
+    support_data['area'] = footprint.area
 
     if ground_contact_polygon:
         support_data['g'] = 1.0 # Ground provides full support
