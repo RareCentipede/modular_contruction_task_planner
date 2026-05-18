@@ -36,16 +36,16 @@ def create_support_relation_graph(world: World, support_ratio_threshold: float =
 
     objs = world.entities.get_entities(Object)
     objs = cast(List[Object], objs)
-    obj_with_goals = [obj for obj in objs if obj.goal.value]
+    obj_with_goals = np.array([obj for obj in objs if obj.goal.value])
     for obj in obj_with_goals:
         goal_pose = world.pose_dict.get(obj.goal.value) # type: ignore
         goal_pose_dict[obj.name] = goal_pose
+        # goal_pose.position[2] += obj.dim[2] / 2 # type: ignore
         obj.mesh
         obj.mesh.apply_transform(goal_pose.homogeneous) # type: ignore
 
     goal_poses = np.array([goal_pose.position for goal_pose in goal_pose_dict.values()])
     goal_positions = np.array([[g[0], g[1], g[2]] for g in goal_poses])
-
     # Create a ground plane at z=0
     max_x = np.max(goal_positions[:, 0]) + 1.0
     max_y = np.max(goal_positions[:, 1]) + 1.0
@@ -57,10 +57,10 @@ def create_support_relation_graph(world: World, support_ratio_threshold: float =
 
     for i, obj in enumerate(obj_with_goals):
         goal_pos = goal_positions[i]
-        candidate_position_idx = goal_positions[goal_positions[:, 2] < goal_pos[2]] # Objects below the current object
+        candidate_position_idx = goal_positions[:, 2] < goal_pos[2] # Objects below the current object
         candidate_objs = obj_with_goals[candidate_position_idx]
 
-        support_data, overall_support_area_ratio = compute_placement_stability(obj, candidate_objs, ground_mesh) # type: ignore
+        support_data, overall_support_area_ratio = compute_placement_stability(obj, candidate_objs, [], ground_mesh) # type: ignore
         supporting_objs = [(name, score, False) for name, score in support_data.items() if name != 'area' and name != 'g']
         support_node = SupportNode(
             name=obj.name,
@@ -70,6 +70,9 @@ def create_support_relation_graph(world: World, support_ratio_threshold: float =
             supporting_objects=supporting_objs
         )
         support_graph[obj.name] = support_node
+
+        if 'g' in support_data:
+            support_node.supporting_objects.append(('g', support_data['g'], False))
 
     for support_node in support_graph.values():
         for name, score, _ in support_node.supporting_objects:
@@ -83,7 +86,7 @@ def compute_placement_stability(object: Object | Trimesh,
                                 supp_names: List[str],
                                 ground_plane: Trimesh) -> Tuple[Dict[str, float], float]:
     """
-    Compute the stability of placing the object at its goal position based on support area analysis.
+        Compute the stability of placing the object at its goal position based on support area analysis.
     """
     support_data = {}
     support_polys = []
