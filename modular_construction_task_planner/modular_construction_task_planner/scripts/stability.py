@@ -78,11 +78,6 @@ def create_support_relation_graph(world: World, support_ratio_threshold: float =
 
     return support_graph
 
-import numpy as np
-from trimesh import Trimesh
-from shapely.geometry import Polygon
-from typing import Dict, List, Tuple, Optional, cast
-
 def compute_placement_stability(object: Object | Trimesh,
                                 candidate_support_objs: List[Object] | List[Trimesh],
                                 supp_names: List[str],
