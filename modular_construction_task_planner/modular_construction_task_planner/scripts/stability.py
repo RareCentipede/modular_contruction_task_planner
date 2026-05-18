@@ -1,6 +1,7 @@
 import trimesh
 import numpy as np
 import matplotlib.pyplot as plt
+import networkx as nx
 
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from trimesh import Trimesh
@@ -156,7 +157,6 @@ def get_contact_polygon(mesh_above: Trimesh, mesh_below: Trimesh, contact_z_tole
 
     return intersection_poly
 
-
 def make_box_mesh(size: list, position: list) -> trimesh.Trimesh:
     """Helper to generate a transformed Trimesh box given size and position."""
     mesh = trimesh.creation.box(extents=size)
@@ -241,5 +241,104 @@ def visualize_goal_structure(goal_data: dict, title: str = "Target Goal Structur
     # Initial camera view angle (isometric-leaning bird's-eye perspective)
     ax.view_init(elev=22, azim=-55)
     
+    plt.tight_layout()
+    plt.show()
+
+def visualize_support_node_graph(support_graph: Dict[str, 'SupportNode'], 
+                                 goal_data: Optional[Dict] = None, 
+                                 title: str = "Structural Support & Stability Graph"):
+    """
+        Visualizes the support relations using a dictionary of SupportNode objects.
+        
+        Args:
+            support_graph: Dict[str, SupportNode] mapping block names to their SupportNode.
+            goal_data: Optional dictionary from goal.yaml containing 'color' properties. 
+                    If omitted, nodes are color-coded by their stability status.
+            title: Title of the generated graph plot.
+    """
+    G = nx.DiGraph()
+    node_colors = []
+    labels = {}
+    
+    # 1. Build nodes and determine coloring strategy
+    for name, node in support_graph.items():
+        G.add_node(name)
+        
+        # Build text label to show at the center of the node
+        # Displays name, current support score, and required threshold
+        labels[name] = f"{name}\n({node.current_support_score:.2f}/{node.support_threshold:.2f})"
+        
+        # Color mapping logic
+        if goal_data and name in goal_data and 'color' in goal_data[name]:
+            # Use original block color from goal configuration if provided
+            node_colors.append(goal_data[name]['color'])
+        else:
+            # Fallback to status colors: Green for stable/supported, Orange-Red for unstable
+            if node.supported:
+                node_colors.append([0.2, 0.65, 0.3]) # Stable Green
+            else:
+                node_colors.append([0.85, 0.3, 0.2]) # Unstable Red
+
+    # 2. Extract directed edges
+    # Standardizing direction: 'supporting_objects' means Parent -> Child (This object)
+    for name, node in support_graph.items():
+        for parent_name, score, is_placed in node.supporting_objects:
+            # Add edge from the block that provides support to the block receiving it
+            if parent_name in support_graph:
+                G.add_edge(parent_name, name, weight=score)
+
+    # 3. Graph Presentation and Layout
+    plt.figure(figsize=(14, 10))
+    plt.title(title, fontsize=14, fontweight='bold', pad=15)
+    
+    try:
+        # Hierarchical layout prioritizing bottom-up structure mapping
+        pos_layout = nx.drawing.nx_agraph.graphviz_layout(G, prog='dot')
+    except (ImportError, OSError):
+        # Reliable spring/force-directed layout fallback
+        pos_layout = nx.spring_layout(G, k=1.5, seed=42)
+
+    # 4. Render Graph Elements
+    nx.draw_networkx_nodes(
+        G, pos_layout, 
+        node_color=node_colors, 
+        node_size=2800, 
+        edgecolors='#222222', 
+        linewidths=1.5,
+        alpha=0.9
+    )
+    
+    nx.draw_networkx_edges(
+        G, pos_layout, 
+        edge_color='#555555', 
+        width=2.0, 
+        arrowstyle='-|>', 
+        arrowsize=22, 
+        node_size=2800
+    )
+
+    # Extract weights from the graph edges to label them
+    edge_labels = {(u, v): f"{d['weight']:.2f}" for u, v, d in G.edges(data=True)}
+    nx.draw_networkx_edge_labels(G, pos_layout, edge_labels=edge_labels, font_size=8, font_color="#333333")
+
+    # Determine highly readable text contrast dynamically based on node color background brightness
+    for node_name, pos in pos_layout.items():
+        idx = list(G.nodes()).index(node_name)
+        bg_color = node_colors[idx]
+        
+        # Compute simple luminance to pick text color
+        luminance = 0.299 * bg_color[0] + 0.587 * bg_color[1] + 0.114 * bg_color[2]
+        text_color = 'white' if luminance < 0.6 else 'black'
+        
+        plt.text(
+            pos[0], pos[1], labels[node_name],
+            color=text_color,
+            fontsize=8,
+            fontweight='bold',
+            horizontalalignment='center',
+            verticalalignment='center'
+        )
+
+    plt.axis('off')
     plt.tight_layout()
     plt.show()
