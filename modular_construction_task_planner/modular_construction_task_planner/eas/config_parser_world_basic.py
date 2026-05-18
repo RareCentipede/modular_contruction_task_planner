@@ -75,6 +75,7 @@ def create_domains(init_config: Dict, goal_config: Dict) -> Dict[str, Tuple]:
     block_var_domain.append('')
     domains = {
         'pos': tuple(pos_var_domain),
+        'robo_pos': tuple(pos_var_domain),
         'block': tuple(block_var_domain),
         'bool': bool_var_domain
     }
@@ -110,6 +111,7 @@ def assign_entities_variable_values_and_create_pose_dict(init_config: Dict, goal
         pose_dict[pos_entity.name] = pose
         obj_entity.at.value = pos_entity.name
         obj_entity.on.value = gnd_obj_entity.name
+        obj_entity.dim = info['size']
 
         pos_entity.occupied_by.value = obj_entity.name
         pos_entity.on.value = gnd_pos_entity.name
