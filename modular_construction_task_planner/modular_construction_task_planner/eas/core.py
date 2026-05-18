@@ -26,7 +26,11 @@ class Pose:
     @property
     def homogeneous(self) -> np.ndarray:
         T = np.eye(4)
-        rotation = R.from_quat(self.orientation)
+        if len(self.orientation) == 3: # Euler angles
+            rotation = R.from_euler('xyz', self.orientation)
+        elif len(self.orientation) == 4: # Quaternion
+            rotation = R.from_quat(self.orientation)
+
         T[:3, :3] = rotation.as_matrix()
         T[:3, 3] = self.position
         return T
