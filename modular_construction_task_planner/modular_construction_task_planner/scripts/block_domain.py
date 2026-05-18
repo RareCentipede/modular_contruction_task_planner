@@ -1,6 +1,6 @@
 import numpy as np
 
-from trimesh import Trimesh
+from trimesh import Trimesh, creation
 from typing import List, Tuple, Callable
 from dataclasses import dataclass, field
 from modular_construction_task_planner.eas.core import (
@@ -88,12 +88,18 @@ class Object(Entity):
     placeable_from: List[str] = field(default_factory=list)
     surfaces: List[Surface] = field(default_factory=list)
     propagated_cost: float = 0.0
+    dim: List[float] = field(default_factory=list) # [length, width, height]
     _mesh: Trimesh | None = None
 
     @property
     def mesh(self) -> Trimesh:
         if self._mesh:
             return self._mesh
+
+        if not self.surfaces:
+            mesh = creation.box(extents=self.dim)
+            self._mesh = mesh
+            return mesh
 
         all_verts, all_faces = [], []
         offset = 0

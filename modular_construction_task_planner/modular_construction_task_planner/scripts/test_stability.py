@@ -106,7 +106,7 @@ def visualize_scenario(title: str,
     for mesh_below, name in zip(meshes_below, names_below):
         contact = get_contact_polygon(mesh_above, mesh_below)
         if contact:
-            draw_polygon_xy(ax, contact, bottom_z + 0.02, COLORS['contact'],
+            draw_polygon_xy(ax, contact, bottom_z + 0.02, COLORS['contact'], # type: ignore
                             f'contact ({name})')
 
     # Axis formatting
