@@ -91,7 +91,8 @@ class ModularConstructionTaskPlanner(Node):
 
         return response
 
-    def retrace_best_plan(self, goal_linked_states: List[LinkedState] | LinkedState) -> Tuple[List[Tuple[str, Tuple[str, ...]]], float]:
+    @staticmethod
+    def retrace_best_plan(goal_linked_states: List[LinkedState] | LinkedState) -> Tuple[List[Tuple[str, Tuple[str, ...]]], float]:
         # Backtrack to get all the plans with total costs
         plans = []
         if isinstance(goal_linked_states, LinkedState):

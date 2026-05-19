@@ -23,9 +23,9 @@ class SupportNode:
     support_threshold: float
     total_support_ratio: float = 0.0
     current_support_score: float = 0.0
-    supporting_objects: List[Tuple[str, float, bool]] = field(default_factory=list) # Objects that support THIS object.
+    supporting_objects: Dict[str, Tuple[float, bool]] = field(default_factory=dict) # Objects that support THIS object.
     # (name, support_score, is_placed)
-    supported_objects: List[Tuple[str, float, bool]] = field(default_factory=list) # Objects that this object SUPPORTS
+    supported_objects: Dict[str, Tuple[float, bool]] = field(default_factory=dict) # Objects that this object SUPPORTS
     support_combo_dict: Dict[Tuple[str, ...], float] = field(default_factory=dict) # For future use: mapping of specific combinations of supporting objects to their combined support score.
 
     @property
@@ -69,7 +69,7 @@ def create_support_relation_graph(world: World, support_ratio_threshold: float =
         candidate_objs = obj_with_goals[candidate_position_idx]
 
         support_data, overall_support_area_ratio = compute_placement_stability(obj, candidate_objs, [], ground_mesh) # type: ignore
-        supporting_objs = [(name, score, False) for name, score in support_data.items() if name != 'area' and name != 'g']
+        supporting_objs = {name: (score, False) for name, score in support_data.items() if name != 'area' and name != 'g'}
         support_node = SupportNode(
             name=obj.name,
             area=support_data['area'],
@@ -80,13 +80,13 @@ def create_support_relation_graph(world: World, support_ratio_threshold: float =
         support_graph[obj.name] = support_node
 
         if 'g' in support_data:
-            support_node.supporting_objects.append(('g', support_data['g'], True)) # Ground support is considered already placed
+            support_node.supporting_objects['g'] = (support_data['g'], True) # Ground support is considered already placed
             support_node.current_support_score += support_data['g']
 
     for support_node in support_graph.values():
-        for name, score, _ in support_node.supporting_objects:
+        for name, (score, _) in support_node.supporting_objects.items():
             if name in support_graph:
-                support_graph[name].supported_objects.append((support_node.name, score, False))
+                support_graph[name].supported_objects[support_node.name] = (score, False)
 
     return ground_mesh, support_graph
 
@@ -300,7 +300,7 @@ def visualize_support_node_graph(support_graph: Dict[str, 'SupportNode'],
     # 2. Extract directed edges
     # Standardizing direction: 'supporting_objects' means Parent -> Child (This object)
     for name, node in support_graph.items():
-        for parent_name, score, is_placed in node.supporting_objects:
+        for parent_name, (score, is_placed) in node.supporting_objects.items():
             # Add edge from the block that provides support to the block receiving it
             if parent_name in support_graph:
                 G.add_edge(parent_name, name, weight=score)
@@ -411,7 +411,7 @@ def find_feasible_block_sequence(support_graph: Dict[str, SupportNode]) -> List[
             return []
 
         tentative_total_support_score = 0.0
-        for parent_name, score, _ in node.supporting_objects:
+        for parent_name, (score, _) in node.supporting_objects.items():
             tentative_total_support_score += score
             if parent_name in support_graph:
                 G.add_edge(parent_name, name)

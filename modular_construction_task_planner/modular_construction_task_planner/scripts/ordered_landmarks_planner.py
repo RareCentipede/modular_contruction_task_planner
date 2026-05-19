@@ -218,10 +218,22 @@ class OrderedLandmarksPlanner:
             self.world.update_state()
             self.generate_new_linked_state(action_name, action_params, self.current_cost)
 
+            if action_name == 'place':
+                support_score = 1 - weighted_branch[2]
+                obj_entity = cast(Object, action_params['object'])
+                obj_support_node = support_graph[obj_entity.name]
+                obj_support_node.current_support_score = support_score
+
+                for supported_name, supported_edge in obj_support_node.supported_objects.items():
+                    obj_support_node.supported_objects[supported_name] = (supported_edge[0], True)
+                    supported_obj_support_node = support_graph[supported_name]
+                    supported_obj_support_node.supporting_objects[obj_entity.name] = (supported_edge[0], True)
+
             if self.world.goal_reached:
                 print("GOAL REACHED using stable lazy heuristic!")
                 self.current_linked_state.goal = True
                 self.goal_linked_states.append(self.current_linked_state)
+                self.goal_linked_state = self.current_linked_state
                 print(f"{len(self.goal_linked_states)} goal linked states found so far. {len(self.goal_linked_states)}/"
                       f"{self.num_potential_solutions} potential solutions explored.")
                 break
@@ -434,7 +446,7 @@ class OrderedLandmarksPlanner:
         supporting_objs = []
         supp_names = []
 
-        for parent_name, score, is_placed in obj_support_node.supporting_objects:
+        for parent_name, (score, is_placed) in obj_support_node.supporting_objects.items():
             if is_placed:
                 branch_support_score += score
                 parent_obj = self.world.entities.get_entities(parent_name)
@@ -568,6 +580,30 @@ class OrderedLandmarksPlanner:
                 parent = child_linked_state[1]
 
         return cost
+
+    @staticmethod
+    def retrace_best_plan(goal_linked_states: List[LinkedState] | LinkedState) -> Tuple[List[Tuple[str, Tuple[str, ...]]], float]:
+        # Backtrack to get all the plans with total costs
+        plans = []
+        if isinstance(goal_linked_states, LinkedState):
+            goal_linked_states = [goal_linked_states]
+
+        for goal_linked_state in goal_linked_states:
+            plan = []
+            total_cost = 0.0
+            current_linked_state = goal_linked_state
+            parent = current_linked_state.parent
+            while parent is not None:
+                plan.append(current_linked_state.action_from_parent)  # (action_name, involved_entities)
+                current_linked_state = parent[1]
+                parent = current_linked_state.parent
+
+            total_cost = goal_linked_state.cost
+            plan.reverse()  # Reverse to get the correct order from initial state to goal
+            plans.append((plan, total_cost))
+
+        best_plan = min(plans, key=lambda plan: plan[1])  # Get the plan with the lowest total cost
+        return best_plan
 
 def compute_dists_from_points_to_vector(points: np.ndarray, vector: np.ndarray, start_point: np.ndarray, 
                                         verbose: bool = False) -> Tuple[np.ndarray, np.ndarray]:

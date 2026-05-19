@@ -4,7 +4,7 @@ from yaml import safe_load
 
 from modular_construction_task_planner.scripts.ordered_landmarks_planner import OrderedLandmarksPlanner
 from modular_construction_task_planner.eas.config_parser_world_basic import parse_configs_to_world
-from modular_construction_task_planner.scripts.block_domain import PickAction, PlaceAction, MoveAction
+from modular_construction_task_planner.scripts.block_domain import PickAction, PlaceAction, TransitAction, TransportAction
 from modular_construction_task_planner.scripts.stability import (
     visualize_goal_structure,
     create_support_relation_graph,
@@ -14,17 +14,17 @@ from modular_construction_task_planner.scripts.stability import (
 def main():
     goal_linked_state = None
     problem_config_path = "src/object_rearrangement_ros2_sim/mpnp_simulation/config/problem_configs/"
-    problem_name = "temple_facade"
+    problem_name = "interlocking_pyramid"
     world = parse_configs_to_world(problem_name, problem_config_path)
     for ent in world.entities.entities:
-        print(ent.state)
+        print(f"{ent.name}: {ent.state}")
 
     goal_config = safe_load(open(f"{problem_config_path}/{problem_name}/goal.yaml", 'r'))
     colors = visualize_goal_structure(goal_config, show=False)
 
     action_dict = {
-        'transit': MoveAction,
-        'transport': MoveAction,
+        'transit': TransitAction,
+        'transport': TransportAction,
         'pick': PickAction,
         'place': PlaceAction
     }
@@ -36,7 +36,14 @@ def main():
     goal_linked_state = planner.run_stable_planner(support_graph, ground_mesh)
 
     if goal_linked_state:
-        print(f"Goal linked state found!")
+        print(f"Goal linked state found! :)")
+        plan, _ = planner.retrace_best_plan(goal_linked_state)
+        print(f"Plan found with {len(plan)} actions:")
+        for action in plan:
+            if action[0] == 'pick':
+                print(action[1])
+    else:
+        print(f"Goal linked state not found :(.")
 
     plt.show()
 

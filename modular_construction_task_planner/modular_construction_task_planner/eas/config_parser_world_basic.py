@@ -53,6 +53,7 @@ def create_domains(init_config: Dict, goal_config: Dict) -> Dict[str, Tuple]:
     idx = 1
     block_var_domain = []
     pos_var_domain = []
+    robo_pos_var_domain = []
     bool_var_domain = (True, False)
 
     for obj_name in init_config.keys():
@@ -61,12 +62,19 @@ def create_domains(init_config: Dict, goal_config: Dict) -> Dict[str, Tuple]:
 
         if obj_name != "robot":
             block_var_domain.append(obj_name)
+            robot_pos_name = obj_name + '_pick_target0'
+            robo_pos_var_domain.append(robot_pos_name)
+        else:
+            robot_pos_name = 'r_init_pos'
+            robo_pos_var_domain.append(robot_pos_name)
 
         idx += 1
 
-    for _ in goal_config.values():
+    for obj_name in goal_config.keys():
         pos_name = 'p' + str(idx)
+        robot_pos_name = obj_name + '_place_target0'
         pos_var_domain.append(pos_name)
+        robo_pos_var_domain.append(robot_pos_name)
         idx += 1
 
     pos_var_domain.append('g')
@@ -75,7 +83,7 @@ def create_domains(init_config: Dict, goal_config: Dict) -> Dict[str, Tuple]:
     block_var_domain.append('')
     domains = {
         'pos': tuple(pos_var_domain),
-        'robo_pos': tuple(pos_var_domain),
+        'robo_pos': tuple(robo_pos_var_domain),
         'block': tuple(block_var_domain),
         'bool': bool_var_domain
     }
@@ -89,8 +97,7 @@ def create_entities(domains: Dict[str, Tuple]) -> Entities:
     for pos in domains['pos']:
         entities.append(PosEntity(pos))
     for robo_pos in domains['robo_pos']:
-        if robo_pos not in domains['pos']:
-            entities.append(PosEntity(robo_pos))
+        entities.append(PosEntity(robo_pos))
     entities.append(Robot('robot'))
 
     return Entities(entities)
@@ -111,10 +118,10 @@ def assign_entities_variable_values_and_create_pose_dict(init_config: Dict, goal
         pose_dict[pos_entity.name] = pose
         obj_entity.at.value = pos_entity.name
         obj_entity.on.value = gnd_obj_entity.name
-        obj_entity.placeable_from = [pos_entity.name]
-        obj_entity.reachable_from = [pos_entity.name]
+        obj_entity.reachable_from = [f'{obj_entity.name}_pick_target0']
         obj_entity.dim = info['size']
 
+        pose_dict[f'{obj_entity.name}_pick_target0'] = pose
         pos_entity.occupied_by.value = obj_entity.name
         pos_entity.on.value = gnd_pos_entity.name
         pos_entity.clear.value = False
@@ -123,9 +130,9 @@ def assign_entities_variable_values_and_create_pose_dict(init_config: Dict, goal
         pos_counter += 1
 
     robot_entity = cast(Robot, entities.get_entities('robot'))
-    robot_entity.at.value = pos_entities[pos_counter].name
-    pose_dict[pos_entities[pos_counter].name] = Pose(init_config['robot']['position'],
-                                                     init_config['robot']['orientation'])
+    robot_entity.at.value = 'r_init_pos'
+    pose_dict[robot_entity.at.value] = Pose(init_config['robot']['position'],
+                                            init_config['robot']['orientation'])
 
     for obj_name, info, pos_entity in zip(goal_config.keys(), goal_config.values(), pos_entities[pos_counter+1:-2]):
         pos_val = info['position']
@@ -135,6 +142,8 @@ def assign_entities_variable_values_and_create_pose_dict(init_config: Dict, goal
             pose_dict[pos_entity.name] = pose
             pos_entity.clear.value = True
             pos_entity.on.value = gnd_pos_entity.name
+            obj_entity.placeable_from = [f'{obj_entity.name}_place_target0']
+            pose_dict[f'{obj_entity.name}_place_target0'] = pose
 
             if obj_name != "robot":
                 obj_entity = cast(Object, entities.get_entities(obj_name))
