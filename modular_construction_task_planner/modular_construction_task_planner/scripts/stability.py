@@ -33,7 +33,7 @@ class SupportNode:
         return self.current_support_score >= self.support_threshold
 
 # Assume cubes
-def create_support_relation_graph(world: World, support_ratio_threshold: float = 0.7) -> Dict[str, SupportNode]:
+def create_support_relation_graph(world: World, support_ratio_threshold: float = 0.7) -> Tuple[Trimesh, Dict[str, SupportNode]]:
     """
         Create a support relation graph based on the current world state.
         Each node represents an object, and edges represent support relationships.
@@ -87,7 +87,7 @@ def create_support_relation_graph(world: World, support_ratio_threshold: float =
             if name in support_graph:
                 support_graph[name].supported_objects.append((support_node.name, score, False))
 
-    return support_graph
+    return ground_mesh, support_graph
 
 def compute_placement_stability(object: Object | Trimesh,
                                 candidate_support_objs: List[Object] | List[Trimesh],

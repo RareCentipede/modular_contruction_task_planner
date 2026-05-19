@@ -1,3 +1,4 @@
+from trimesh import Trimesh
 import numpy as np
 
 from enum import Enum
@@ -11,6 +12,7 @@ from modular_construction_task_planner.eas.core import (
 from modular_construction_task_planner.scripts.block_domain import (
     Action, Object, PosEntity, Robot,
 )
+from modular_construction_task_planner.scripts.stability import SupportNode, compute_placement_stability
 from path_planner.path_planner_node import GridGraph, OCCUPANCY
 
 HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT ANTICIPATORY')
@@ -24,10 +26,11 @@ HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT ANTICIPATORY')
 """
 
 class OrderedLandmarksPlanner:
-    def __init__(self, world: World, action_dict: Dict[str, Action], gg: Optional[GridGraph]) -> None:
+    def __init__(self, world: World, action_dict: Dict[str, Action], gg: Optional[GridGraph] = None) -> None:
         self.world: World = world
         self.action_dict: Dict[str, Action] = action_dict
         self.gg: Optional[GridGraph] = gg
+
         self.state_counter: int = 0
 
         self.current_state: State = world.current_state
@@ -177,6 +180,50 @@ class OrderedLandmarksPlanner:
                 if self.solution_count <= 0:
                     print("Solution count limit reached, terminating search.")
                     break
+
+        return self.goal_linked_state
+
+    def run_stable_planner(self, support_graph: Dict[str, SupportNode], ground_mesh: Trimesh) -> Optional[LinkedState]:
+        # Branch out
+        # For Transit actions, also check the stability of the target block.
+            # First sum up the individual support scores of supporting objects that are already placed. If the total
+            # score exceeds the threshold, then the block can be considered stable.
+            # Otherwise, run compute_placement_stability to get a more accurate score and compare again.
+            # Record this score combination in the node in case it needs to be queries again.
+        # If unstable, prune the branch.
+
+        while self.current_linked_state.status == StateStatus.ALIVE:
+            self.branch_out(self.current_linked_state)
+            if not self.current_linked_state.branches_to_explore:
+                print("No branches to explore, backtracking...")
+                self.backtrack()
+                continue
+
+            weighted_branch = min(self.current_linked_state.branches_to_explore, key=lambda x: x[2])
+            action_name, action_params, cost = weighted_branch
+            self.current_cost += cost
+            action = self.action_dict[action_name]
+            # print(f"Executing: {action_name} with params {[str(param) + ': ' + str(ent.name) \
+                # for param, ent in action_params.items()]} and cost {cost}")
+            action.execute(action_params)
+            if self.gg:
+                if action_name == 'pick':
+                    obj_pos = self.world.pose_dict[action_params['target_pose'].name].position[:2]
+                    self.gg.update_block_move(obj_pos, OCCUPANCY.FREE)
+                elif action_name == 'place':
+                    obj_pos = self.world.pose_dict[action_params['target_pose'].name].position[:2]
+                    self.gg.update_block_move(obj_pos, OCCUPANCY.OCCUPIED)
+
+            self.world.update_state()
+            self.generate_new_linked_state(action_name, action_params, self.current_cost)
+
+            if self.world.goal_reached:
+                print("GOAL REACHED using lazy heuristic!")
+                self.current_linked_state.goal = True
+                self.goal_linked_states.append(self.current_linked_state)
+                print(f"{len(self.goal_linked_states)} goal linked states found so far. {len(self.goal_linked_states)}/"
+                      f"{self.num_potential_solutions} potential solutions explored.")
+                break
 
         return self.goal_linked_state
 
@@ -358,6 +405,37 @@ class OrderedLandmarksPlanner:
                 evaluated_branches.append((action_name, branch, cost))
 
         return evaluated_branches
+
+    def evaluate_obj_stability(self, obj: Object, support_graph: Dict[str, SupportNode], ground_mesh: Trimesh) -> Tuple[bool, float]:
+        """
+            Evaluate the stability of the branch by checking the support score of the target block after placing.
+            If the score is below the threshold, return a high cost to discourage exploring this branch.
+
+            Returns a tuple of whether the placement is stable and the support score.
+        """
+        branch_support_score = 0.0
+        obj_support_node = support_graph[obj.name]
+        supporting_objs = []
+        supp_names = []
+
+        for parent_name, score, is_placed in obj_support_node.supporting_objects:
+            if is_placed:
+                branch_support_score += score
+                parent_obj = self.world.entities.get_entities(parent_name)
+                parent_obj = cast(Object, parent_obj)
+                supporting_objs.append(parent_obj)
+                supp_names.append(parent_name)
+
+        is_stable = branch_support_score >= obj_support_node.support_threshold
+
+        if not is_stable:
+            overall_support_score = obj_support_node.support_combo_dict.get(tuple(supp_names), None)
+            if not overall_support_score:
+                _, overall_support_score = compute_placement_stability(obj, supporting_objs, [], ground_mesh)
+                obj_support_node.support_combo_dict.update({tuple(supp_names): overall_support_score})
+
+        is_stable = overall_support_score >= obj_support_node.support_threshold
+        return is_stable, branch_support_score
 
     def simple_collision_heuristic(self, start_pos: List[float], target_pos: List[float]) -> float:
         """
