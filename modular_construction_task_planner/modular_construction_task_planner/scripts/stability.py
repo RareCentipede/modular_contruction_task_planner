@@ -26,6 +26,7 @@ class SupportNode:
     supporting_objects: List[Tuple[str, float, bool]] = field(default_factory=list) # Objects that support THIS object.
     # (name, support_score, is_placed)
     supported_objects: List[Tuple[str, float, bool]] = field(default_factory=list) # Objects that this object SUPPORTS
+    support_combo_dict: Dict[Tuple[str, ...], float] = field(default_factory=dict) # For future use: mapping of specific combinations of supporting objects to their combined support score.
 
     @property
     def supported(self) -> bool:
@@ -407,9 +408,18 @@ def find_feasible_block_sequence(support_graph: Dict[str, SupportNode]) -> List[
         if not node.supporting_objects:
             print(f"Block '{name}' has no supports, invalid structure!")
             return []
-        for parent_name, _, _ in node.supporting_objects:
+
+        tentative_total_support_score = 0.0
+        for parent_name, score, _ in node.supporting_objects:
+            tentative_total_support_score += score
             if parent_name in support_graph:
                 G.add_edge(parent_name, name)
+
+        if (tentative_total_support_score < node.support_threshold and len(node.supporting_objects) < 2) or \
+            tentative_total_support_score < 1e-3: # If the total support score is negligible, treat it as unsupported
+            print(f"Block '{name}' with support score {tentative_total_support_score:.2f} "
+                  f"does not meet support threshold with current supports, invalid structure!")
+            return []
 
     try:
         # Perform topological sort to find a valid placement sequence
