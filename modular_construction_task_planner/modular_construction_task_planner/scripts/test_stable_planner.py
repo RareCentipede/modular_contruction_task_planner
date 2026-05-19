@@ -54,7 +54,7 @@ def main():
                 block_sequence.append(action[1][1])
 
         construction_animation = animate_construction_sequence(goal_config, block_sequence, interval=1000)
-        construction_animation.save('src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/movies/construction_sequence.gif', writer='pillow')
+        construction_animation.save(f'src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/movies/{problem_name}.gif', writer='pillow')
     else:
         print(f"Goal linked state not found :(.")
 
