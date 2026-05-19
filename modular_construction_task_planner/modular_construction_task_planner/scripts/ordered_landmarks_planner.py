@@ -15,7 +15,7 @@ from modular_construction_task_planner.scripts.block_domain import (
 from modular_construction_task_planner.scripts.stability import SupportNode, compute_placement_stability
 from path_planner.path_planner_node import GridGraph, OCCUPANCY
 
-HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT ANTICIPATORY')
+HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT ANTICIPATORY STABLE_DISCRETE STABLE')
 """
     LAZY: Only considers the euclidean distance to the target for the preferred action.
     SIMPLE_COLLISION: Checks for collisions and adds lazy collision cost if applicable. Lazy collision cost is the arc length
@@ -23,6 +23,8 @@ HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT ANTICIPATORY')
                        half with of the robot base.
     DILIGENT: Runs full path planning for evaluation.
     ANTICIPATORY: Considers the hindrance the current action places onto future actions.
+    STABLE_DISCRETE: For place actions, just checks if the place action can be performed.
+    STABLE: For place actions, uses the stability score as a heuristic.
 """
 
 class OrderedLandmarksPlanner:
@@ -192,6 +194,9 @@ class OrderedLandmarksPlanner:
             # Record this score combination in the node in case it needs to be queries again.
         # If unstable, prune the branch.
 
+        self.support_graph = support_graph
+        self.ground_mesh = ground_mesh
+
         while self.current_linked_state.status == StateStatus.ALIVE:
             self.branch_out(self.current_linked_state)
             if not self.current_linked_state.branches_to_explore:
@@ -321,7 +326,8 @@ class OrderedLandmarksPlanner:
 
             case "transit":
                 potential_target_objs = cast(List[Object], self.world.not_at_goal_entities)
-                potential_target_pos_vals = [obj.reachable_from for obj in potential_target_objs if obj.goal.value]
+                potential_target_objs = [obj for obj in potential_target_objs if obj.goal.value] # Only consider objects that still need to be placed
+                potential_target_pos_vals = [obj.reachable_from for obj in potential_target_objs]
                 potential_target_pos_vals = [pos for sublist in potential_target_pos_vals for pos in sublist]
 
                 for target_pos in potential_target_pos_vals:
@@ -364,15 +370,25 @@ class OrderedLandmarksPlanner:
 
         return branches
 
-    def evaluate_branches(self, branches: List[Dict[str, Entity]], action_name: str,
+    def evaluate_branches(self,
+                          branches: List[Dict[str, Entity]],
+                          action_name: str,
                           heuristic: HEURISTIC = HEURISTIC.LAZY) -> List[Tuple[str, Dict[str, Entity], float]]:
         """
             Evaluate the given branches and return a list of tuples of the branch and its cost, which is defined as the
             euclidean distance between the robot and the target. The branch with the lowest cost will be explored first.
         """
         evaluated_branches = []
-        if action_name == "pick" or action_name == "place":
+        if action_name == "pick":
             evaluated_branches = [(action_name, branch, 0.0) for branch in branches]
+        elif action_name == "place":
+            if heuristic == HEURISTIC.STABLE_DISCRETE or heuristic == HEURISTIC.STABLE:
+                for branch in branches:
+                    obj_entity = cast(Object, branch['object'])
+                    is_stable, support_score = self.evaluate_obj_stability(obj_entity, self.support_graph, self.ground_mesh)
+                    if is_stable:
+                        cost = 1 - support_score if heuristic == HEURISTIC.STABLE else 0.0
+                        evaluated_branches.append((action_name, branch, cost))
         elif action_name == "transit" or action_name == "transport":
             for branch in branches:
                 start_pos = branch['start_pose'].name
