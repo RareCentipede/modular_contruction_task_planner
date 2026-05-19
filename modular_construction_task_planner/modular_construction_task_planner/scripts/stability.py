@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import networkx as nx
 
+from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from trimesh import Trimesh
 from shapely.geometry import Polygon
@@ -428,3 +429,99 @@ def find_feasible_block_sequence(support_graph: Dict[str, SupportNode]) -> List[
         return placement_sequence
     except nx.NetworkXUnfeasible:
         raise ValueError("The support graph contains cycles, no valid placement sequence exists.")
+
+def animate_construction_sequence(goal_data: dict, placement_sequence: list, interval: int = 800, show: bool = False):
+    """
+        Animates the assembly process step-by-step. 
+        Unplaced blocks appear as faint gray references; placed blocks snap in with their true colors.
+        
+        Args:
+            goal_data: The parsed dictionary from goal.yaml {block_name: {position, size, color}}
+            placement_sequence: A sorted list of block names specifying the order of assembly
+                                e.g., ['block1', 'block4', 'block2', ...]
+            interval: Delay between sequence frames in milliseconds
+    """
+    fig = plt.figure(figsize=(12, 9))
+    ax = fig.add_subplot(111, projection='3d')
+    
+    # Pre-calculate meshes and vertices for bounding limits
+    block_meshes = {}
+    all_vertices = []
+    
+    for name, data in goal_data.items():
+        if name == 'robot' or 'position' not in data:
+            continue
+        mesh = make_box_mesh(data['size'], data['position'])
+        block_meshes[name] = mesh
+        all_vertices.append(mesh.vertices)
+        
+    # Calculate global workspace dimensions dynamically
+    flat_verts = np.vstack(all_vertices)
+    max_x, min_x = flat_verts[:, 0].max(), flat_verts[:, 0].min()
+    max_y, min_y = flat_verts[:, 1].max(), flat_verts[:, 1].min()
+    max_z = flat_verts[:, 2].max()
+    margin = 1.5
+
+    # Core updates loop executed on every step
+    def update(frame_idx):
+        ax.clear()  # Wipe canvas to prevent collection layering artifacts
+        
+        # Configure layout styling and perspective rules
+        ax.set_title(f"Assembly Progress: Step {frame_idx}/{len(placement_sequence)}", 
+                     fontsize=14, fontweight='bold', pad=20)
+        ax.set_xlabel('X (Width)')
+        ax.set_ylabel('Y (Depth)')
+        ax.set_zlabel('Z (Height)')
+        ax.set_xlim(min_x - margin, max_x + margin)
+        ax.set_ylim(min_y - margin, max_y + margin)
+        ax.set_zlim(0, max_z + margin)
+        ax.view_init(elev=22, azim=-55)
+        
+        # Draw explicit base floor grid
+        extent_x = max(abs(min_x), abs(max_x)) + margin
+        extent_y = max(abs(min_y), abs(max_y)) + margin
+        gx, gy = np.meshgrid(np.linspace(-extent_x, extent_x, 10), np.linspace(-extent_y, extent_y, 10))
+        ax.plot_wireframe(gx, gy, np.zeros_like(gx), color=(0.7, 0.7, 0.7, 0.15), linewidth=0.8)
+
+        # Slice sequence to find out what has been physically anchored up to this frame
+        built_so_far = set(placement_sequence[:frame_idx])
+
+        # Draw all objects
+        for name, mesh in block_meshes.items():
+            tris = mesh.vertices[mesh.faces]
+            
+            if name in built_so_far:
+                # Block is placed: draw in full vivid color
+                true_color = goal_data[name].get('color', [0.2, 0.5, 0.8])
+                face_color = true_color[:3]
+                alpha_val = true_color[3] if len(true_color) == 4 else 0.75
+                edge_color = [0.1, 0.1, 0.1]
+                edge_width = 0.8
+            else:
+                # Block is unplaced: draw as a faint gray phantom outline reference
+                face_color = [0.85, 0.85, 0.85]
+                alpha_val = 0.08  # Faint transparent face filling
+                edge_color = [0.6, 0.6, 0.6, 0.25]  # Muted grey dashed borders
+                edge_width = 0.5
+
+            poly3d = Poly3DCollection(tris, alpha=alpha_val)
+            poly3d.set_facecolor(face_color)
+            poly3d.set_edgecolor(edge_color)
+            poly3d.set_linewidth(edge_width)
+            ax.add_collection3d(poly3d)
+
+    # Frame count maps to total pieces + 1 starting state frame (nothing built)
+    total_frames = len(placement_sequence) + 1
+    
+    anim = FuncAnimation(
+        fig, update, 
+        frames=total_frames, 
+        interval=interval, 
+        repeat=True, 
+        blit=False
+    )
+    
+    plt.tight_layout()
+    if show:
+        plt.show()
+    return anim
