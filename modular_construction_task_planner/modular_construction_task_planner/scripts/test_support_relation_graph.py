@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 from shapely.geometry import Polygon
 from typing import Optional, Dict, Tuple, List
@@ -18,11 +19,11 @@ def main():
     world = parse_configs_to_world(problem_name, problem_config_path)
 
     goal_config = safe_load(open(f"{problem_config_path}/{problem_name}/goal.yaml", 'r'))
-    visualize_goal_structure(goal_config)
+    colors = visualize_goal_structure(goal_config, show=False)
 
     # Create support relation graph
     support_graph = create_support_relation_graph(world)
-    visualize_support_node_graph(support_graph)
+    visualize_support_node_graph(support_graph, colors=colors, show=False)
 
     # Print support relationships
     for obj_name, node in support_graph.items():
@@ -31,6 +32,8 @@ def main():
         print(f"  Supports: {[f'{name} (Score: {score:.2f})' for name, score, _ in node.supported_objects]}")
         print(f"  Supported by: {[f'{name} (Score: {score:.2f})' for name, score, _ in node.supporting_objects]}")
         print()
+
+    plt.show()
 
 if __name__ == "__main__":
     main()

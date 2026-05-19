@@ -1,6 +1,9 @@
 import trimesh
+import colorsys
+import random
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import networkx as nx
 
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
@@ -165,7 +168,7 @@ def make_box_mesh(size: list, position: list) -> trimesh.Trimesh:
     mesh.apply_translation(position)
     return mesh
 
-def visualize_goal_structure(goal_data: dict, title: str = "Target Goal Structure Layout"):
+def visualize_goal_structure(goal_data: dict, title: str = "Target Goal Structure Layout", show: bool = True) -> List[List[float]]:
     """
         Visualizes the parsed goal.yaml structure in 3D.
         
@@ -179,20 +182,23 @@ def visualize_goal_structure(goal_data: dict, title: str = "Target Goal Structur
     ax.set_title(title, fontsize=14, fontweight='bold', pad=20)
 
     all_vertices = []
-    
     # Track unique colors for the legend if needed
-    legend_patches = []
+    legends = []
+    unique_colors = generate_nice_colors(len(goal_data))
 
     # Iterate and draw each block
-    for name, data in goal_data.items():
+    for (name, data), random_color in zip(goal_data.items(), unique_colors):
         if name == 'robot' or 'position' not in data:
             continue
-            
+
+        patch = mpatches.Patch(color=random_color, label=name, alpha=0.8)
+        legends.append(patch)
+
         pos = data['position']
         size = data['size']
         # Default to a nice slate blue if color isn't provided in the goal dict
-        color = data.get('color', [0.2, 0.5, 0.8]) 
-        
+        color = data.get('color', random_color) 
+
         # Ensure alpha/transparency channel is attached for clear overlay overlapping
         if len(color) == 3:
             color = list(color) + [0.6]
@@ -207,7 +213,7 @@ def visualize_goal_structure(goal_data: dict, title: str = "Target Goal Structur
         poly3d.set_facecolor(color[:3])
         poly3d.set_edgecolor([0.1, 0.1, 0.1]) # Crisp dark edges
         poly3d.set_linewidth(0.6)
-        
+
         ax.add_collection3d(poly3d)
 
     # Compile vertices to set appropriate axis bounds dynamically
@@ -216,7 +222,7 @@ def visualize_goal_structure(goal_data: dict, title: str = "Target Goal Structur
         max_x, min_x = flat_verts[:, 0].max(), flat_verts[:, 0].min()
         max_y, min_y = flat_verts[:, 1].max(), flat_verts[:, 1].min()
         max_z = flat_verts[:, 2].max()
-        
+
         margin = 1.0
         ax.set_xlim(min_x - margin, max_x + margin)
         ax.set_ylim(min_y - margin, max_y + margin)
@@ -237,16 +243,30 @@ def visualize_goal_structure(goal_data: dict, title: str = "Target Goal Structur
     ax.set_xlabel('X (Width)', fontweight='bold')
     ax.set_ylabel('Y (Depth)', fontweight='bold')
     ax.set_zlabel('Z (Height)', fontweight='bold')
-    
+
     # Initial camera view angle (isometric-leaning bird's-eye perspective)
     ax.view_init(elev=22, azim=-55)
-    
-    plt.tight_layout()
-    plt.show()
 
-def visualize_support_node_graph(support_graph: Dict[str, 'SupportNode'], 
-                                 goal_data: Optional[Dict] = None, 
-                                 title: str = "Structural Support & Stability Graph"):
+    ax.legend(
+        handles=legends,
+        loc='upper left',
+        bbox_to_anchor=(1.05, 1), # Moves the legend just to the right of the plot area
+        borderaxespad=0.,
+        title="Objects List",
+        title_fontproperties={'weight': 'bold'}
+    )
+
+    plt.tight_layout()
+    if show:
+        plt.show()
+
+    return unique_colors
+
+def visualize_support_node_graph(support_graph: Dict[str, 'SupportNode'],
+                                 goal_data: Optional[Dict] = None,
+                                 colors: List[List[float]] = [],
+                                 title: str = "Structural Support & Stability Graph",
+                                 show: bool = True):
     """
         Visualizes the support relations using a dictionary of SupportNode objects.
         
@@ -257,23 +277,19 @@ def visualize_support_node_graph(support_graph: Dict[str, 'SupportNode'],
             title: Title of the generated graph plot.
     """
     G = nx.DiGraph()
-    node_colors = []
+    node_colors = colors
     labels = {}
-    
+
     # 1. Build nodes and determine coloring strategy
     for name, node in support_graph.items():
         G.add_node(name)
-        
+
         # Build text label to show at the center of the node
         # Displays name, current support score, and required threshold
         labels[name] = f"{name}\n({node.current_support_score:.2f}/{node.support_threshold:.2f})"
-        
+
         # Color mapping logic
-        if goal_data and name in goal_data and 'color' in goal_data[name]:
-            # Use original block color from goal configuration if provided
-            node_colors.append(goal_data[name]['color'])
-        else:
-            # Fallback to status colors: Green for stable/supported, Orange-Red for unstable
+        if not node_colors:
             if node.supported:
                 node_colors.append([0.2, 0.65, 0.3]) # Stable Green
             else:
@@ -290,7 +306,7 @@ def visualize_support_node_graph(support_graph: Dict[str, 'SupportNode'],
     # 3. Graph Presentation and Layout
     plt.figure(figsize=(14, 10))
     plt.title(title, fontsize=14, fontweight='bold', pad=15)
-    
+
     try:
         # Hierarchical layout prioritizing bottom-up structure mapping
         pos_layout = nx.drawing.nx_agraph.graphviz_layout(G, prog='dot')
@@ -307,7 +323,7 @@ def visualize_support_node_graph(support_graph: Dict[str, 'SupportNode'],
         linewidths=1.5,
         alpha=0.9
     )
-    
+
     nx.draw_networkx_edges(
         G, pos_layout, 
         edge_color='#555555', 
@@ -325,11 +341,11 @@ def visualize_support_node_graph(support_graph: Dict[str, 'SupportNode'],
     for node_name, pos in pos_layout.items():
         idx = list(G.nodes()).index(node_name)
         bg_color = node_colors[idx]
-        
+
         # Compute simple luminance to pick text color
         luminance = 0.299 * bg_color[0] + 0.587 * bg_color[1] + 0.114 * bg_color[2]
         text_color = 'white' if luminance < 0.6 else 'black'
-        
+
         plt.text(
             pos[0], pos[1], labels[node_name],
             color=text_color,
@@ -341,4 +357,33 @@ def visualize_support_node_graph(support_graph: Dict[str, 'SupportNode'],
 
     plt.axis('off')
     plt.tight_layout()
-    plt.show()
+
+    if show:
+        plt.show()
+
+def generate_nice_colors(num_colors: int) -> list:
+    """
+        Generates a list of distinct, visually cohesive RGB colors using HSV.
+        
+        Args:
+            num_colors: Number of unique colors needed.
+        Returns:
+            A list of [R, G, B] lists with values scaled between 0.0 and 1.0.
+    """
+    colors = []
+    for i in range(num_colors):
+        # Evenly space the hues across the color wheel, then add a tiny random jitter
+        hue = (i / num_colors) + random.uniform(-0.02, 0.02)
+        hue = hue % 1.0  # Keep it wrapped around 0-1
+        
+        # Keep saturation and brightness high and consistent for a clean look
+        saturation = random.uniform(0.65, 0.80)  # Rich but not blinding
+        value = random.uniform(0.75, 0.85)       # Bright and clean
+        
+        # Convert to RGB (colorsys outputs 0.0 - 1.0 floats)
+        rgb = list(colorsys.hsv_to_rgb(hue, saturation, value))
+        colors.append(rgb)
+        
+    # Shuffle so that adjacent blocks in your loop don't get near-identical gradients
+    random.shuffle(colors)
+    return colors
