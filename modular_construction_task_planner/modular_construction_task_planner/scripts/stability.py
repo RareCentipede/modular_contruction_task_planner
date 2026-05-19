@@ -401,6 +401,7 @@ def find_feasible_block_sequence(support_graph: Dict[str, SupportNode]) -> List[
     G = nx.DiGraph()
 
     # Build directed graph from support relationships
+    # Also check if all the support scores exceed the stability threshold.
     for name, node in support_graph.items():
         G.add_node(name)
         if not node.supporting_objects:

@@ -16,7 +16,7 @@ from modular_construction_task_planner.scripts.stability import (
 def main():
     # Load world from config
     problem_config_path = "src/object_rearrangement_ros2_sim/mpnp_simulation/config/problem_configs/"
-    problem_name = "temple_facade"
+    problem_name = "scaffolding_tower"
     world = parse_configs_to_world(problem_name, problem_config_path)
 
     goal_config = safe_load(open(f"{problem_config_path}/{problem_name}/goal.yaml", 'r'))
