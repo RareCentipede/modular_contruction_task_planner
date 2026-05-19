@@ -16,11 +16,12 @@ from modular_construction_task_planner.scripts.stability import (
 def main():
     goal_linked_state = None
     problem_config_path = "src/object_rearrangement_ros2_sim/mpnp_simulation/config/problem_configs/"
-    problem_name = "quadriple_towers"
+    problem_name = "interlocking_pyramid"
     world = parse_configs_to_world(problem_name, problem_config_path)
     for ent in world.entities.entities:
         print(f"{ent.name}: {ent.state}")
 
+    init_config = safe_load(open(f"{problem_config_path}/{problem_name}/init.yaml", 'r'))
     goal_config = safe_load(open(f"{problem_config_path}/{problem_name}/goal.yaml", 'r'))
     colors = visualize_goal_structure(goal_config, show=False)
 
@@ -53,8 +54,8 @@ def main():
                 print(action[1][1])
                 block_sequence.append(action[1][1])
 
-        construction_animation = animate_construction_sequence(goal_config, block_sequence, interval=1000)
-        construction_animation.save(f'src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/movies/{problem_name}.gif', writer='pillow')
+        construction_animation = animate_construction_sequence(init_config, goal_config, block_sequence, colors, interval=1000)
+        construction_animation.save(f'src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/movies/{problem_name}_full.gif', writer='pillow')
     else:
         print(f"Goal linked state not found :(.")
 

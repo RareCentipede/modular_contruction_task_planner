@@ -430,98 +430,114 @@ def find_feasible_block_sequence(support_graph: Dict[str, SupportNode]) -> List[
     except nx.NetworkXUnfeasible:
         raise ValueError("The support graph contains cycles, no valid placement sequence exists.")
 
-def animate_construction_sequence(goal_data: dict, placement_sequence: list, interval: int = 800, show: bool = False):
+def animate_construction_sequence(init_data: dict, goal_data: dict, placement_sequence: list, color_array: list, 
+                                  interval: int = 800, show: bool = False) -> FuncAnimation:
     """
-        Animates the assembly process step-by-step. 
-        Unplaced blocks appear as faint gray references; placed blocks snap in with their true colors.
+        Animates blocks moving from initial positions to target positions.
+        - Unplaced blocks wait at their initial position in full color.
+        - Future positions at the construction site are shown as faint gray references.
+        - Placed blocks snap to their goal positions in full color.
         
         Args:
-            goal_data: The parsed dictionary from goal.yaml {block_name: {position, size, color}}
-            placement_sequence: A sorted list of block names specifying the order of assembly
-                                e.g., ['block1', 'block4', 'block2', ...]
-            interval: Delay between sequence frames in milliseconds
+            init_data: Dict from init.yaml containing starting positions.
+            goal_data: Dict from goal.yaml containing target positions.
+            placement_sequence: List of block names in assembly order.
+            color_array: List of RGB(A) colors corresponding 1:1 to the placement_sequence order.
+            interval: Animation step delay in milliseconds.
     """
-    fig = plt.figure(figsize=(12, 9))
+    fig = plt.figure(figsize=(14, 10))
     ax = fig.add_subplot(111, projection='3d')
     
-    # Pre-calculate meshes and vertices for bounding limits
-    block_meshes = {}
+    # 1. Map blocks to their sequence color for easy lookup
+    block_colors = {name: color_array[i] for i, name in enumerate(placement_sequence)}
+    
+    # Pre-calculate meshes for both states to avoid re-generating during frames
+    init_meshes = {}
+    goal_meshes = {}
     all_vertices = []
     
-    for name, data in goal_data.items():
-        if name == 'robot' or 'position' not in data:
+    for name in placement_sequence:
+        if name not in init_data or name not in goal_data:
             continue
-        mesh = make_box_mesh(data['size'], data['position'])
-        block_meshes[name] = mesh
-        all_vertices.append(mesh.vertices)
+            
+        # Initial position mesh
+        init_mesh = make_box_mesh(init_data[name]['size'], init_data[name]['position'])
+        init_meshes[name] = init_mesh
+        all_vertices.append(init_mesh.vertices)
         
-    # Calculate global workspace dimensions dynamically
+        # Target goal position mesh
+        goal_mesh = make_box_mesh(goal_data[name]['size'], goal_data[name]['position'])
+        goal_meshes[name] = goal_mesh
+        all_vertices.append(goal_mesh.vertices)
+        
+    # Calculate global workspace dimensions dynamically to fit both areas
     flat_verts = np.vstack(all_vertices)
     max_x, min_x = flat_verts[:, 0].max(), flat_verts[:, 0].min()
     max_y, min_y = flat_verts[:, 1].max(), flat_verts[:, 1].min()
     max_z = flat_verts[:, 2].max()
-    margin = 1.5
+    margin = 2.0
 
-    # Core updates loop executed on every step
     def update(frame_idx):
-        ax.clear()  # Wipe canvas to prevent collection layering artifacts
+        ax.clear()
         
-        # Configure layout styling and perspective rules
-        ax.set_title(f"Assembly Progress: Step {frame_idx}/{len(placement_sequence)}", 
+        ax.set_title(f"Assembly Sequence Map: Step {frame_idx}/{len(placement_sequence)}", 
                      fontsize=14, fontweight='bold', pad=20)
-        ax.set_xlabel('X (Width)')
-        ax.set_ylabel('Y (Depth)')
-        ax.set_zlabel('Z (Height)')
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
         ax.set_xlim(min_x - margin, max_x + margin)
         ax.set_ylim(min_y - margin, max_y + margin)
         ax.set_zlim(0, max_z + margin)
-        ax.view_init(elev=22, azim=-55)
+        ax.view_init(elev=25, azim=-45)
         
-        # Draw explicit base floor grid
+        # Ground Grid Floor
         extent_x = max(abs(min_x), abs(max_x)) + margin
         extent_y = max(abs(min_y), abs(max_y)) + margin
-        gx, gy = np.meshgrid(np.linspace(-extent_x, extent_x, 10), np.linspace(-extent_y, extent_y, 10))
-        ax.plot_wireframe(gx, gy, np.zeros_like(gx), color=(0.7, 0.7, 0.7, 0.15), linewidth=0.8)
+        gx, gy = np.meshgrid(np.linspace(-extent_x, extent_x, 12), np.linspace(-extent_y, extent_y, 12))
+        ax.plot_wireframe(gx, gy, np.zeros_like(gx), color=(0.7, 0.7, 0.7, 0.12), linewidth=0.8)
 
-        # Slice sequence to find out what has been physically anchored up to this frame
+        # Separate what has been moved vs what is still waiting
         built_so_far = set(placement_sequence[:frame_idx])
 
-        # Draw all objects
-        for name, mesh in block_meshes.items():
-            tris = mesh.vertices[mesh.faces]
+        for name in placement_sequence:
+            if name not in init_meshes:
+                continue
+                
+            color = block_colors[name]
+            face_color = color[:3]
+            alpha_val = color[3] if len(color) == 4 else 0.8
             
+            # SCENARIO A: Block has been built / moved to goal
             if name in built_so_far:
-                # Block is placed: draw in full vivid color
-                true_color = goal_data[name].get('color', [0.2, 0.5, 0.8])
-                face_color = true_color[:3]
-                alpha_val = true_color[3] if len(true_color) == 4 else 0.75
-                edge_color = [0.1, 0.1, 0.1]
-                edge_width = 0.8
+                # Draw at GOAL position in full color
+                tris = goal_meshes[name].vertices[goal_meshes[name].faces]
+                poly = Poly3DCollection(tris, alpha=alpha_val)
+                poly.set_facecolor(face_color)
+                poly.set_edgecolor([0.1, 0.1, 0.1])
+                poly.set_linewidth(0.8)
+                ax.add_collection3d(poly)
+                
+            # SCENARIO B: Block is still waiting at the staging area
             else:
-                # Block is unplaced: draw as a faint gray phantom outline reference
-                face_color = [0.85, 0.85, 0.85]
-                alpha_val = 0.08  # Faint transparent face filling
-                edge_color = [0.6, 0.6, 0.6, 0.25]  # Muted grey dashed borders
-                edge_width = 0.5
+                # 1. Draw at INIT position in full color
+                tris_init = init_meshes[name].vertices[init_meshes[name].faces]
+                poly_init = Poly3DCollection(tris_init, alpha=alpha_val)
+                poly_init.set_facecolor(face_color)
+                poly_init.set_edgecolor([0.2, 0.2, 0.2])
+                poly_init.set_linewidth(0.8)
+                ax.add_collection3d(poly_init)
+                
+                # 2. Draw phantom reference at GOAL position (faint grey wireframe)
+                tris_goal = goal_meshes[name].vertices[goal_meshes[name].faces]
+                poly_phantom = Poly3DCollection(tris_goal, alpha=0.04)
+                poly_phantom.set_facecolor([0.85, 0.85, 0.85])
+                poly_phantom.set_edgecolor([0.6, 0.6, 0.6, 0.2])
+                poly_phantom.set_linewidth(0.5)
+                ax.add_collection3d(poly_phantom)
 
-            poly3d = Poly3DCollection(tris, alpha=alpha_val)
-            poly3d.set_facecolor(face_color)
-            poly3d.set_edgecolor(edge_color)
-            poly3d.set_linewidth(edge_width)
-            ax.add_collection3d(poly3d)
-
-    # Frame count maps to total pieces + 1 starting state frame (nothing built)
     total_frames = len(placement_sequence) + 1
-    
-    anim = FuncAnimation(
-        fig, update, 
-        frames=total_frames, 
-        interval=interval, 
-        repeat=True, 
-        blit=False
-    )
+    anim = FuncAnimation(fig, update, frames=total_frames, interval=interval, repeat=True)
     
     plt.tight_layout()
-    if show:
-        plt.show()
+    plt.show()
     return anim
