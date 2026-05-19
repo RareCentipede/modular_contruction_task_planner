@@ -372,10 +372,6 @@ class OrderedLandmarksPlanner:
             if not self.action_dict[action_name].check(branch):
                 branches.remove(branch)
 
-            # # Placeholder for stability computation. If not stable, prune the branch.
-            # if action_name == "place":
-            #     stability = compute_placement_stability(self.world, cKDTree, branch['object'])
-
         return branches
 
     def evaluate_branches(self,
