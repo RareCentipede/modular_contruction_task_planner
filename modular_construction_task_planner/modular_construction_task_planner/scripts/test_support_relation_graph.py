@@ -9,7 +9,8 @@ from modular_construction_task_planner.eas.config_parser_world_basic import pars
 from modular_construction_task_planner.scripts.stability import (
     create_support_relation_graph,
     visualize_goal_structure,
-    visualize_support_node_graph
+    visualize_support_node_graph,
+    find_feasible_block_sequence
 )
 
 def main():
@@ -24,6 +25,11 @@ def main():
     # Create support relation graph
     support_graph = create_support_relation_graph(world)
     visualize_support_node_graph(support_graph, colors=colors, show=False)
+
+    feasible_seq = find_feasible_block_sequence(support_graph)
+    print("Feasible block placement sequence (bottom to top):")
+    for idx, block_name in enumerate(feasible_seq):
+        print(f"{idx+1}. {block_name}")
 
     # Print support relationships
     for obj_name, node in support_graph.items():

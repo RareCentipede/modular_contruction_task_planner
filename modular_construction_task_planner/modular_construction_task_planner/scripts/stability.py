@@ -309,7 +309,7 @@ def visualize_support_node_graph(support_graph: Dict[str, 'SupportNode'],
 
     try:
         # Hierarchical layout prioritizing bottom-up structure mapping
-        pos_layout = nx.drawing.nx_agraph.graphviz_layout(G, prog='dot')
+        pos_layout = nx.drawing.nx_agraph.graphviz_layout(G, prog='dot', args='-Grankdir=BT')
     except (ImportError, OSError):
         # Reliable spring/force-directed layout fallback
         pos_layout = nx.spring_layout(G, k=1.5, seed=42)
@@ -387,3 +387,32 @@ def generate_nice_colors(num_colors: int) -> list:
     # Shuffle so that adjacent blocks in your loop don't get near-identical gradients
     random.shuffle(colors)
     return colors
+
+def find_feasible_block_sequence(support_graph: Dict[str, SupportNode]) -> List[str]:
+    """
+        Determines a feasible sequence of block placements based on the support graph.
+        Uses a topological sort approach to ensure all dependencies are respected.
+        
+        Args:
+            support_graph: Dict mapping block names to their SupportNode with support relationships.
+        Returns:
+            A list of block names in the order they should be placed.
+    """
+    G = nx.DiGraph()
+
+    # Build directed graph from support relationships
+    for name, node in support_graph.items():
+        G.add_node(name)
+        if not node.supporting_objects:
+            print(f"Block '{name}' has no supports, invalid structure!")
+            return []
+        for parent_name, _, _ in node.supporting_objects:
+            if parent_name in support_graph:
+                G.add_edge(parent_name, name)
+
+    try:
+        # Perform topological sort to find a valid placement sequence
+        placement_sequence = list(nx.topological_sort(G))
+        return placement_sequence
+    except nx.NetworkXUnfeasible:
+        raise ValueError("The support graph contains cycles, no valid placement sequence exists.")
