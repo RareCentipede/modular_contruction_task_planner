@@ -1,0 +1,44 @@
+import matplotlib.pyplot as plt
+
+from yaml import safe_load
+
+from modular_construction_task_planner.scripts.ordered_landmarks_planner import OrderedLandmarksPlanner
+from modular_construction_task_planner.eas.config_parser_world_basic import parse_configs_to_world
+from modular_construction_task_planner.scripts.block_domain import PickAction, PlaceAction, MoveAction
+from modular_construction_task_planner.scripts.stability import (
+    visualize_goal_structure,
+    create_support_relation_graph,
+    visualize_support_node_graph
+)
+
+def main():
+    goal_linked_state = None
+    problem_config_path = "src/object_rearrangement_ros2_sim/mpnp_simulation/config/problem_configs/"
+    problem_name = "temple_facade"
+    world = parse_configs_to_world(problem_name, problem_config_path)
+    for ent in world.entities.entities:
+        print(ent.state)
+
+    goal_config = safe_load(open(f"{problem_config_path}/{problem_name}/goal.yaml", 'r'))
+    colors = visualize_goal_structure(goal_config, show=False)
+
+    action_dict = {
+        'transit': MoveAction,
+        'transport': MoveAction,
+        'pick': PickAction,
+        'place': PlaceAction
+    }
+
+    ground_mesh, support_graph = create_support_relation_graph(world)
+    visualize_support_node_graph(support_graph, colors=colors, show=False)
+
+    planner = OrderedLandmarksPlanner(world, action_dict)
+    goal_linked_state = planner.run_stable_planner(support_graph, ground_mesh)
+
+    if goal_linked_state:
+        print(f"Goal linked state found!")
+
+    plt.show()
+
+if __name__ == "__main__":
+    main()

@@ -111,6 +111,8 @@ def assign_entities_variable_values_and_create_pose_dict(init_config: Dict, goal
         pose_dict[pos_entity.name] = pose
         obj_entity.at.value = pos_entity.name
         obj_entity.on.value = gnd_obj_entity.name
+        obj_entity.placeable_from = [pos_entity.name]
+        obj_entity.reachable_from = [pos_entity.name]
         obj_entity.dim = info['size']
 
         pos_entity.occupied_by.value = obj_entity.name

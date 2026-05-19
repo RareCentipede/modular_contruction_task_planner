@@ -23,7 +23,7 @@ def main():
     colors = visualize_goal_structure(goal_config, show=False)
 
     # Create support relation graph
-    support_graph = create_support_relation_graph(world)
+    _, support_graph = create_support_relation_graph(world)
     visualize_support_node_graph(support_graph, colors=colors, show=False)
 
     feasible_seq = find_feasible_block_sequence(support_graph)

@@ -99,6 +99,7 @@ class OrderedLandmarksPlanner:
 
             weighted_branch = min(self.current_linked_state.branches_to_explore, key=lambda x: x[2])
             action_name, action_params, cost = weighted_branch
+            self.current_linked_state.branches_to_explore.remove(weighted_branch)
             self.current_cost += cost
             action = self.action_dict[action_name]
             # print(f"Executing: {action_name} with params {[str(param) + ': ' + str(ent.name) \
@@ -186,26 +187,21 @@ class OrderedLandmarksPlanner:
         return self.goal_linked_state
 
     def run_stable_planner(self, support_graph: Dict[str, SupportNode], ground_mesh: Trimesh) -> Optional[LinkedState]:
-        # Branch out
-        # For Transit actions, also check the stability of the target block.
-            # First sum up the individual support scores of supporting objects that are already placed. If the total
-            # score exceeds the threshold, then the block can be considered stable.
-            # Otherwise, run compute_placement_stability to get a more accurate score and compare again.
-            # Record this score combination in the node in case it needs to be queries again.
-        # If unstable, prune the branch.
-
         self.support_graph = support_graph
         self.ground_mesh = ground_mesh
 
         while self.current_linked_state.status == StateStatus.ALIVE:
-            self.branch_out(self.current_linked_state)
+            self.branch_out(self.current_linked_state, HEURISTIC.STABLE_DISCRETE)
             if not self.current_linked_state.branches_to_explore:
                 print("No branches to explore, backtracking...")
                 self.backtrack()
                 continue
 
+            # Might be easier to add stability analysis and pruning unstable branches here
+
             weighted_branch = min(self.current_linked_state.branches_to_explore, key=lambda x: x[2])
             action_name, action_params, cost = weighted_branch
+            self.current_linked_state.branches_to_explore.remove(weighted_branch)
             self.current_cost += cost
             action = self.action_dict[action_name]
             # print(f"Executing: {action_name} with params {[str(param) + ': ' + str(ent.name) \
@@ -223,7 +219,7 @@ class OrderedLandmarksPlanner:
             self.generate_new_linked_state(action_name, action_params, self.current_cost)
 
             if self.world.goal_reached:
-                print("GOAL REACHED using lazy heuristic!")
+                print("GOAL REACHED using stable lazy heuristic!")
                 self.current_linked_state.goal = True
                 self.goal_linked_states.append(self.current_linked_state)
                 print(f"{len(self.goal_linked_states)} goal linked states found so far. {len(self.goal_linked_states)}/"
@@ -386,9 +382,13 @@ class OrderedLandmarksPlanner:
                 for branch in branches:
                     obj_entity = cast(Object, branch['object'])
                     is_stable, support_score = self.evaluate_obj_stability(obj_entity, self.support_graph, self.ground_mesh)
+                    print(f"Branch for placing object {obj_entity.name} is {'stable' if is_stable else 'unstable'} "
+                          f"with support score {support_score}.")
+
                     if is_stable:
                         cost = 1 - support_score if heuristic == HEURISTIC.STABLE else 0.0
                         evaluated_branches.append((action_name, branch, cost))
+
         elif action_name == "transit" or action_name == "transport":
             for branch in branches:
                 start_pos = branch['start_pose'].name
@@ -448,9 +448,10 @@ class OrderedLandmarksPlanner:
             overall_support_score = obj_support_node.support_combo_dict.get(tuple(supp_names), None)
             if not overall_support_score:
                 _, overall_support_score = compute_placement_stability(obj, supporting_objs, [], ground_mesh)
+                branch_support_score = overall_support_score
                 obj_support_node.support_combo_dict.update({tuple(supp_names): overall_support_score})
 
-        is_stable = overall_support_score >= obj_support_node.support_threshold
+        is_stable = branch_support_score >= obj_support_node.support_threshold
         return is_stable, branch_support_score
 
     def simple_collision_heuristic(self, start_pos: List[float], target_pos: List[float]) -> float:

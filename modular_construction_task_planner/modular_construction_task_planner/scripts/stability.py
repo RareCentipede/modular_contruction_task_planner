@@ -80,7 +80,8 @@ def create_support_relation_graph(world: World, support_ratio_threshold: float =
         support_graph[obj.name] = support_node
 
         if 'g' in support_data:
-            support_node.supporting_objects.append(('g', support_data['g'], False))
+            support_node.supporting_objects.append(('g', support_data['g'], True)) # Ground support is considered already placed
+            support_node.current_support_score += support_data['g']
 
     for support_node in support_graph.values():
         for name, score, _ in support_node.supporting_objects:

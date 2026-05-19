@@ -14,7 +14,7 @@ action_dict = {
     'place': PlaceAction
 }
 planner = OrderedLandmarksPlanner(world, action_dict)
-goal_linked_states = planner.run_optimal_planner()
+goal_linked_states = planner.run_bfs_planner()
 
 print(f"{len(goal_linked_states)} goal linked states found.")
 
