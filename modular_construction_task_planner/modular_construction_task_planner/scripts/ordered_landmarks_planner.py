@@ -407,6 +407,8 @@ class OrderedLandmarksPlanner:
                 match heuristic:
                     case HEURISTIC.LAZY:
                         cost = np.linalg.norm(np.array(start_pos) - np.array(target_pos))
+                    case HEURISTIC.STABLE_DISCRETE:
+                        cost = np.linalg.norm(np.array(start_pos) - np.array(target_pos))
                     case HEURISTIC.SIMPLE_COLLISION:
                         cost = self.simple_collision_heuristic(start_pos, target_pos)
                     case HEURISTIC.DILIGENT:

@@ -34,7 +34,9 @@ class SupportNode:
         return self.current_support_score >= self.support_threshold
 
 # Assume cubes
-def create_support_relation_graph(world: World, support_ratio_threshold: float = 0.7) -> Tuple[Trimesh, Dict[str, SupportNode]]:
+def create_support_relation_graph(world: World,
+                                  support_ratio_threshold: float = 0.7,
+                                  verbose: bool = False) -> Tuple[Trimesh, Dict[str, SupportNode]]:
     """
         Create a support relation graph based on the current world state.
         Each node represents an object, and edges represent support relationships.
@@ -69,7 +71,11 @@ def create_support_relation_graph(world: World, support_ratio_threshold: float =
         candidate_position_idx = goal_positions[:, 2] < goal_pos[2] # Objects below the current object
         candidate_objs = obj_with_goals[candidate_position_idx]
 
-        support_data, overall_support_area_ratio = compute_placement_stability(obj, candidate_objs, [], ground_mesh) # type: ignore
+        support_data, overall_support_area_ratio = compute_placement_stability(obj,
+                                                                               candidate_objs, # type: ignore
+                                                                               [],
+                                                                               ground_mesh,
+                                                                               verbose=verbose)
         supporting_objs = {name: (score, False) for name, score in support_data.items() if name != 'area' and name != 'g'}
         support_node = SupportNode(
             name=obj.name,
@@ -79,6 +85,8 @@ def create_support_relation_graph(world: World, support_ratio_threshold: float =
             supporting_objects=supporting_objs
         )
         support_graph[obj.name] = support_node
+        if verbose:
+            print(f"Object '{obj.name}' support data: {support_data}, overall support ratio: {overall_support_area_ratio:.2f}")
 
         if 'g' in support_data:
             support_node.supporting_objects['g'] = (support_data['g'], True) # Ground support is considered already placed
@@ -94,7 +102,8 @@ def create_support_relation_graph(world: World, support_ratio_threshold: float =
 def compute_placement_stability(object: Object | Trimesh,
                                 candidate_support_objs: List[Object] | List[Trimesh],
                                 supp_names: List[str],
-                                ground_plane: Trimesh) -> Tuple[Dict[str, float], float]:
+                                ground_plane: Trimesh,
+                                verbose: bool = False) -> Tuple[Dict[str, float], float]:
     """
         Compute the stability of placing the object at its goal position based on support area analysis.
     """
@@ -127,6 +136,11 @@ def compute_placement_stability(object: Object | Trimesh,
         support_score = support_polygon.area / footprint.area
         support_data[supp_name] = support_score
         support_polys.append(support_polygon)
+
+        if verbose:
+            print(f"Support from '{supp_name}': contact area = {support_polygon.area:.2f}, "
+                  f"support score = {support_score:.2f}")
+            print(f"Support polygon vertices: {support_polygon.bounds}, object vertices: {footprint.bounds}")
 
     # 3. Aggregate total support
     if support_polys:
