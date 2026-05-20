@@ -562,5 +562,6 @@ def animate_construction_sequence(init_data: dict, goal_data: dict, placement_se
     anim = FuncAnimation(fig, update, frames=total_frames, interval=interval, repeat=True)
     
     plt.tight_layout()
-    plt.show()
+    if show:
+        plt.show()
     return anim

@@ -12,6 +12,7 @@ from modular_construction_task_planner.scripts.stability import (
     animate_construction_sequence,
     find_feasible_block_sequence
 )
+from modular_construction_task_planner.scripts.block_sequence_animator import TrimeshBlockAnimator
 
 def main():
     goal_linked_state = None
@@ -52,8 +53,12 @@ def main():
                 print(action[1][1])
                 block_sequence.append(action[1][1])
 
-        construction_animation = animate_construction_sequence(init_config, goal_config, block_sequence, colors, interval=500)
-        construction_animation.save(f'src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/movies/{problem_name}_full.gif', writer='pillow')
+        animator = TrimeshBlockAnimator(init_config, goal_config, block_sequence, colors)
+        # animator.run()
+        animator.save_to_video(f'src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/movies/{problem_name}.mp4',
+                               fps=60)
+        # construction_animation = animate_construction_sequence(init_config, goal_config, block_sequence, colors, interval=500)
+        # construction_animation.save(f'src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/movies/{problem_name}_full.gif', writer='pillow')
     else:
         print(f"Goal linked state not found :(.")
 
