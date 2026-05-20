@@ -31,7 +31,6 @@ def main():
         print("No valid block placement sequence found due to cyclic support relations.")
         return
     print(f"Feasible block placement sequence found: {seq}")
-    plt.show()
 
     action_dict = {
         'transit': TransitAction,
@@ -53,7 +52,7 @@ def main():
                 print(action[1][1])
                 block_sequence.append(action[1][1])
 
-        construction_animation = animate_construction_sequence(init_config, goal_config, block_sequence, colors, interval=1000)
+        construction_animation = animate_construction_sequence(init_config, goal_config, block_sequence, colors, interval=500)
         construction_animation.save(f'src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/movies/{problem_name}_full.gif', writer='pillow')
     else:
         print(f"Goal linked state not found :(.")

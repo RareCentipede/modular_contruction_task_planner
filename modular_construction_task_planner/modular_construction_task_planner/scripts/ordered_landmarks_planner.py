@@ -191,11 +191,13 @@ class OrderedLandmarksPlanner:
         self.ground_mesh = ground_mesh
 
         while self.current_linked_state.status == StateStatus.ALIVE:
-            self.branch_out(self.current_linked_state, HEURISTIC.STABLE_DISCRETE)
+            self.branch_out(self.current_linked_state, HEURISTIC.STABLE_DISCRETE, verbose=True)
             if not self.current_linked_state.branches_to_explore:
-                print("No branches to explore, backtracking...")
-                self.backtrack()
-                continue
+                print("No branches, terminating")
+                return self.goal_linked_state
+                # print("No branches to explore, backtracking...")
+                # self.backtrack()
+                # continue
 
             # Might be easier to add stability analysis and pruning unstable branches here
 
@@ -204,8 +206,8 @@ class OrderedLandmarksPlanner:
             self.current_linked_state.branches_to_explore.remove(weighted_branch)
             self.current_cost += cost
             action = self.action_dict[action_name]
-            # print(f"Executing: {action_name} with params {[str(param) + ': ' + str(ent.name) \
-                # for param, ent in action_params.items()]} and cost {cost}")
+            print(f"Executing: {action_name} with params {[str(param) + ': ' + str(ent.name) \
+                for param, ent in action_params.items()]} and cost {cost}")
             action.execute(action_params)
             if self.gg:
                 if action_name == 'pick':
@@ -250,7 +252,7 @@ class OrderedLandmarksPlanner:
         self.current_linked_state = new_linked_state
         self.current_state = new_state
 
-    def branch_out(self, linked_state: LinkedState, heuristic: HEURISTIC = HEURISTIC.LAZY) -> None:
+    def branch_out(self, linked_state: LinkedState, heuristic: HEURISTIC = HEURISTIC.LAZY, verbose: bool = False) -> None:
         """
             Branch out from the current state by defining branches based on the preferred action and evaluating the branches.
             Assigns the weighted branches to the linked state.
@@ -265,7 +267,7 @@ class OrderedLandmarksPlanner:
 
         preferred_action_name = self.get_preferred_action()
         branches = self.define_branches_based_on_action(preferred_action_name)
-        weighted_branches = self.evaluate_branches(branches, preferred_action_name, heuristic)
+        weighted_branches = self.evaluate_branches(branches, preferred_action_name, heuristic, verbose)
         linked_state.branches_to_explore = weighted_branches
 
     def get_preferred_action(self) -> str:
@@ -336,19 +338,17 @@ class OrderedLandmarksPlanner:
                 potential_target_objs = cast(List[Object], self.world.not_at_goal_entities)
                 potential_target_objs = [obj for obj in potential_target_objs if obj.goal.value] # Only consider objects that still need to be placed
                 potential_target_pos_vals = [obj.reachable_from for obj in potential_target_objs]
-                potential_target_pos_vals = [pos for sublist in potential_target_pos_vals for pos in sublist]
 
-                for target_pos in potential_target_pos_vals:
-                    if not target_pos:
-                        continue
-
-                    pos_entity = cast(PosEntity, self.world.entities.get_entities(target_pos))
-                    branch_params = {
-                        'robot': self.robot,
-                        'start_pose': current_pos_entity,
-                        'target_pose': pos_entity
-                    }
-                    branches.append(branch_params)
+                for potential_target_pos_sublist, potential_obj in zip(potential_target_pos_vals, potential_target_objs):
+                    for target_pos in potential_target_pos_sublist:
+                        pos_entity = cast(PosEntity, self.world.entities.get_entities(target_pos))
+                        branch_params = {
+                            'robot': self.robot,
+                            'start_pose': current_pos_entity,
+                            'target_pose': pos_entity,
+                            'object': potential_obj
+                        }
+                        branches.append(branch_params)
 
             case "transport":
                 obj_in_gripper = cast(str, self.robot.holding.value)
@@ -377,26 +377,15 @@ class OrderedLandmarksPlanner:
     def evaluate_branches(self,
                           branches: List[Dict[str, Entity]],
                           action_name: str,
-                          heuristic: HEURISTIC = HEURISTIC.LAZY) -> List[Tuple[str, Dict[str, Entity], float]]:
+                          heuristic: HEURISTIC = HEURISTIC.LAZY,
+                          verbose: bool = False) -> List[Tuple[str, Dict[str, Entity], float]]:
         """
             Evaluate the given branches and return a list of tuples of the branch and its cost, which is defined as the
             euclidean distance between the robot and the target. The branch with the lowest cost will be explored first.
         """
         evaluated_branches = []
-        if action_name == "pick":
+        if action_name == "pick" or action_name == "place":
             evaluated_branches = [(action_name, branch, 0.0) for branch in branches]
-        elif action_name == "place":
-            if heuristic == HEURISTIC.STABLE_DISCRETE or heuristic == HEURISTIC.STABLE:
-                for branch in branches:
-                    obj_entity = cast(Object, branch['object'])
-                    is_stable, support_score = self.evaluate_obj_stability(obj_entity, self.support_graph, self.ground_mesh)
-                    print(f"Branch for placing object {obj_entity.name} is {'stable' if is_stable else 'unstable'} "
-                          f"with support score {support_score}.")
-
-                    if is_stable:
-                        cost = 1 - support_score if heuristic == HEURISTIC.STABLE else 0.0
-                        evaluated_branches.append((action_name, branch, cost))
-
         elif action_name == "transit" or action_name == "transport":
             for branch in branches:
                 start_pos = branch['start_pose'].name
@@ -408,7 +397,27 @@ class OrderedLandmarksPlanner:
                     case HEURISTIC.LAZY:
                         cost = np.linalg.norm(np.array(start_pos) - np.array(target_pos))
                     case HEURISTIC.STABLE_DISCRETE:
-                        cost = np.linalg.norm(np.array(start_pos) - np.array(target_pos))
+                        obj_entity = cast(Object, branch['object'])
+                        is_stable, support_score = self.evaluate_obj_stability(obj_entity, self.support_graph, self.ground_mesh, verbose=verbose)
+                        print(f"Branch for {action_name} object {obj_entity.name} is {'stable' if is_stable else 'unstable'} "
+                            f"with support score {support_score}.")
+
+                        if is_stable:
+                            cost = 1 - support_score
+                        else:
+                            support_node = self.support_graph[obj_entity.name]
+                            print(support_node)
+                            continue
+                    case HEURISTIC.STABLE:
+                        obj_entity = cast(Object, branch['object'])
+                        is_stable, support_score = self.evaluate_obj_stability(obj_entity, self.support_graph, self.ground_mesh, verbose=verbose)
+                        print(f"Branch for {action_name} object {obj_entity.name} is {'stable' if is_stable else 'unstable'} "
+                            f"with support score {support_score}.")
+
+                        if is_stable:
+                            cost = (1 - support_score) + np.linalg.norm(np.array(start_pos) - np.array(target_pos))
+                        else:
+                            continue
                     case HEURISTIC.SIMPLE_COLLISION:
                         cost = self.simple_collision_heuristic(start_pos, target_pos)
                     case HEURISTIC.DILIGENT:
@@ -432,7 +441,8 @@ class OrderedLandmarksPlanner:
 
         return evaluated_branches
 
-    def evaluate_obj_stability(self, obj: Object, support_graph: Dict[str, SupportNode], ground_mesh: Trimesh) -> Tuple[bool, float]:
+    def evaluate_obj_stability(self, obj: Object, support_graph: Dict[str, SupportNode], ground_mesh: Trimesh,
+                               verbose: bool = False) -> Tuple[bool, float]:
         """
             Evaluate the stability of the branch by checking the support score of the target block after placing.
             If the score is below the threshold, return a high cost to discourage exploring this branch.
@@ -456,10 +466,17 @@ class OrderedLandmarksPlanner:
 
         if not is_stable:
             overall_support_score = obj_support_node.support_combo_dict.get(tuple(supp_names), None)
-            if not overall_support_score:
-                _, overall_support_score = compute_placement_stability(obj, supporting_objs, [], ground_mesh)
+            branch_support_score = overall_support_score if overall_support_score else branch_support_score
+            if not overall_support_score and supp_names:
+                sd, overall_support_score = compute_placement_stability(obj, supporting_objs, [], ground_mesh)
                 branch_support_score = overall_support_score
                 obj_support_node.support_combo_dict.update({tuple(supp_names): overall_support_score})
+
+                if verbose:
+                    print(f"Evaluating stability for object {obj.name} with supporting objects {supp_names}. "
+                          f"Individual support scores: {[supp_name + ': ' + str(score) for supp_name, (score, _) in support_graph[obj.name].supporting_objects.items()]}. "
+                          f"Combined support score: {overall_support_score}. Threshold: {obj_support_node.support_threshold}.")
+                    print(f"Support data: {sd}")
 
         is_stable = branch_support_score >= obj_support_node.support_threshold
         return is_stable, branch_support_score

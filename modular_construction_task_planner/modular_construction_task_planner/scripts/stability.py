@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import networkx as nx
 
+from scipy.spatial import ConvexHull
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from trimesh import Trimesh
@@ -32,6 +33,15 @@ class SupportNode:
     @property
     def supported(self) -> bool:
         return self.current_support_score >= self.support_threshold
+
+    def __str__(self):
+        return (f"SupportNode(name={self.name}, area={self.area:.2f}, "
+                f"current_support_score={self.current_support_score:.2f}, "
+                f"support_threshold={self.support_threshold:.2f}, "
+                f"supported={self.supported}, "
+                f"supporting_objects={self.supporting_objects}, "
+                f"supported_objects={self.supported_objects}), "
+                f"support_combo_dict={self.support_combo_dict})")
 
 # Assume cubes
 def create_support_relation_graph(world: World,
@@ -109,6 +119,7 @@ def compute_placement_stability(object: Object | Trimesh,
     """
     support_data = {}
     support_polys = []
+    all_contact_vertices = []
     overall_support_area_ratio = 0.0
 
     # Handle object type extraction
@@ -132,6 +143,8 @@ def compute_placement_stability(object: Object | Trimesh,
         if not contact_polygon or contact_polygon.is_empty:
             continue
 
+        minx, miny, maxx, maxy = contact_polygon.bounds
+        all_contact_vertices.extend([(minx, miny), (maxx, miny), (maxx, maxy), (minx, maxy)])
         support_polygon = contact_polygon.convex_hull
         support_score = support_polygon.area / footprint.area
         support_data[supp_name] = support_score
@@ -142,13 +155,9 @@ def compute_placement_stability(object: Object | Trimesh,
                   f"support score = {support_score:.2f}")
             print(f"Support polygon vertices: {support_polygon.bounds}, object vertices: {footprint.bounds}")
 
-    # 3. Aggregate total support
-    if support_polys:
-        # Combine all supporting polygons using shapely union to handle overlaps safely
-        combined_support = unary_union(support_polys).convex_hull
-        # Intersect with object footprint so we don't count "phantom support" outside the block
-        actual_support = combined_support.intersection(footprint)
-        overall_support_area_ratio = actual_support.area / footprint.area
+    if len(all_contact_vertices) > 4:
+        global_hull = ConvexHull(all_contact_vertices)
+        overall_support_area_ratio = global_hull.area / footprint.area
 
     return support_data, overall_support_area_ratio
 

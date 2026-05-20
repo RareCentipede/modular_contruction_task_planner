@@ -161,7 +161,8 @@ def robot_can_reach_object_place(robot: Robot, obj: Object) -> bool:
 transit_parameters = {
     'robot': Robot,
     'start_pose': PosEntity,
-    'target_pose': PosEntity
+    'target_pose': PosEntity,
+    'object': Object
 }
 transit_conditions = [
     Condition('robot_at_start', 'robot', 'at', 'start_pose'),
