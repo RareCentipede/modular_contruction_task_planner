@@ -17,7 +17,7 @@ from modular_construction_task_planner.scripts.block_sequence_animator import Tr
 def main():
     goal_linked_state = None
     problem_config_path = "src/object_rearrangement_ros2_sim/mpnp_simulation/config/problem_configs/"
-    problem_name = "double_viaduct"
+    problem_name = "temple_facade"
     world = parse_configs_to_world(problem_name, problem_config_path)
     for ent in world.entities.entities:
         print(f"{ent.name}: {ent.state}")

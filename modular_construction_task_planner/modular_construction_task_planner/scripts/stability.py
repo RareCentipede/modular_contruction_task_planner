@@ -253,8 +253,9 @@ def visualize_goal_structure(goal_data: dict, title: str = "Target Goal Structur
         max_z = flat_verts[:, 2].max()
 
         margin = 1.0
-        ax.set_xlim(min_x - margin, max_x + margin)
-        ax.set_ylim(min_y - margin, max_y + margin)
+        lim = max(max_x - min_x, max_y - min_y, max_z) / 2 + margin
+        ax.set_xlim(-lim, lim)
+        ax.set_ylim(-lim, lim)
         ax.set_zlim(0, max_z + margin)
 
         # Draw an explicit light grey ground grid at Z = 0
@@ -298,7 +299,7 @@ def visualize_support_node_graph(support_graph: Dict[str, 'SupportNode'],
                                  show: bool = True):
     """
         Visualizes the support relations using a dictionary of SupportNode objects.
-        
+
         Args:
             support_graph: Dict[str, SupportNode] mapping block names to their SupportNode.
             goal_data: Optional dictionary from goal.yaml containing 'color' properties. 
@@ -393,7 +394,7 @@ def visualize_support_node_graph(support_graph: Dict[str, 'SupportNode'],
 def generate_nice_colors(num_colors: int) -> list:
     """
         Generates a list of distinct, visually cohesive RGB colors using HSV.
-        
+
         Args:
             num_colors: Number of unique colors needed.
         Returns:
@@ -404,15 +405,15 @@ def generate_nice_colors(num_colors: int) -> list:
         # Evenly space the hues across the color wheel, then add a tiny random jitter
         hue = (i / num_colors) + random.uniform(-0.02, 0.02)
         hue = hue % 1.0  # Keep it wrapped around 0-1
-        
+
         # Keep saturation and brightness high and consistent for a clean look
         saturation = random.uniform(0.65, 0.80)  # Rich but not blinding
         value = random.uniform(0.75, 0.85)       # Bright and clean
-        
+
         # Convert to RGB (colorsys outputs 0.0 - 1.0 floats)
         rgb = list(colorsys.hsv_to_rgb(hue, saturation, value))
         colors.append(rgb)
-        
+
     # Shuffle so that adjacent blocks in your loop don't get near-identical gradients
     random.shuffle(colors)
     return colors
@@ -421,7 +422,7 @@ def find_feasible_block_sequence(support_graph: Dict[str, SupportNode]) -> List[
     """
         Determines a feasible sequence of block placements based on the support graph.
         Uses a topological sort approach to ensure all dependencies are respected.
-        
+
         Args:
             support_graph: Dict mapping block names to their SupportNode with support relationships.
         Returns:
@@ -473,29 +474,30 @@ def animate_construction_sequence(init_data: dict, goal_data: dict, placement_se
     """
     fig = plt.figure(figsize=(14, 10))
     ax = fig.add_subplot(111, projection='3d')
-    
+    ax.set_xlim(-5, 5)
+    ax.set_ylim(-5, 5)
     # 1. Map blocks to their sequence color for easy lookup
     block_colors = {name: color_array[i] for i, name in enumerate(placement_sequence)}
-    
+
     # Pre-calculate meshes for both states to avoid re-generating during frames
     init_meshes = {}
     goal_meshes = {}
     all_vertices = []
-    
+
     for name in placement_sequence:
         if name not in init_data or name not in goal_data:
             continue
-            
+
         # Initial position mesh
         init_mesh = make_box_mesh(init_data[name]['size'], init_data[name]['position'])
         init_meshes[name] = init_mesh
         all_vertices.append(init_mesh.vertices)
-        
+
         # Target goal position mesh
         goal_mesh = make_box_mesh(goal_data[name]['size'], goal_data[name]['position'])
         goal_meshes[name] = goal_mesh
         all_vertices.append(goal_mesh.vertices)
-        
+
     # Calculate global workspace dimensions dynamically to fit both areas
     flat_verts = np.vstack(all_vertices)
     max_x, min_x = flat_verts[:, 0].max(), flat_verts[:, 0].min()
@@ -505,7 +507,7 @@ def animate_construction_sequence(init_data: dict, goal_data: dict, placement_se
 
     def update(frame_idx):
         ax.clear()
-        
+
         ax.set_title(f"Assembly Sequence Map: Step {frame_idx}/{len(placement_sequence)}", 
                      fontsize=14, fontweight='bold', pad=20)
         ax.set_xlabel('X')
@@ -515,7 +517,7 @@ def animate_construction_sequence(init_data: dict, goal_data: dict, placement_se
         ax.set_ylim(min_y - margin, max_y + margin)
         ax.set_zlim(0, max_z + margin)
         ax.view_init(elev=25, azim=-45)
-        
+
         # Ground Grid Floor
         extent_x = max(abs(min_x), abs(max_x)) + margin
         extent_y = max(abs(min_y), abs(max_y)) + margin
@@ -528,11 +530,11 @@ def animate_construction_sequence(init_data: dict, goal_data: dict, placement_se
         for name in placement_sequence:
             if name not in init_meshes:
                 continue
-                
+
             color = block_colors[name]
             face_color = color[:3]
             alpha_val = color[3] if len(color) == 4 else 0.8
-            
+
             # SCENARIO A: Block has been built / moved to goal
             if name in built_so_far:
                 # Draw at GOAL position in full color
@@ -542,7 +544,7 @@ def animate_construction_sequence(init_data: dict, goal_data: dict, placement_se
                 poly.set_edgecolor([0.1, 0.1, 0.1])
                 poly.set_linewidth(0.8)
                 ax.add_collection3d(poly)
-                
+
             # SCENARIO B: Block is still waiting at the staging area
             else:
                 # 1. Draw at INIT position in full color
@@ -552,7 +554,7 @@ def animate_construction_sequence(init_data: dict, goal_data: dict, placement_se
                 poly_init.set_edgecolor([0.2, 0.2, 0.2])
                 poly_init.set_linewidth(0.8)
                 ax.add_collection3d(poly_init)
-                
+
                 # 2. Draw phantom reference at GOAL position (faint grey wireframe)
                 tris_goal = goal_meshes[name].vertices[goal_meshes[name].faces]
                 poly_phantom = Poly3DCollection(tris_goal, alpha=0.04)
@@ -563,7 +565,7 @@ def animate_construction_sequence(init_data: dict, goal_data: dict, placement_se
 
     total_frames = len(placement_sequence) + 1
     anim = FuncAnimation(fig, update, frames=total_frames, interval=interval, repeat=True)
-    
+
     plt.tight_layout()
     if show:
         plt.show()

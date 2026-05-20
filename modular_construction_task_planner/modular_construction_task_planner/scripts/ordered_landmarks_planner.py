@@ -191,7 +191,7 @@ class OrderedLandmarksPlanner:
         self.ground_mesh = ground_mesh
 
         while self.current_linked_state.status == StateStatus.ALIVE:
-            self.branch_out(self.current_linked_state, HEURISTIC.STABLE_DISCRETE, verbose=True)
+            self.branch_out(self.current_linked_state, HEURISTIC.STABLE_DISCRETE)
             if not self.current_linked_state.branches_to_explore:
                 print("No branches, terminating")
                 return self.goal_linked_state
