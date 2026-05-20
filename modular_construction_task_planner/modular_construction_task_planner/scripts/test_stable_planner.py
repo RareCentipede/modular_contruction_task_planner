@@ -17,7 +17,7 @@ from modular_construction_task_planner.scripts.block_sequence_animator import Tr
 def main():
     goal_linked_state = None
     problem_config_path = "src/object_rearrangement_ros2_sim/mpnp_simulation/config/problem_configs/"
-    problem_name = "scaffolding_tower"
+    problem_name = "double_viaduct"
     world = parse_configs_to_world(problem_name, problem_config_path)
     for ent in world.entities.entities:
         print(f"{ent.name}: {ent.state}")
@@ -28,8 +28,9 @@ def main():
     ground_mesh, support_graph = create_support_relation_graph(world)
     seq = find_feasible_block_sequence(support_graph)
     visualize_support_node_graph(support_graph, colors=colors, show=False)
+
     if not seq:
-        print("No valid block placement sequence found due to cyclic support relations.")
+        print("No valid block placement sequence found due to invalid supports.")
         return
     print(f"Feasible block placement sequence found: {seq}")
 

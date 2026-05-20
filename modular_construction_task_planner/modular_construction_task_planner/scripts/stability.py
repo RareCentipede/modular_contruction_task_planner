@@ -151,9 +151,12 @@ def compute_placement_stability(object: Object | Trimesh,
         support_polys.append(support_polygon)
 
         if verbose:
+            print(f"\nObject '{object.name if isinstance(object, Object) else 'unknown'}' support from '{supp_name}':")
             print(f"Support from '{supp_name}': contact area = {support_polygon.area:.2f}, "
                   f"support score = {support_score:.2f}")
-            print(f"Support polygon vertices: {support_polygon.bounds}, object vertices: {footprint.bounds}")
+            print(f"Object vertices: {[b for b in footprint.bounds]},\n"
+                  f"Support object vertices: {[b for b in mesh_below.bounds]},\n"
+                  f"Support polygon vertices: {[b for b in support_polygon.bounds]},\n")
 
     if len(all_contact_vertices) > 4:
         global_hull = ConvexHull(all_contact_vertices)
