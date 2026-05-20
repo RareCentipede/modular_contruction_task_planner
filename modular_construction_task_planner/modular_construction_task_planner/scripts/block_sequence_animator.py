@@ -19,7 +19,8 @@ class TrimeshBlockAnimator:
         self.sequence = placement_sequence
         self.color_array = color_array
         self.scene = trimesh.Scene()
-        
+        self.begin = False
+
         # State counters for the OpenGL callback loop
         self.current_step_idx = 0
         self.interpolation_alpha = 0.0
@@ -62,6 +63,10 @@ class TrimeshBlockAnimator:
             self.scene.add_geometry(active_mesh, node_name=f"{name}_active", transform=active_matrix)
 
     def animation_callback(self, scene):
+        if not self.begin:
+            time.sleep(5.0)
+            self.begin = True
+
         if self.current_step_idx >= len(self.sequence):
             return  # Run complete
 
@@ -92,6 +97,12 @@ class TrimeshBlockAnimator:
             Requires installing: pip install imageio[ffmpeg]
         """
         print(f"Recording animation to {output_path}...")
+        self._setup_profile_camera()
+        # Continue with your existing video writer stream...
+        writer = imageio.get_writer(output_path, fps=fps, codec='libx264', quality=9)
+
+        initial_frame_bytes = self.scene.save_image(resolution=resolution, visible=False)
+        writer.append_data(imageio.v3.imread(initial_frame_bytes))
 
         # 1. Force the Camera view angle parallel to the XY plane (0 elevation)
         # We look straight down the Y axis from a slight X angle offset for dimensional depth
@@ -138,6 +149,21 @@ class TrimeshBlockAnimator:
 
         writer.close()
         print(f"Successfully exported video file to: {output_path}")
+
+    def _setup_profile_camera(self):
+        """Forces the camera to look at the structure perfectly horizontally from the side."""
+        # 1. Calculate the spatial center of your block layout
+        all_positions = [data['position'] for data in self.init_data.values()] + \
+                        [data['position'] for data in self.goal_data.values()]
+        center_of_mass = np.mean(all_positions, axis=0)
+
+        # 2. FORCE PERFECT HORIZONTAL LEVEL PROFILE VIEW
+        # angles=[pitch_radians, roll_radians, yaw_radians]
+        # Pitch = 90 degrees puts the camera lens level with the horizon, looking straight across the XY plane.
+        # Yaw = -45 degrees turns the camera horizontally so you see both the front and side faces of the structure.
+        self.scene.set_camera(angles=[np.radians(90), 0, np.radians(-45)], 
+                              distance=10.0, 
+                              center=center_of_mass)
 
     def run(self):
         # Open live renderer canvas

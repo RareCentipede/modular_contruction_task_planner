@@ -54,9 +54,8 @@ def main():
                 block_sequence.append(action[1][1])
 
         animator = TrimeshBlockAnimator(init_config, goal_config, block_sequence, colors)
-        # animator.run()
-        animator.save_to_video(f'src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/movies/{problem_name}.mp4',
-                               fps=60)
+        animator.run()
+        # animator.save_to_video(f'src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/movies/{problem_name}.mp4')
         # construction_animation = animate_construction_sequence(init_config, goal_config, block_sequence, colors, interval=500)
         # construction_animation.save(f'src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/movies/{problem_name}_full.gif', writer='pillow')
     else:
