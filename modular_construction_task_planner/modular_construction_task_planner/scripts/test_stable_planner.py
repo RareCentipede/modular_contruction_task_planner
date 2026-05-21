@@ -1,8 +1,9 @@
 import matplotlib.pyplot as plt
 
+from copy import deepcopy
 from yaml import safe_load
 
-from modular_construction_task_planner.scripts.ordered_landmarks_planner import OrderedLandmarksPlanner
+from modular_construction_task_planner.scripts.ordered_landmarks_planner import OrderedLandmarksPlanner, HEURISTIC
 from modular_construction_task_planner.eas.config_parser_world_basic import parse_configs_to_world
 from modular_construction_task_planner.scripts.block_domain import PickAction, PlaceAction, TransitAction, TransportAction
 from modular_construction_task_planner.scripts.stability import (
@@ -13,12 +14,14 @@ from modular_construction_task_planner.scripts.stability import (
     find_feasible_block_sequence
 )
 from modular_construction_task_planner.scripts.block_sequence_animator import TrimeshBlockAnimator
+from path_planner.path_planner_node import GridGraph, OCCUPANCY
 
 def main():
     goal_linked_state = None
     problem_config_path = "src/object_rearrangement_ros2_sim/mpnp_simulation/config/problem_configs/"
     problem_name = "temple_facade"
     world = parse_configs_to_world(problem_name, problem_config_path)
+    original_world = deepcopy(world)  # Keep a copy of the original world for logging
     for ent in world.entities.entities:
         print(f"{ent.name}: {ent.state}")
 
@@ -41,13 +44,41 @@ def main():
         'place': PlaceAction
     }
 
+    h = HEURISTIC.STABLE
     planner = OrderedLandmarksPlanner(world, action_dict)
-    goal_linked_state = planner.run_stable_planner(support_graph, ground_mesh)
+    goal_linked_state = planner.run_stable_planner(support_graph, ground_mesh, h)
+    # goal_linked_state = planner.run_heuristic_planner(h)
 
     if goal_linked_state:
-        print(f"Goal linked state found! :)")
-        plan, _ = planner.retrace_best_plan(goal_linked_state)
-        print(f"Plan found with {len(plan)} actions:")
+        plan, cost = planner.retrace_best_plan(goal_linked_state)
+        print(f"Goal linked state found using {h.name}! Total cost: {cost}")
+        lazy_nav_cost = planner.compute_lazy_nav_cost(plan)
+        print(f"Lazy navigation cost: {lazy_nav_cost}")
+        # full_nav_cost = planner.compute_full_nav_cost(plan)
+        block_sequence = []
+        for action in plan:
+            if action[0] == 'pick':
+                print(action[1][1])
+                block_sequence.append(action[1][1])
+
+        animator = TrimeshBlockAnimator(init_config, goal_config, block_sequence, colors)
+        animator.run()
+
+    planner.world = original_world
+    planner.current_cost = 0.0
+    planner.current_linked_state = planner.s0
+    planner.current_state = planner.s0.state
+    support_graph = create_support_relation_graph(planner.world)[1]
+    h = HEURISTIC.STABLE_DISCRETE
+    goal_linked_state = planner.run_stable_planner(support_graph, ground_mesh, h)
+    # goal_linked_state = planner.run_heuristic_planner(h)
+
+    if goal_linked_state:
+        plan, cost = planner.retrace_best_plan(goal_linked_state)
+        print(f"Goal linked state found using {h.name}! Total cost: {cost}")
+        lazy_nav_cost = planner.compute_lazy_nav_cost(plan)
+        print(f"Lazy navigation cost: {lazy_nav_cost}")
+        # full_nav_cost = planner.compute_full_nav_cost(plan)
         block_sequence = []
         for action in plan:
             if action[0] == 'pick':

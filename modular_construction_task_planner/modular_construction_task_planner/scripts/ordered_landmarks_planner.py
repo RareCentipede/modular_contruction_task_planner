@@ -1,3 +1,5 @@
+from tabnanny import verbose
+
 from trimesh import Trimesh
 import numpy as np
 
@@ -15,7 +17,7 @@ from modular_construction_task_planner.scripts.block_domain import (
 from modular_construction_task_planner.scripts.stability import SupportNode, compute_placement_stability
 from path_planner.path_planner_node import GridGraph, OCCUPANCY
 
-HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT ANTICIPATORY STABLE_DISCRETE STABLE')
+HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT ANTICIPATORY STABLE_DISCRETE STABLE STABLE_NAV')
 """
     LAZY: Only considers the euclidean distance to the target for the preferred action.
     SIMPLE_COLLISION: Checks for collisions and adds lazy collision cost if applicable. Lazy collision cost is the arc length
@@ -23,8 +25,9 @@ HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT ANTICIPATORY STABL
                        half with of the robot base.
     DILIGENT: Runs full path planning for evaluation.
     ANTICIPATORY: Considers the hindrance the current action places onto future actions.
-    STABLE_DISCRETE: For place actions, just checks if the place action can be performed.
+    STABLE_DISCRETE: For place actions, just checks if the place action can be performed, use lazy cost.
     STABLE: For place actions, uses the stability score as a heuristic.
+    STABLE_NAV: For place actions, uses the stability score as a heuristic and considers navigation.
 """
 
 class OrderedLandmarksPlanner:
@@ -186,28 +189,27 @@ class OrderedLandmarksPlanner:
 
         return self.goal_linked_state
 
-    def run_stable_planner(self, support_graph: Dict[str, SupportNode], ground_mesh: Trimesh) -> Optional[LinkedState]:
+    def run_stable_planner(self, support_graph: Dict[str, SupportNode], ground_mesh: Trimesh,
+                           h: HEURISTIC = HEURISTIC.STABLE_DISCRETE) -> Optional[LinkedState]:
         self.support_graph = support_graph
         self.ground_mesh = ground_mesh
 
         while self.current_linked_state.status == StateStatus.ALIVE:
-            self.branch_out(self.current_linked_state, HEURISTIC.STABLE_DISCRETE)
+            self.branch_out(self.current_linked_state, h, forecast=True)
             if not self.current_linked_state.branches_to_explore:
-                print("No branches, terminating")
-                return self.goal_linked_state
-                # print("No branches to explore, backtracking...")
-                # self.backtrack()
-                # continue
-
-            # Might be easier to add stability analysis and pruning unstable branches here
+                # print("No branches, terminating")
+                # return self.goal_linked_state
+                print("No branches to explore, backtracking...")
+                self.backtrack()
+                continue
 
             weighted_branch = min(self.current_linked_state.branches_to_explore, key=lambda x: x[2])
             action_name, action_params, cost = weighted_branch
             self.current_linked_state.branches_to_explore.remove(weighted_branch)
             self.current_cost += cost
             action = self.action_dict[action_name]
-            print(f"Executing: {action_name} with params {[str(param) + ': ' + str(ent.name) \
-                for param, ent in action_params.items()]} and cost {cost}")
+            # print(f"Executing: {action_name} with params {[str(param) + ': ' + str(ent.name) \
+                # for param, ent in action_params.items()]} and cost {cost}")
             action.execute(action_params)
             if self.gg:
                 if action_name == 'pick':
@@ -252,7 +254,8 @@ class OrderedLandmarksPlanner:
         self.current_linked_state = new_linked_state
         self.current_state = new_state
 
-    def branch_out(self, linked_state: LinkedState, heuristic: HEURISTIC = HEURISTIC.LAZY, verbose: bool = False) -> None:
+    def branch_out(self, linked_state: LinkedState, heuristic: HEURISTIC = HEURISTIC.LAZY,
+                   forecast: bool = False, verbose: bool = False) -> None:
         """
             Branch out from the current state by defining branches based on the preferred action and evaluating the branches.
             Assigns the weighted branches to the linked state.
@@ -267,7 +270,11 @@ class OrderedLandmarksPlanner:
 
         preferred_action_name = self.get_preferred_action()
         branches = self.define_branches_based_on_action(preferred_action_name)
-        weighted_branches = self.evaluate_branches(branches, preferred_action_name, heuristic, verbose)
+
+        if forecast:
+            weighted_branches = self.evaluate_cost_to_next_transit(branches, preferred_action_name, heuristic, verbose)
+        else:
+            weighted_branches = self.evaluate_branches(branches, preferred_action_name, heuristic, verbose)
         linked_state.branches_to_explore = weighted_branches
 
     def get_preferred_action(self) -> str:
@@ -438,6 +445,82 @@ class OrderedLandmarksPlanner:
                 # print(f"Evaluated branch for action {action_name} with target position {branch['target_pose'].name} has cost {cost}")
 
                 evaluated_branches.append((action_name, branch, cost))
+
+        return evaluated_branches
+
+    def evaluate_cost_to_next_transit(self,
+                                      branches: List[Dict[str, Entity]],
+                                      action_name: str,
+                                      heuristic: HEURISTIC = HEURISTIC.LAZY,
+                                      verbose: bool = False) -> List[Tuple[str, Dict[str, Entity], float]]:
+        """
+            At a Transit state, meaning a state to perform a transit action, look ahead from current position to transit targets,
+            then from each target to the transport target. And check if the target object can be placed stably.
+
+            Return [prune, cost], where prune is a boolean indicating whether to prune this branch or not, and cost is
+            the evaluated cost to the next transit state.
+        """
+        evaluated_branches = []
+
+        if action_name != 'transit':
+            evaluated_branches.append((action_name, branches[0], 0.0))
+            return evaluated_branches
+
+        for transit_branch in branches:
+            obj_entity = cast(Object, transit_branch['object'])
+            transit_start_pos_name = transit_branch['start_pose'].name
+            transit_target_pos_name = transit_branch['target_pose'].name
+            transit_start_pos = self.world.pose_dict[transit_start_pos_name].position
+            transit_target_pos = self.world.pose_dict[transit_target_pos_name].position
+
+            goal_pos_name = obj_entity.goal.value
+            goal_pos_name = cast(str, goal_pos_name)
+            goal_pos = self.world.pose_dict[goal_pos_name].position
+
+            is_stable, support_score = self.evaluate_obj_stability(obj_entity, self.support_graph, self.ground_mesh, verbose=verbose)
+            print(f"Branch for transit object {obj_entity.name} is {'stable' if is_stable else 'unstable'} "
+                f"with support score {support_score}.")
+
+            if not is_stable:
+                continue
+
+            match heuristic:
+                case HEURISTIC.LAZY:
+                    cost = np.linalg.norm(np.array(transit_start_pos) - np.array(transit_target_pos)).item()
+                    cost += np.linalg.norm(np.array(transit_target_pos) - np.array(goal_pos)).item()
+                case HEURISTIC.STABLE:
+                    cost = (1 - support_score)
+                case HEURISTIC.STABLE_NAV:
+                    cost = (1 - support_score)
+                    cost += np.linalg.norm(np.array(transit_start_pos) - np.array(transit_target_pos)).item() * 0.8
+                    cost += np.linalg.norm(np.array(transit_target_pos) - np.array(goal_pos)).item() * 0.8
+                case HEURISTIC.SIMPLE_COLLISION:
+                    cost = self.simple_collision_heuristic(transit_start_pos, transit_target_pos)
+                    cost += self.simple_collision_heuristic(transit_target_pos, goal_pos)
+                case HEURISTIC.DILIGENT:
+                    if not self.gg:
+                        raise ValueError("GridGraph is not initialized for diligent heuristic.")
+                    path_to_transit = self.gg.plan(transit_start_pos[:2], transit_target_pos[:2])
+                    obj_pos = cast(str, obj_entity.at.value)
+                    obj_pos = self.world.pose_dict[obj_pos].position
+                    self.gg.update_block_move(obj_pos[:2], OCCUPANCY.FREE)
+
+                    path_to_transport = self.gg.plan(transit_target_pos[:2], goal_pos[:2])
+                    self.gg.update_block_move(obj_pos[:2], OCCUPANCY.OCCUPIED)
+                    if path_to_transit.size == 0:
+                        continue
+                    else:
+                        transit_path_length = np.sum(np.linalg.norm(np.diff(path_to_transit, axis=0), axis=1))
+                        transport_path_length = np.sum(np.linalg.norm(np.diff(path_to_transport, axis=0), axis=1))
+                        cost = transit_path_length.item() + transport_path_length.item()
+                case HEURISTIC.ANTICIPATORY:
+                    pass
+                case _:
+                    print(f"Unknown heuristic: {heuristic}, defaulting to lazy.")
+                    cost = np.linalg.norm(np.array(transit_start_pos) - np.array(transit_target_pos)).item()
+                    cost += np.linalg.norm(np.array(transit_target_pos) - np.array(goal_pos)).item()
+
+            evaluated_branches.append((action_name, transit_branch, cost))
 
         return evaluated_branches
 
@@ -619,6 +702,49 @@ class OrderedLandmarksPlanner:
 
         best_plan = min(plans, key=lambda plan: plan[1])  # Get the plan with the lowest total cost
         return best_plan
+
+    def compute_lazy_nav_cost(self, plan: List[Tuple[str, Tuple[str, ...]]]) -> float:
+        pp_cost = 0.0
+        for action_name, params in plan:
+            match action_name:
+                case 'pick' | 'place':
+                    continue
+                case 'transit' | 'transport':
+                    start_pos = self.world.pose_dict[params[1]].position
+                    target_pos = self.world.pose_dict[params[2]].position
+                    path_length = np.linalg.norm(np.array(start_pos) - np.array(target_pos)).item()
+                    pp_cost += path_length
+                case _:
+                    print(f"Unknown action {action_name} in plan. Skipping...")
+        return pp_cost
+
+    def compute_full_nav_cost(self, plan: List[Tuple[str, Tuple[str, ...]]]) -> float:
+        self.gg = cast(GridGraph, self.gg)  # Type hint for better code completion
+        pp_cost = 0.0
+        for action_name, params in plan:
+            match action_name:
+                case 'pick':
+                    obj_pos = self.world.pose_dict[params[2]].position[:2]
+                    self.gg.update_block_move(obj_pos, OCCUPANCY.FREE)
+                case 'place':
+                    obj_pos = self.world.pose_dict[params[2]].position[:2]
+                    self.gg.update_block_move(obj_pos, OCCUPANCY.OCCUPIED)
+                case 'transit' | 'transport':
+                    start_pos = self.world.pose_dict[params[1]].position[:2]
+                    target_pos = self.world.pose_dict[params[2]].position[:2]
+                    path = self.gg.plan(start_pos, target_pos)
+                    if path.size == 0:
+                        print(f"No path found for action {action_name} from {start_pos} to {target_pos}.")
+                    else:
+                        path_length = np.sum(np.linalg.norm(np.diff(path, axis=0), axis=1))
+                        pp_cost += path_length
+                        print(f"Path found for action {action_name} from {start_pos} to {target_pos} "
+                              f"with length {path_length:.2f}.")
+                        # Optionally, visualize the path here using RViz or another tool
+                case _:
+                    print(f"Unknown action {action_name} in plan. Skipping...")
+
+        return pp_cost
 
 def compute_dists_from_points_to_vector(points: np.ndarray, vector: np.ndarray, start_point: np.ndarray, 
                                         verbose: bool = False) -> Tuple[np.ndarray, np.ndarray]:

@@ -87,7 +87,7 @@ class TrimeshBlockAnimator:
             scene.graph.update(f"{block_name}_active", matrix=trimesh.transformations.translation_matrix(end_xyz))
             self.interpolation_alpha = 0.0
             self.current_step_idx += 1
-            time.sleep(0.15) 
+            # time.sleep(0.15) 
 
     def save_to_video(self, output_path: str = "assembly_output.mp4", 
                       steps_per_sequence: int = 30, pause_frames: int = 10, 
