@@ -254,17 +254,18 @@ class LinkedState:
     cost: float = 0.0
     goal: bool = False
     action_from_parent: Optional[Tuple[str, Tuple[str, ...]]] = None # (action_name, involved_entities) that led to this state from parent
+    properties: Dict[str, Any] = field(default_factory=dict) # For storing auxiliary info like heuristic values, support graph snapshots, etc.
 
     # List of potential branches: (action_name, action_params, cost)
-    _branches_to_explore: List[Tuple[str, Dict[str, Entity], float]] = field(default_factory=list)
+    _branches_to_explore: List[Tuple[str, Dict[str, Entity], float, Dict[str, Any]]] = field(default_factory=list)
     _expanded: bool = False
 
     @property
-    def branches_to_explore(self) -> List[Tuple[str, Dict[str, Entity], float]]:
+    def branches_to_explore(self) -> List[Tuple[str, Dict[str, Entity], float, Dict[str, Any]]]:
         return self._branches_to_explore
 
     @branches_to_explore.setter
-    def branches_to_explore(self, branches: List[Tuple[str, Dict[str, Entity], float]]) -> None:
+    def branches_to_explore(self, branches: List[Tuple[str, Dict[str, Entity], float, Dict[str, Any]]]) -> None:
         self._branches_to_explore = branches
         self._expanded = True
 

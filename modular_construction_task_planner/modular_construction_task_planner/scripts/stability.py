@@ -156,11 +156,15 @@ def compute_placement_stability(object: Object | Trimesh,
                   f"support score = {support_score:.2f}")
             print(f"Object vertices: {[b for b in footprint.bounds]},\n"
                   f"Support object vertices: {[b for b in mesh_below.bounds]},\n"
-                  f"Support polygon vertices: {[b for b in support_polygon.bounds]},\n")
+                  f"Support polygon vertices: {[(minx, miny), (maxx, miny), (maxx, maxy), (minx, maxy)]},\n")
 
     if len(all_contact_vertices) > 4:
-        global_hull = ConvexHull(all_contact_vertices)
+        global_hull = Polygon(all_contact_vertices).convex_hull
         overall_support_area_ratio = global_hull.area / footprint.area
+        if verbose:
+            print(f"Overall support area ratio from combined supports: {overall_support_area_ratio:.2f}\n"
+                  f"Global support polygon vertices: {all_contact_vertices},\n"
+                  f"Global hull area: {global_hull.area:.2f}, Footprint area: {footprint.area:.2f}")
 
     return support_data, overall_support_area_ratio
 

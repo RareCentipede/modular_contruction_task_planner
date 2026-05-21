@@ -5,7 +5,7 @@ import numpy as np
 
 from enum import Enum
 from math import factorial
-from typing import Tuple, Dict, cast, List
+from typing import Tuple, Dict, cast, List, Any
 from scipy.spatial import cKDTree
 from modular_construction_task_planner.eas.core import (
     Optional, Pose, State, LinkedState,
@@ -80,25 +80,30 @@ class OrderedLandmarksPlanner:
             print("Resetting support graph to original state.")
             self.support_graph = self.original_support_graph
 
-        self.current_linked_state = self.s0
-        self.current_state = self.s0.state
+        self.current_state: State = self.world.current_state
+        self.s0: LinkedState = LinkedState(self.state_counter, self.current_state)
+        self.current_linked_state: LinkedState = self.s0
+        self.state_counter = 0
         self.goal_linked_state = None
         self.goal_linked_states = []
         self.current_cost = 0.0
         self.solution_count = solution_count
+
+        robot = self.world.entities.get_entities("robot")
+        self.robot = cast(Robot, robot)
 
     def run_bfs_planner(self) -> List[LinkedState]:
         while self.current_linked_state.status == StateStatus.ALIVE:
             self.branch_out(self.current_linked_state)
             weighted_branch = self.current_linked_state.branches_to_explore.pop(0)
 
-            action_name, action_params, cost = weighted_branch
+            action_name, action_params, cost, additional_properties = weighted_branch
             action = self.action_dict[action_name]
             # print(f"Executing: {action_name} with params {[str(param) + ': ' + str(ent.name) \
                 # for param, ent in action_params.items()]} and cost {cost}")
             action.execute(action_params)
             self.world.update_state()
-            self.generate_new_linked_state(action_name, action_params, cost)
+            self.generate_new_linked_state(action_name, action_params, cost, additional_properties)
 
             if self.world.goal_reached:
                 print("GOAL REACHED!")
@@ -120,7 +125,7 @@ class OrderedLandmarksPlanner:
                 continue
 
             weighted_branch = min(self.current_linked_state.branches_to_explore, key=lambda x: x[2])
-            action_name, action_params, cost = weighted_branch
+            action_name, action_params, cost, additional_properties = weighted_branch
             self.current_linked_state.branches_to_explore.remove(weighted_branch)
             self.current_cost += cost
             action = self.action_dict[action_name]
@@ -136,7 +141,7 @@ class OrderedLandmarksPlanner:
                     self.gg.update_block_move(obj_pos, OCCUPANCY.OCCUPIED)
 
             self.world.update_state()
-            self.generate_new_linked_state(action_name, action_params, self.current_cost)
+            self.generate_new_linked_state(action_name, action_params, self.current_cost, additional_properties)
 
             if self.world.goal_reached:
                 print("GOAL REACHED using lazy heuristic!")
@@ -161,7 +166,7 @@ class OrderedLandmarksPlanner:
 
             weighted_branch = min(self.current_linked_state.branches_to_explore, key=lambda x: x[2])
             self.current_linked_state.branches_to_explore.remove(weighted_branch)
-            action_name, action_params, cost = weighted_branch
+            action_name, action_params, cost, additional_properties = weighted_branch
             action = self.action_dict[action_name]
             self.current_cost += cost
             if self.current_cost > best_cost:
@@ -183,7 +188,7 @@ class OrderedLandmarksPlanner:
                     self.gg.update_block_move(obj_pos, OCCUPANCY.OCCUPIED)
 
             self.world.update_state()
-            self.generate_new_linked_state(action_name, action_params, self.current_cost)
+            self.generate_new_linked_state(action_name, action_params, self.current_cost, additional_properties)
 
             if self.world.goal_reached:
                 print(f"GOAL REACHED using lazy heuristic in {self.current_linked_state.state_id} steps!")
@@ -209,28 +214,28 @@ class OrderedLandmarksPlanner:
         return self.goal_linked_state
 
     def run_stable_planner(self, support_graph: Dict[str, SupportNode], ground_mesh: Trimesh,
-                           h: HEURISTIC = HEURISTIC.STABLE_DISCRETE) -> Optional[LinkedState]:
+                           h: HEURISTIC = HEURISTIC.STABLE_DISCRETE, verbose: bool = False) -> Optional[LinkedState]:
         if not self.support_graph:
             self.support_graph = support_graph
             self.original_support_graph = deepcopy(self.support_graph)
         self.ground_mesh = ground_mesh
 
         while self.current_linked_state.status == StateStatus.ALIVE:
-            self.branch_out(self.current_linked_state, h, forecast=True)
+            self.branch_out(self.current_linked_state, h, forecast=True, verbose=verbose)
             if not self.current_linked_state.branches_to_explore:
-                # print("No branches, terminating")
-                # return self.goal_linked_state
-                print("No branches to explore, backtracking...")
-                self.backtrack()
-                continue
+                print("No branches, terminating")
+                return self.goal_linked_state
+                # print("No branches to explore, backtracking...")
+                # self.backtrack()
+                # continue
 
             weighted_branch = min(self.current_linked_state.branches_to_explore, key=lambda x: x[2])
-            action_name, action_params, cost = weighted_branch
+            action_name, action_params, cost, additional_properties = weighted_branch
             self.current_linked_state.branches_to_explore.remove(weighted_branch)
             self.current_cost += cost
             action = self.action_dict[action_name]
-            # print(f"Executing: {action_name} with params {[str(param) + ': ' + str(ent.name) \
-                # for param, ent in action_params.items()]} and cost {cost}")
+            print(f"Executing: {action_name} with params {[str(param) + ' : ' + str(ent.name) \
+                for param, ent in action_params.items()]} and cost {cost}")
             action.execute(action_params)
             if self.gg:
                 if action_name == 'pick':
@@ -241,7 +246,7 @@ class OrderedLandmarksPlanner:
                     self.gg.update_block_move(obj_pos, OCCUPANCY.OCCUPIED)
 
             self.world.update_state()
-            self.generate_new_linked_state(action_name, action_params, self.current_cost)
+            self.generate_new_linked_state(action_name, action_params, self.current_cost, additional_properties)
 
             if action_name == 'place':
                 support_score = 1 - weighted_branch[2]
@@ -265,12 +270,13 @@ class OrderedLandmarksPlanner:
 
         return self.goal_linked_state
 
-    def generate_new_linked_state(self, action_name: str, action_params: Dict[str, Entity], cost: float) -> None:
+    def generate_new_linked_state(self, action_name: str, action_params: Dict[str, Entity], cost: float,
+                                  additional_properties: Dict[str, Any] = {}) -> None:
         new_state = self.world.current_state
         self.state_counter += 1
         action_log = (action_name, tuple(f"{ent.name}" for ent in action_params.values()))
         new_linked_state = LinkedState(self.state_counter, new_state, parent=(action_name, self.current_linked_state),
-                                        cost=cost, action_from_parent=action_log)
+                                        cost=cost, action_from_parent=action_log, properties=additional_properties)
         self.current_linked_state.children.append((action_name, new_linked_state))
         self.current_linked_state = new_linked_state
         self.current_state = new_state
@@ -284,7 +290,7 @@ class OrderedLandmarksPlanner:
         if linked_state.branches_to_explore:
             # Need to check the branches again after backtacking, since the state of the world is different.
             for branch in linked_state.branches_to_explore:
-                action_name, branch_params, _ = branch
+                action_name, branch_params, _, _ = branch
                 if not self.action_dict[action_name].check(branch_params):
                     linked_state.branches_to_explore.remove(branch)
             return
@@ -406,14 +412,16 @@ class OrderedLandmarksPlanner:
                           branches: List[Dict[str, Entity]],
                           action_name: str,
                           heuristic: HEURISTIC = HEURISTIC.LAZY,
-                          verbose: bool = False) -> List[Tuple[str, Dict[str, Entity], float]]:
+                          verbose: bool = False) -> List[Tuple[str, Dict[str, Entity], float, Dict[str, Any]]]:
         """
             Evaluate the given branches and return a list of tuples of the branch and its cost, which is defined as the
             euclidean distance between the robot and the target. The branch with the lowest cost will be explored first.
         """
         evaluated_branches = []
+        additional_properties = {}
+
         if action_name == "pick" or action_name == "place":
-            evaluated_branches = [(action_name, branch, 0.0) for branch in branches]
+            evaluated_branches = [(action_name, branch, 0.0, additional_properties) for branch in branches]
         elif action_name == "transit" or action_name == "transport":
             for branch in branches:
                 start_pos = branch['start_pose'].name
@@ -465,7 +473,7 @@ class OrderedLandmarksPlanner:
 
                 # print(f"Evaluated branch for action {action_name} with target position {branch['target_pose'].name} has cost {cost}")
 
-                evaluated_branches.append((action_name, branch, cost))
+                evaluated_branches.append((action_name, branch, cost, additional_properties))
 
         return evaluated_branches
 
@@ -473,7 +481,7 @@ class OrderedLandmarksPlanner:
                                       branches: List[Dict[str, Entity]],
                                       action_name: str,
                                       heuristic: HEURISTIC = HEURISTIC.LAZY,
-                                      verbose: bool = False) -> List[Tuple[str, Dict[str, Entity], float]]:
+                                      verbose: bool = False) -> List[Tuple[str, Dict[str, Entity], float, Dict[str, Any]]]:
         """
             At a Transit state, meaning a state to perform a transit action, look ahead from current position to transit targets,
             then from each target to the transport target. And check if the target object can be placed stably.
@@ -482,9 +490,10 @@ class OrderedLandmarksPlanner:
             the evaluated cost to the next transit state.
         """
         evaluated_branches = []
+        additional_properties = {}
 
         if action_name != 'transit':
-            evaluated_branches.append((action_name, branches[0], 0.0))
+            evaluated_branches.append((action_name, branches[0], 0.0, additional_properties))
             return evaluated_branches
 
         for transit_branch in branches:
@@ -499,6 +508,8 @@ class OrderedLandmarksPlanner:
             goal_pos = self.world.pose_dict[goal_pos_name].position
 
             is_stable, support_score = self.evaluate_obj_stability(obj_entity, self.support_graph, self.ground_mesh, verbose=verbose)
+            # support_score = np.clip(support_score, 0.0, 1.0)
+            additional_properties = {'support_score': support_score}
             print(f"Branch for transit object {obj_entity.name} is {'stable' if is_stable else 'unstable'} "
                 f"with support score {support_score}.")
 
@@ -541,7 +552,7 @@ class OrderedLandmarksPlanner:
                     cost = np.linalg.norm(np.array(transit_start_pos) - np.array(transit_target_pos)).item()
                     cost += np.linalg.norm(np.array(transit_target_pos) - np.array(goal_pos)).item()
 
-            evaluated_branches.append((action_name, transit_branch, cost))
+            evaluated_branches.append((action_name, transit_branch, cost, additional_properties))
 
         return evaluated_branches
 
@@ -557,6 +568,7 @@ class OrderedLandmarksPlanner:
         obj_support_node = support_graph[obj.name]
         supporting_objs = []
         supp_names = []
+        sd = {}
 
         for parent_name, (score, is_placed) in obj_support_node.supporting_objects.items():
             if is_placed:
@@ -572,15 +584,15 @@ class OrderedLandmarksPlanner:
             overall_support_score = obj_support_node.support_combo_dict.get(tuple(supp_names), None)
             branch_support_score = overall_support_score if overall_support_score else branch_support_score
             if not overall_support_score and supp_names:
-                sd, overall_support_score = compute_placement_stability(obj, supporting_objs, [], ground_mesh)
+                sd, overall_support_score = compute_placement_stability(obj, supporting_objs, [], ground_mesh, verbose)
                 branch_support_score = overall_support_score
                 obj_support_node.support_combo_dict.update({tuple(supp_names): overall_support_score})
 
-                if verbose:
-                    print(f"Evaluating stability for object {obj.name} with supporting objects {supp_names}. "
-                          f"Individual support scores: {[supp_name + ': ' + str(score) for supp_name, (score, _) in support_graph[obj.name].supporting_objects.items()]}. "
-                          f"Combined support score: {overall_support_score}. Threshold: {obj_support_node.support_threshold}.")
-                    print(f"Support data: {sd}")
+        if verbose:
+            print(f"Evaluating stability for object {obj.name} with supporting objects {supp_names}. Initial check: {'passed' if is_stable else 'not passed'}\n"
+                  f"Individual support scores: {[supp_name + ': ' + str(score) for supp_name, (score, _) in support_graph[obj.name].supporting_objects.items()]}.\n"
+                  f"Combined support score: {branch_support_score}. Threshold: {obj_support_node.support_threshold}.")
+            print(f"Support data: {sd}")
 
         is_stable = branch_support_score >= obj_support_node.support_threshold
         return is_stable, branch_support_score
@@ -723,6 +735,28 @@ class OrderedLandmarksPlanner:
 
         best_plan = min(plans, key=lambda plan: plan[1])  # Get the plan with the lowest total cost
         return best_plan
+
+    @staticmethod
+    def unpack_stability_results(goal_linked_state: LinkedState) -> Tuple[List[float], float, float]:
+        stability_scores = []
+        total_stability_score = 0.0
+        average_stability_score = 0.0
+        current_linked_state = goal_linked_state
+        parent = current_linked_state.parent
+        while parent is not None and current_linked_state.action_from_parent is not None:
+            action_name, _ = current_linked_state.action_from_parent
+            if action_name == 'transit':
+                support_score = current_linked_state.properties.get('support_score', None)
+                if support_score is not None:
+                    stability_scores.append(support_score)
+            current_linked_state = parent[1]
+            parent = current_linked_state.parent
+
+        if stability_scores:
+            total_stability_score = sum(stability_scores)
+            average_stability_score = total_stability_score / len(stability_scores)
+
+        return stability_scores[::-1], total_stability_score, average_stability_score
 
     def compute_lazy_nav_cost(self, plan: List[Tuple[str, Tuple[str, ...]]]) -> float:
         pp_cost = 0.0
