@@ -21,7 +21,6 @@ def main():
     problem_config_path = "src/object_rearrangement_ros2_sim/mpnp_simulation/config/problem_configs/"
     problem_name = "temple_facade"
     world = parse_configs_to_world(problem_name, problem_config_path)
-    original_world = deepcopy(world)  # Keep a copy of the original world for logging
     for ent in world.entities.entities:
         print(f"{ent.name}: {ent.state}")
 
@@ -64,11 +63,7 @@ def main():
         animator = TrimeshBlockAnimator(init_config, goal_config, block_sequence, colors)
         animator.run()
 
-    planner.world = original_world
-    planner.current_cost = 0.0
-    planner.current_linked_state = planner.s0
-    planner.current_state = planner.s0.state
-    support_graph = create_support_relation_graph(planner.world)[1]
+    planner.reset()
     h = HEURISTIC.STABLE_DISCRETE
     goal_linked_state = planner.run_stable_planner(support_graph, ground_mesh, h)
     # goal_linked_state = planner.run_heuristic_planner(h)

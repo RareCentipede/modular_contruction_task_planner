@@ -1,4 +1,4 @@
-from tabnanny import verbose
+from copy import deepcopy
 
 from trimesh import Trimesh
 import numpy as np
@@ -33,8 +33,12 @@ HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT ANTICIPATORY STABL
 class OrderedLandmarksPlanner:
     def __init__(self, world: World, action_dict: Dict[str, Action], gg: Optional[GridGraph] = None) -> None:
         self.world: World = world
+        self.original_world = deepcopy(world)
         self.action_dict: Dict[str, Action] = action_dict
         self.gg: Optional[GridGraph] = gg
+        self.support_graph: Dict[str, SupportNode] = {}
+        if self.gg:
+            self.original_gg = deepcopy(gg)
 
         self.state_counter: int = 0
 
@@ -67,6 +71,21 @@ class OrderedLandmarksPlanner:
             print(f"Block {block.name} can be reached from {len(block.reachable_from)} positions")
             self.num_potential_solutions *= len(block.reachable_from)
         print(f"Number of potential solutions: {self.num_potential_solutions}")
+
+    def reset(self, solution_count: int = 100) -> None:
+        self.world = self.original_world
+        if self.gg:
+            self.gg = self.original_gg
+        if self.support_graph and self.original_support_graph:
+            print("Resetting support graph to original state.")
+            self.support_graph = self.original_support_graph
+
+        self.current_linked_state = self.s0
+        self.current_state = self.s0.state
+        self.goal_linked_state = None
+        self.goal_linked_states = []
+        self.current_cost = 0.0
+        self.solution_count = solution_count
 
     def run_bfs_planner(self) -> List[LinkedState]:
         while self.current_linked_state.status == StateStatus.ALIVE:
@@ -191,7 +210,9 @@ class OrderedLandmarksPlanner:
 
     def run_stable_planner(self, support_graph: Dict[str, SupportNode], ground_mesh: Trimesh,
                            h: HEURISTIC = HEURISTIC.STABLE_DISCRETE) -> Optional[LinkedState]:
-        self.support_graph = support_graph
+        if not self.support_graph:
+            self.support_graph = support_graph
+            self.original_support_graph = deepcopy(self.support_graph)
         self.ground_mesh = ground_mesh
 
         while self.current_linked_state.status == StateStatus.ALIVE:
@@ -225,12 +246,12 @@ class OrderedLandmarksPlanner:
             if action_name == 'place':
                 support_score = 1 - weighted_branch[2]
                 obj_entity = cast(Object, action_params['object'])
-                obj_support_node = support_graph[obj_entity.name]
+                obj_support_node = self.support_graph[obj_entity.name]
                 obj_support_node.current_support_score = support_score
 
                 for supported_name, supported_edge in obj_support_node.supported_objects.items():
                     obj_support_node.supported_objects[supported_name] = (supported_edge[0], True)
-                    supported_obj_support_node = support_graph[supported_name]
+                    supported_obj_support_node = self.support_graph[supported_name]
                     supported_obj_support_node.supporting_objects[obj_entity.name] = (supported_edge[0], True)
 
             if self.world.goal_reached:

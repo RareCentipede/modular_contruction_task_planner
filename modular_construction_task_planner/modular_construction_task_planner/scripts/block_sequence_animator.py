@@ -64,7 +64,7 @@ class TrimeshBlockAnimator:
 
     def animation_callback(self, scene):
         if not self.begin:
-            time.sleep(5.0)
+            # time.sleep(5.0)
             self.begin = True
 
         if self.current_step_idx >= len(self.sequence):
