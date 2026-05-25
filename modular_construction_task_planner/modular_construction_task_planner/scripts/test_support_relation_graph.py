@@ -35,8 +35,8 @@ def main():
     for obj_name, node in support_graph.items():
         print(f"Object: {obj_name}")
         print(f"  Supported: {node.supported} (Score: {node.current_support_score:.2f}/{node.support_threshold})")
-        print(f"  Supports: {[f'{name} (Score: {score:.2f})' for name, score, _ in node.supported_objects]}")
-        print(f"  Supported by: {[f'{name} (Score: {score:.2f})' for name, score, _ in node.supporting_objects]}")
+        print(f"  Supports: {[f'{name} (Score: {score:.2f})' for name, (score, _) in node.supported_objects.items()]}")
+        print(f"  Supported by: {[f'{name} (Score: {score:.2f})' for name, (score, _) in node.supporting_objects.items()]}")
         print()
 
     plt.show()
