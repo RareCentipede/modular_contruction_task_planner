@@ -526,6 +526,7 @@ class OrderedLandmarksPlanner:
                     cost = (1 - support_score)
                     cost += np.linalg.norm(np.array(transit_start_pos) - np.array(transit_target_pos)).item() * 0.8
                     cost += np.linalg.norm(np.array(transit_target_pos) - np.array(goal_pos)).item() * 0.8
+                    # print(f"Stable nav heuristic cost breakdown for object {obj_entity.name}: support cost {(1 - support_score)}, total cost: {cost}")
                 case HEURISTIC.SIMPLE_COLLISION:
                     cost = self.simple_collision_heuristic(transit_start_pos, transit_target_pos)
                     cost += self.simple_collision_heuristic(transit_target_pos, goal_pos)

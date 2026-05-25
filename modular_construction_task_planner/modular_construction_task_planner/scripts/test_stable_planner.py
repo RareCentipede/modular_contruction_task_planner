@@ -49,7 +49,6 @@ def main(problem_name:str = "scaffolding_tower", show: bool = False, animate: bo
     supp_res = ([], 0, 0)  # Initialize with empty scores
     cost = np.nan
     block_sequences = []
-    h = HEURISTIC.STABLE
     planner = OrderedLandmarksPlanner(world, action_dict)
     goal_linked_state = planner.run_stable_planner(support_graph, ground_mesh, h)
     # goal_linked_state = planner.run_heuristic_planner(h)
