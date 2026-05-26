@@ -49,6 +49,8 @@ class OrderedLandmarksPlanner:
         self.goal_linked_states: List[LinkedState] = []
         self.current_cost = 0.0
         self.solution_count = 100
+        self.mb_costs = []
+        self.monitor = SearchMonitor(patience=1000)
 
         robot = self.world.entities.get_entities("robot")
         self.robot = cast(Robot, robot)
@@ -62,9 +64,9 @@ class OrderedLandmarksPlanner:
         self.place_positions = [b.placeable_from for b in blocks if b.goal.value]
         self.place_positions = [pos for sublist in self.place_positions for pos in sublist]
 
-        self.num_potential_solutions = factorial(len(blocks)-3)
+        self.num_potential_solutions = factorial(len(blocks)-2)
         print(f"Blocks: {[block.name for block in blocks]}")
-        print(f"Number of blocks: {len(blocks)-3}")
+        print(f"Number of blocks: {len(blocks)-2}")
         for block in blocks:
             if not block.goal.value:
                 continue
@@ -88,6 +90,9 @@ class OrderedLandmarksPlanner:
         self.goal_linked_states = []
         self.current_cost = 0.0
         self.solution_count = solution_count
+        self.mb_costs = []
+        self.monitor.best_cost = float('inf')
+        self.monitor.stagnation_counter = 0
 
         robot = self.world.entities.get_entities("robot")
         self.robot = cast(Robot, robot)
@@ -153,11 +158,11 @@ class OrderedLandmarksPlanner:
 
         return self.goal_linked_states
 
-    def run_multi_bound_planner(self) -> Optional[LinkedState]:
+    def run_multi_bound_planner(self, h: HEURISTIC = HEURISTIC.LAZY) -> Optional[LinkedState]:
         best_cost = float('inf')
         home_state = self.s0
         while self.current_linked_state.status == StateStatus.ALIVE:
-            self.branch_out(self.current_linked_state, HEURISTIC.LAZY)
+            self.branch_out(self.current_linked_state, h, forecast=True)
             if not self.current_linked_state.branches_to_explore:
                 print("No branches to explore, backtracking...")
                 self.backtrack()
@@ -194,8 +199,11 @@ class OrderedLandmarksPlanner:
                 print(f"GOAL REACHED using lazy heuristic in {self.current_linked_state.state_id} steps!")
                 self.current_linked_state.goal = True
                 goal_state = self.current_linked_state
-                nav_cost = self.nav_cost_from_home_to_target(home_state, goal_state)
-
+                if h == HEURISTIC.LAZY:
+                    lazy=True
+                else:
+                    lazy=False
+                nav_cost = self.nav_cost_from_home_to_target(home_state, goal_state, lazy=lazy)
                 upper_bound = nav_cost + home_state.cost
                 if upper_bound < best_cost:
                     best_cost = upper_bound
@@ -204,12 +212,12 @@ class OrderedLandmarksPlanner:
                 else:
                     print(f"New bound {upper_bound} is not better than current best cost {best_cost}.")
 
+                self.mb_costs.append(upper_bound)
+                if self.monitor.should_stop(upper_bound):
+                    break
+
                 self.backtrack()
                 home_state = self.current_linked_state
-                self.solution_count -= 1
-                if self.solution_count <= 0:
-                    print("Solution count limit reached, terminating search.")
-                    break
 
         return self.goal_linked_state
 
@@ -221,7 +229,7 @@ class OrderedLandmarksPlanner:
         self.ground_mesh = ground_mesh
 
         while self.current_linked_state.status == StateStatus.ALIVE:
-            self.branch_out(self.current_linked_state, h, forecast=True, verbose=verbose)
+            self.branch_out(self.current_linked_state, h, forecast=True, verbose=verbose, stable_check=True)
             if not self.current_linked_state.branches_to_explore:
                 print("No branches, terminating")
                 return self.goal_linked_state
@@ -282,7 +290,7 @@ class OrderedLandmarksPlanner:
         self.current_state = new_state
 
     def branch_out(self, linked_state: LinkedState, heuristic: HEURISTIC = HEURISTIC.LAZY,
-                   forecast: bool = False, verbose: bool = False) -> None:
+                   forecast: bool = False, verbose: bool = False, stable_check: bool = False) -> None:
         """
             Branch out from the current state by defining branches based on the preferred action and evaluating the branches.
             Assigns the weighted branches to the linked state.
@@ -299,7 +307,7 @@ class OrderedLandmarksPlanner:
         branches = self.define_branches_based_on_action(preferred_action_name)
 
         if forecast:
-            weighted_branches = self.evaluate_cost_to_next_transit(branches, preferred_action_name, heuristic, verbose)
+            weighted_branches = self.evaluate_cost_to_next_transit(branches, preferred_action_name, heuristic, verbose, stable_check)
         else:
             weighted_branches = self.evaluate_branches(branches, preferred_action_name, heuristic, verbose)
         linked_state.branches_to_explore = weighted_branches
@@ -483,7 +491,8 @@ class OrderedLandmarksPlanner:
                                       branches: List[Dict[str, Entity]],
                                       action_name: str,
                                       heuristic: HEURISTIC = HEURISTIC.LAZY,
-                                      verbose: bool = False) -> List[Tuple[str, Dict[str, Entity], float, Dict[str, Any]]]:
+                                      verbose: bool = False,
+                                      stable_check: bool = False) -> List[Tuple[str, Dict[str, Entity], float, Dict[str, Any]]]:
         """
             At a Transit state, meaning a state to perform a transit action, look ahead from current position to transit targets,
             then from each target to the transport target. And check if the target object can be placed stably.
@@ -493,6 +502,8 @@ class OrderedLandmarksPlanner:
         """
         evaluated_branches = []
         additional_properties = {}
+        is_stable = False
+        support_score = 0.0
 
         if action_name != 'transit':
             evaluated_branches.append((action_name, branches[0], 0.0, additional_properties))
@@ -509,15 +520,16 @@ class OrderedLandmarksPlanner:
             goal_pos_name = cast(str, goal_pos_name)
             goal_pos = self.world.pose_dict[goal_pos_name].position
 
-            is_stable, support_score = self.evaluate_obj_stability(obj_entity, self.support_graph, self.ground_mesh, verbose=verbose)
-            # support_score = np.clip(support_score, 0.0, 1.0)
-            additional_properties = {'support_score': support_score}
-            if verbose:
-                print(f"Branch for transit object {obj_entity.name} is {'stable' if is_stable else 'unstable'} "
-                    f"with support score {support_score}.")
+            if stable_check:
+                is_stable, support_score = self.evaluate_obj_stability(obj_entity, self.support_graph, self.ground_mesh, verbose=verbose)
+                # support_score = np.clip(support_score, 0.0, 1.0)
+                additional_properties = {'support_score': support_score}
+                if verbose:
+                    print(f"Branch for transit object {obj_entity.name} is {'stable' if is_stable else 'unstable'} "
+                        f"with support score {support_score}.")
 
-            if not is_stable:
-                continue
+                if not is_stable:
+                    continue
 
             match heuristic:
                 case HEURISTIC.LAZY:
@@ -673,7 +685,10 @@ class OrderedLandmarksPlanner:
         self.world.update_entities_from_state(self.current_state)
         self.world.update_state()
 
-    def nav_cost_from_home_to_target(self, home_linked_state: LinkedState, target_linked_state: LinkedState) -> float:
+    def nav_cost_from_home_to_target(self,
+                                     home_linked_state: LinkedState,
+                                     target_linked_state:LinkedState,
+                                     lazy: bool = False) -> float:
         self.gg = cast(GridGraph, self.gg)  # Type hint for better code completion
         cost = home_linked_state.cost
         current_linked_state = target_linked_state
@@ -704,11 +719,16 @@ class OrderedLandmarksPlanner:
                 elif action_name == 'transit' or action_name == 'transport':
                     start_pos = self.world.pose_dict[action_params[1]].position
                     target_pos = self.world.pose_dict[action_params[2]].position
-                    path = self.gg.plan(start_pos[:2], target_pos[:2])
-                    if path.size == 0:
-                        cost = float('inf')
+                    if not lazy:
+                        path = self.gg.plan(start_pos[:2], target_pos[:2])
+                        if path.size == 0:
+                            cost = float('inf')
+                        else:
+                            path_length = np.sum(np.linalg.norm(np.diff(path, axis=0), axis=1))
+                            cost += path_length
+                            child_linked_state[1].cost = cost
                     else:
-                        path_length = np.sum(np.linalg.norm(np.diff(path, axis=0), axis=1))
+                        path_length = np.linalg.norm(np.array(start_pos) - np.array(target_pos)).item()
                         cost += path_length
                         child_linked_state[1].cost = cost
 
@@ -867,3 +887,49 @@ def compute_arc_length(start_pos: List[float], target_pos: List[float], obj_pos:
     arc_length = angle_at_obstacle * col_radius
 
     return arc_length
+
+class SearchMonitor:
+    def __init__(self, patience: int = 5, min_delta: float = 0.1):
+        """
+        Args:
+            patience: How many plan improvements to wait before stopping 
+                      if the cost stagnates.
+            min_delta: The minimum percentage decrease required to qualify 
+                       as a significant improvement (e.g., 0.01 = 1%).
+        """
+        self.patience = patience
+        self.min_delta = min_delta
+        self.best_cost = float('inf')
+        self.stagnation_counter = 0
+
+    def should_stop(self, new_plan_cost: float) -> bool:
+        """
+        Checks if the search should be terminated due to cost stagnation.
+        Call this every time a valid, complete plan is found.
+        """
+        if new_plan_cost < self.best_cost:
+            # Calculate how much it actually improved relative to the best cost
+            if self.best_cost == float('inf'):
+                improvement = float('inf')
+            else:
+                improvement = (self.best_cost - new_plan_cost) / self.best_cost
+            
+            # Check if the improvement is worth noting
+            if improvement > self.min_delta:
+                self.best_cost = new_plan_cost
+                self.stagnation_counter = 0  # Reset counter on significant progress
+                return False
+            else:
+                # Cost went down, but not by enough to matter
+                self.stagnation_counter += 1
+        else:
+            # The new plan is worse than or equal to our historical best
+            self.stagnation_counter += 1
+
+        # Trigger early stopping if patience is exceeded
+        if self.stagnation_counter >= self.patience:
+            print(f"[Early Stopping] Search terminated. Cost stagnated at {self.best_cost:.4f} "
+                  f"for {self.stagnation_counter} iterations.")
+            return True
+            
+        return False

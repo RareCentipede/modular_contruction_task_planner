@@ -1,5 +1,6 @@
 import rclpy
 import numpy as np
+import pandas as pd
 
 from copy import deepcopy
 from rclpy.node import Node
@@ -10,10 +11,10 @@ from mpnp_interfaces.msg import Plan, TaskAction
 from mpnp_interfaces.srv import PlanConstructionTask
 
 from modular_construction_task_planner.scripts.ordered_landmarks_planner import OrderedLandmarksPlanner, HEURISTIC
-from modular_construction_task_planner.eas.core import LinkedState
+from modular_construction_task_planner.eas.core import LinkedState, World
 from modular_construction_task_planner.eas.config_parser_world_basic import parse_configs_to_world
 from modular_construction_task_planner.eas.block_list_parser_world import parse_block_list_to_world
-from modular_construction_task_planner.scripts.block_domain import PickAction, PlaceAction, TransitAction, TransportAction
+from modular_construction_task_planner.scripts.block_domain import PickAction, PlaceAction, TransitAction, TransportAction, Object
 from path_planner.path_planner_node import GridGraph, OCCUPANCY
 
 class ModularConstructionTaskPlanner(Node):
@@ -30,18 +31,22 @@ class ModularConstructionTaskPlanner(Node):
         }
         self.gg: GridGraph | None = None
 
+        self.h = [HEURISTIC.LAZY, HEURISTIC.SIMPLE_COLLISION, HEURISTIC.DILIGENT]
+        self.planner_types = ['greedy', 'multi_bound']
+        self.columns = ['no.blocks', 'planner_type', 'heuristic', 'planning_time', 'plan_cost', 'pp_cost']
+        self.res_path = 'src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/results/'
+
     def plan_construction_task_service(self, request, response):
         try:
             if request.blocks:
                 self.get_logger().info("Parsing block list from request to create world representation.")
-                self.get_logger().info(f"Robot initial pose:\n{request.robot_init_pose}")
+                # self.get_logger().info(f"Robot initial pose:\n{request.robot_init_pose}")
                 world = parse_block_list_to_world(request.blocks, request.robot_init_pose)
-                original_world = deepcopy(world)  # Keep a copy of the original world for logging
                 self.gg = GridGraph(list(request.blocks), block_size=0.3)
 
-                for entity in world.entities.entities:
-                    self.get_logger().info(f"Entity: {entity.name}, State: {entity.state}")
-                self.get_logger().info(f"Pose dict names: {list(world.pose_dict.keys())}")
+                # for entity in world.entities.entities:
+                    # self.get_logger().info(f"Entity: {entity.name}, State: {entity.state}")
+                # self.get_logger().info(f"Pose dict names: {list(world.pose_dict.keys())}")
             else:
                 self.get_logger().info("Parsing configuration files to create world representation.")
                 world = parse_configs_to_world(request.config_name, request.problem_config_path)
@@ -53,43 +58,60 @@ class ModularConstructionTaskPlanner(Node):
             response.msg = f"Failed to parse configuration: {e}"
             return response
 
-        # planner = OrderedLandmarksPlanner(world, self.action_dict, self.gg)
-        # multi_bound_goal_state = planner.run_multi_bound_planner()
+        original_world = deepcopy(world)  # Keep a copy of the original world for logging
+        original_gg = deepcopy(self.gg)  # Keep a copy of the original grid graph for logging
+        res_pd = pd.DataFrame(columns=self.columns)
+        idx = 0
+        blocks = world.entities.get_entities(Object)
+        blocks = cast(List, blocks)
+        print(blocks)
+        for planner_type in self.planner_types:
+            for heuristic in self.h:
+                world = deepcopy(original_world)
+                gg = deepcopy(original_gg)
+                pp_cost = float('inf')
+                self.get_logger().info(f"Running {planner_type} planner with {heuristic} heuristic...")
+                start_time = self.get_clock().now()
+                plan, cost = self.run_planner_type_heuristic(world, planner_type, heuristic, gg)
+                end_time = self.get_clock().now()
+                planning_time = (end_time - start_time).nanoseconds
+                if plan:
+                    self.get_logger().info(f"Plan found with {planner_type} planner and {heuristic} heuristic. Cost: {cost:.2f}")
+                    pp_cost = self.compute_full_nav_cost(plan, OrderedLandmarksPlanner(world, self.action_dict, gg))
+                    self.get_logger().info(f"Navigation cost: {pp_cost:.2f}")
+                else:
+                    self.get_logger().warning(f"No plan found with {planner_type} planner and {heuristic} heuristic.")
 
-        # if not multi_bound_goal_state:
-        #     self.get_logger().error("No plan found with the given heuristic.")
-        #     response.success = False
-        #     response.result = PlanConstructionTask.Response.PLANNING_FAILED
-        #     response.msg = "No plan found with the given heuristic."
-        #     return response
+                res_row = [len(blocks)-2, planner_type, heuristic, planning_time, cost, pp_cost]
+                res_pd.loc[idx] = res_row
+                res_pd.to_csv(f"{self.res_path}{len(blocks)-2}_{planner_type}_{heuristic}.csv", index=False)
+                idx += 1
 
-        # mb_plan, heuristic_cost = self.retrace_best_plan(multi_bound_goal_state)
-        # self.get_logger().info(f"Multi-bound plan with total cost {heuristic_cost} found.")
-        # best_plan = mb_plan
-
-        # self.gg = GridGraph(list(request.blocks), block_size=0.3)  # Reinitialize the grid graph for accurate path planning
-        # full_nav_cost = self.compute_full_nav_cost(best_plan, planner)
-        # self.get_logger().info(f"Total path planning cost for the plan: {full_nav_cost:.2f}")
-
-        planner = OrderedLandmarksPlanner(original_world, self.action_dict, None)
-        h = HEURISTIC.LAZY
-        greedy_goal_state = planner.run_heuristic_planner(h)
-        greedy_plan, greedy_cost = self.retrace_best_plan(greedy_goal_state)
-        self.get_logger().info(f"Greedy plan with heuristic cost {greedy_cost} found.")
-        self.gg = GridGraph(list(request.blocks), block_size=0.3)  # Reinitialize the grid graph for accurate path planning
-        greedy_full_nav_cost = self.compute_full_nav_cost(greedy_plan, planner)
-
-        self.get_logger().info(f"Total path planning cost for the greedy plan: {greedy_full_nav_cost:.2f}")
-        # self.get_logger().info(f"Multi-bound cost: {heuristic_cost:.2f}, Greedy cost: {greedy_cost:.2f}, "
-        #                        f"Multi-bound full nav cost: {full_nav_cost:.2f}, Greedy full nav cost: {greedy_full_nav_cost:.2f}")
-
-        best_plan = greedy_plan
-        response.plan = self.format_plan(best_plan)
+        best_plan = plan
+        response.plan = self.format_plan(best_plan) if best_plan else Plan()
         response.success = True
         response.result = PlanConstructionTask.Response.SUCCESS
         response.msg = "Plan found successfully."
 
         return response
+
+    def run_planner_type_heuristic(self, world: World, planner_type: str, heuristic: HEURISTIC, gg: GridGraph | None = None):
+        planner = OrderedLandmarksPlanner(world, self.action_dict, gg)
+        plan = []
+        cost = 0.0
+
+        if planner_type == 'greedy':
+            goal_state = planner.run_heuristic_planner(heuristic)
+        elif planner_type == 'multi_bound':
+            goal_state = planner.run_multi_bound_planner(heuristic)
+        else:
+            raise ValueError(f"Unknown planner type: {planner_type}")
+
+        if goal_state:
+            plan, cost = self.retrace_best_plan(goal_state)
+        planner.reset()
+
+        return plan, cost
 
     @staticmethod
     def retrace_best_plan(goal_linked_states: List[LinkedState] | LinkedState) -> Tuple[List[Tuple[str, Tuple[str, ...]]], float]:

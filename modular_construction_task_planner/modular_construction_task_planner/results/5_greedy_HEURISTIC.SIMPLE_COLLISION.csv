@@ -1,0 +1,3 @@
+no.blocks,planner_type,heuristic,planning_time,plan_cost,pp_cost
+5,greedy,HEURISTIC.LAZY,0,52.87690690980924,54.88453196012183
+5,greedy,HEURISTIC.SIMPLE_COLLISION,0,54.24205352777339,54.97526487482625
