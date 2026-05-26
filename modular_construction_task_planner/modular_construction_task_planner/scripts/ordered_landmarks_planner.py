@@ -234,8 +234,8 @@ class OrderedLandmarksPlanner:
             self.current_linked_state.branches_to_explore.remove(weighted_branch)
             self.current_cost += cost
             action = self.action_dict[action_name]
-            print(f"Executing: {action_name} with params {[str(param) + ' : ' + str(ent.name) \
-                for param, ent in action_params.items()]} and cost {cost}")
+            # print(f"Executing: {action_name} with params {[str(param) + ' : ' + str(ent.name) \
+                # for param, ent in action_params.items()]} and cost {cost}")
             action.execute(action_params)
             if self.gg:
                 if action_name == 'pick':
@@ -435,8 +435,9 @@ class OrderedLandmarksPlanner:
                     case HEURISTIC.STABLE_DISCRETE:
                         obj_entity = cast(Object, branch['object'])
                         is_stable, support_score = self.evaluate_obj_stability(obj_entity, self.support_graph, self.ground_mesh, verbose=verbose)
-                        print(f"Branch for {action_name} object {obj_entity.name} is {'stable' if is_stable else 'unstable'} "
-                            f"with support score {support_score}.")
+                        if verbose:
+                            print(f"Branch for {action_name} object {obj_entity.name} is {'stable' if is_stable else 'unstable'} "
+                                f"with support score {support_score}.")
 
                         if is_stable:
                             cost = 1 - support_score
@@ -447,8 +448,9 @@ class OrderedLandmarksPlanner:
                     case HEURISTIC.STABLE:
                         obj_entity = cast(Object, branch['object'])
                         is_stable, support_score = self.evaluate_obj_stability(obj_entity, self.support_graph, self.ground_mesh, verbose=verbose)
-                        print(f"Branch for {action_name} object {obj_entity.name} is {'stable' if is_stable else 'unstable'} "
-                            f"with support score {support_score}.")
+                        if verbose:
+                            print(f"Branch for {action_name} object {obj_entity.name} is {'stable' if is_stable else 'unstable'} "
+                                f"with support score {support_score}.")
 
                         if is_stable:
                             cost = (1 - support_score) + np.linalg.norm(np.array(start_pos) - np.array(target_pos))
@@ -510,8 +512,9 @@ class OrderedLandmarksPlanner:
             is_stable, support_score = self.evaluate_obj_stability(obj_entity, self.support_graph, self.ground_mesh, verbose=verbose)
             # support_score = np.clip(support_score, 0.0, 1.0)
             additional_properties = {'support_score': support_score}
-            print(f"Branch for transit object {obj_entity.name} is {'stable' if is_stable else 'unstable'} "
-                f"with support score {support_score}.")
+            if verbose:
+                print(f"Branch for transit object {obj_entity.name} is {'stable' if is_stable else 'unstable'} "
+                    f"with support score {support_score}.")
 
             if not is_stable:
                 continue

@@ -16,7 +16,7 @@ from modular_construction_task_planner.scripts.block_domain import (
 from modular_construction_task_planner.eas.config_parser_world_basic import create_entities, define_goal_state
 from mpnp_interfaces.msg import Block
 
-def parse_block_list_to_world(block_list: List[Block], robot_init_pose: PoseStamped) -> World:
+def parse_block_list_to_world(block_list: List[Block], robot_init_pose: PoseStamped, verbose: bool = False) -> World:
     block_var_domain = []
     robo_pos_var_domain = []
     pos_var_domain = []
@@ -55,10 +55,11 @@ def parse_block_list_to_world(block_list: List[Block], robot_init_pose: PoseStam
     robot_entity = cast(Robot, entities.get_entities('robot'))
     robot_entity.at.value = robot_init_pose.header.frame_id
 
-    print(f"Domains:\n{domains}\n")
+    if verbose:
+        print(f"Domains:\n{domains}\n")
 
-    for ent in entities.entities:
-        print(ent.state)
+        for ent in entities.entities:
+            print(ent.state)
 
     goal_state = define_goal_state(entities)
     world = World(entities, pose_dict, goal_state=goal_state)

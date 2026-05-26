@@ -53,23 +53,23 @@ class ModularConstructionTaskPlanner(Node):
             response.msg = f"Failed to parse configuration: {e}"
             return response
 
-        planner = OrderedLandmarksPlanner(world, self.action_dict, self.gg)
-        multi_bound_goal_state = planner.run_multi_bound_planner()
+        # planner = OrderedLandmarksPlanner(world, self.action_dict, self.gg)
+        # multi_bound_goal_state = planner.run_multi_bound_planner()
 
-        if not multi_bound_goal_state:
-            self.get_logger().error("No plan found with the given heuristic.")
-            response.success = False
-            response.result = PlanConstructionTask.Response.PLANNING_FAILED
-            response.msg = "No plan found with the given heuristic."
-            return response
+        # if not multi_bound_goal_state:
+        #     self.get_logger().error("No plan found with the given heuristic.")
+        #     response.success = False
+        #     response.result = PlanConstructionTask.Response.PLANNING_FAILED
+        #     response.msg = "No plan found with the given heuristic."
+        #     return response
 
-        mb_plan, heuristic_cost = self.retrace_best_plan(multi_bound_goal_state)
-        self.get_logger().info(f"Multi-bound plan with total cost {heuristic_cost} found.")
-        best_plan = mb_plan
+        # mb_plan, heuristic_cost = self.retrace_best_plan(multi_bound_goal_state)
+        # self.get_logger().info(f"Multi-bound plan with total cost {heuristic_cost} found.")
+        # best_plan = mb_plan
 
-        self.gg = GridGraph(list(request.blocks), block_size=0.3)  # Reinitialize the grid graph for accurate path planning
-        full_nav_cost = self.compute_full_nav_cost(best_plan, planner)
-        self.get_logger().info(f"Total path planning cost for the plan: {full_nav_cost:.2f}")
+        # self.gg = GridGraph(list(request.blocks), block_size=0.3)  # Reinitialize the grid graph for accurate path planning
+        # full_nav_cost = self.compute_full_nav_cost(best_plan, planner)
+        # self.get_logger().info(f"Total path planning cost for the plan: {full_nav_cost:.2f}")
 
         planner = OrderedLandmarksPlanner(original_world, self.action_dict, None)
         h = HEURISTIC.LAZY
@@ -80,8 +80,8 @@ class ModularConstructionTaskPlanner(Node):
         greedy_full_nav_cost = self.compute_full_nav_cost(greedy_plan, planner)
 
         self.get_logger().info(f"Total path planning cost for the greedy plan: {greedy_full_nav_cost:.2f}")
-        self.get_logger().info(f"Multi-bound cost: {heuristic_cost:.2f}, Greedy cost: {greedy_cost:.2f}, "
-                               f"Multi-bound full nav cost: {full_nav_cost:.2f}, Greedy full nav cost: {greedy_full_nav_cost:.2f}")
+        # self.get_logger().info(f"Multi-bound cost: {heuristic_cost:.2f}, Greedy cost: {greedy_cost:.2f}, "
+        #                        f"Multi-bound full nav cost: {full_nav_cost:.2f}, Greedy full nav cost: {greedy_full_nav_cost:.2f}")
 
         best_plan = greedy_plan
         response.plan = self.format_plan(best_plan)
