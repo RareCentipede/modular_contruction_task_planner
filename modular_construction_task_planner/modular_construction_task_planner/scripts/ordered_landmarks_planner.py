@@ -123,7 +123,7 @@ class OrderedLandmarksPlanner:
 
     def run_heuristic_planner(self, heuristic: HEURISTIC = HEURISTIC.LAZY) -> List[LinkedState]:
         while self.current_linked_state.status == StateStatus.ALIVE:
-            self.branch_out(self.current_linked_state, heuristic)
+            self.branch_out(self.current_linked_state, heuristic, forecast=True)
             if not self.current_linked_state.branches_to_explore:
                 print("No branches to explore, backtracking...")
                 self.backtrack()
@@ -162,7 +162,7 @@ class OrderedLandmarksPlanner:
         best_cost = float('inf')
         home_state = self.s0
         while self.current_linked_state.status == StateStatus.ALIVE:
-            self.branch_out(self.current_linked_state, low_h, forecast=True)
+            self.branch_out(self.current_linked_state, low_h)
             if not self.current_linked_state.branches_to_explore:
                 print("No branches to explore, backtracking...")
                 self.backtrack()

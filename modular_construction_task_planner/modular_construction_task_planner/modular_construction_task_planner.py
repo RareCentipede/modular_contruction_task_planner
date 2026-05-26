@@ -87,7 +87,7 @@ class ModularConstructionTaskPlanner(Node):
 
                 res_row = [len(blocks)-2, planner_type, heuristic, planning_time/1e9, cost, pp_cost]
                 res_pd.loc[idx] = res_row
-                res_pd.to_csv(f"{self.res_path}intermediate/{len(blocks)-2}_{planner_type}_{heuristic}.csv", index=False)
+                res_pd.to_csv(f"{self.res_path}forecast/intermediate/{len(blocks)-2}_{planner_type}_{heuristic}.csv", index=False)
                 idx += 1
 
                 if planner_type == 'multi_bound':
@@ -95,7 +95,7 @@ class ModularConstructionTaskPlanner(Node):
                         mb_row = [len(blocks)-2, heuristic, mb_cost]
                         mb_costs_pd.loc[mb_idx] = mb_row
                         mb_idx += 1
-                    mb_costs_pd.to_csv(f"{self.res_path}intermediate/{len(blocks)-2}_{planner_type}_{heuristic}_mb_costs.csv", index=False)
+                    mb_costs_pd.to_csv(f"{self.res_path}forecast/intermediate/{len(blocks)-2}_{planner_type}_{heuristic}_mb_costs.csv", index=False)
 
         planner_type = 'multi_bound'
         world = deepcopy(original_world)
@@ -115,13 +115,13 @@ class ModularConstructionTaskPlanner(Node):
 
         res_row = [len(blocks)-2, planner_type, 'mixed', planning_time/1e9, cost, pp_cost]
         res_pd.loc[idx] = res_row
-        res_pd.to_csv(f"{self.res_path}{len(blocks)-2}_{planner_type}.csv", index=False)
+        res_pd.to_csv(f"{self.res_path}forecast/{len(blocks)-2}_{planner_type}.csv", index=False)
 
         for mb_cost in mb_costs:
             mb_row = [len(blocks)-2, heuristic, mb_cost]
             mb_costs_pd.loc[mb_idx] = mb_row
             mb_idx += 1
-        mb_costs_pd.to_csv(f"{self.res_path}{len(blocks)-2}_{planner_type}_mb_costs.csv", index=False)
+        mb_costs_pd.to_csv(f"{self.res_path}forecast/{len(blocks)-2}_{planner_type}_mb_costs.csv", index=False)
 
         best_plan = plan
         response.plan = self.format_plan(best_plan) if best_plan else Plan()
