@@ -80,14 +80,14 @@ class ModularConstructionTaskPlanner(Node):
                 planning_time = end_time - start_time
                 if plan:
                     self.get_logger().info(f"Plan found with {planner_type} planner and {heuristic} heuristic. Cost: {cost:.2f}. Time: {planning_time/1e9} seconds.")
-                    pp_cost = self.compute_full_nav_cost(plan, world.pose_dict)
+                    pp_cost = self.compute_full_nav_cost(plan, world.pose_dict, gg) #type: ignore
                     self.get_logger().info(f"Navigation cost: {pp_cost:.2f}")
                 else:
                     self.get_logger().warning(f"No plan found with {planner_type} planner and {heuristic} heuristic.")
 
                 res_row = [len(blocks)-2, planner_type, heuristic, planning_time/1e9, cost, pp_cost]
                 res_pd.loc[idx] = res_row
-                res_pd.to_csv(f"{self.res_path}{len(blocks)-2}_{planner_type}_{heuristic}.csv", index=False)
+                res_pd.to_csv(f"{self.res_path}intermediate/{len(blocks)-2}_{planner_type}_{heuristic}.csv", index=False)
                 idx += 1
 
                 if planner_type == 'multi_bound':
@@ -95,7 +95,7 @@ class ModularConstructionTaskPlanner(Node):
                         mb_row = [len(blocks)-2, heuristic, mb_cost]
                         mb_costs_pd.loc[mb_idx] = mb_row
                         mb_idx += 1
-                    mb_costs_pd.to_csv(f"{self.res_path}{len(blocks)-2}_{planner_type}_{heuristic}_mb_costs.csv", index=False)
+                    mb_costs_pd.to_csv(f"{self.res_path}intermediate/{len(blocks)-2}_{planner_type}_{heuristic}_mb_costs.csv", index=False)
 
         planner_type = 'multi_bound'
         world = deepcopy(original_world)
@@ -108,20 +108,20 @@ class ModularConstructionTaskPlanner(Node):
         planning_time = end_time - start_time
         if plan:
             self.get_logger().info(f"Plan found with {planner_type} planner and {heuristic} heuristic. Cost: {cost:.2f}. Time: {planning_time/1e9} seconds.")
-            pp_cost = self.compute_full_nav_cost(plan, world.pose_dict)
+            pp_cost = self.compute_full_nav_cost(plan, world.pose_dict, gg) # type: ignore
             self.get_logger().info(f"Navigation cost: {pp_cost:.2f}")
         else:
             self.get_logger().warning(f"No plan found with {planner_type} planner and {heuristic} heuristic.")
 
         res_row = [len(blocks)-2, planner_type, 'mixed', planning_time/1e9, cost, pp_cost]
         res_pd.loc[idx] = res_row
-        res_pd.to_csv(f"{self.res_path}{len(blocks)-2}_{planner_type}_mixed.csv", index=False)
+        res_pd.to_csv(f"{self.res_path}{len(blocks)-2}_{planner_type}.csv", index=False)
 
         for mb_cost in mb_costs:
             mb_row = [len(blocks)-2, heuristic, mb_cost]
             mb_costs_pd.loc[mb_idx] = mb_row
             mb_idx += 1
-        mb_costs_pd.to_csv(f"{self.res_path}{len(blocks)-2}_{planner_type}_mixed_mb_costs.csv", index=False)
+        mb_costs_pd.to_csv(f"{self.res_path}{len(blocks)-2}_{planner_type}_mb_costs.csv", index=False)
 
         best_plan = plan
         response.plan = self.format_plan(best_plan) if best_plan else Plan()
@@ -188,21 +188,20 @@ class ModularConstructionTaskPlanner(Node):
         task_plan.actions = actions
         return task_plan
 
-    def compute_full_nav_cost(self, plan: List[Tuple[str, Tuple[str, ...]]], pose_dict: Dict[str, Pose]) -> float:
-        self.gg = cast(GridGraph, self.gg)  # Type hint for better code completion
+    def compute_full_nav_cost(self, plan: List[Tuple[str, Tuple[str, ...]]], pose_dict: Dict[str, Pose], gg: GridGraph) -> float:
         pp_cost = 0.0
         for action_name, params in plan:
             match action_name:
                 case 'pick':
                     obj_pos = pose_dict[params[2]].position[:2]
-                    self.gg.update_block_move(obj_pos, OCCUPANCY.FREE)
+                    gg.update_block_move(obj_pos, OCCUPANCY.FREE)
                 case 'place':
                     obj_pos = pose_dict[params[2]].position[:2]
-                    self.gg.update_block_move(obj_pos, OCCUPANCY.OCCUPIED)
+                    gg.update_block_move(obj_pos, OCCUPANCY.OCCUPIED)
                 case 'transit' | 'transport':
                     start_pos = pose_dict[params[1]].position[:2]
                     target_pos = pose_dict[params[2]].position[:2]
-                    path = self.gg.plan(start_pos, target_pos)
+                    path = gg.plan(start_pos, target_pos)
                     if path.size == 0:
                         self.get_logger().error(f"No path found for action {action_name} from {start_pos} to {target_pos}.")
                     else:

@@ -196,7 +196,7 @@ class OrderedLandmarksPlanner:
             self.generate_new_linked_state(action_name, action_params, self.current_cost, additional_properties)
 
             if self.world.goal_reached:
-                print(f"GOAL REACHED using lazy heuristic in {self.current_linked_state.state_id} steps!")
+                # print(f"GOAL REACHED using lazy heuristic in {self.current_linked_state.state_id} steps!")
                 self.current_linked_state.goal = True
                 goal_state = self.current_linked_state
                 if high_h == HEURISTIC.LAZY:
