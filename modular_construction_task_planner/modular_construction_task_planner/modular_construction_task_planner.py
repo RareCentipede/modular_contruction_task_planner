@@ -67,7 +67,7 @@ class ModularConstructionTaskPlanner(Node):
         mb_idx = 0
         blocks = world.entities.get_entities(Object)
         blocks = cast(List, blocks)
-        print(blocks)
+
         for planner_type in self.planner_types:
             for heuristic in self.h:
                 world = deepcopy(original_world)
