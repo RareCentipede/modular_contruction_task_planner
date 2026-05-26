@@ -158,11 +158,11 @@ class OrderedLandmarksPlanner:
 
         return self.goal_linked_states
 
-    def run_multi_bound_planner(self, h: HEURISTIC = HEURISTIC.LAZY) -> Optional[LinkedState]:
+    def run_multi_bound_planner(self, low_h: HEURISTIC = HEURISTIC.LAZY, high_h: HEURISTIC = HEURISTIC.DILIGENT) -> Optional[LinkedState]:
         best_cost = float('inf')
         home_state = self.s0
         while self.current_linked_state.status == StateStatus.ALIVE:
-            self.branch_out(self.current_linked_state, h, forecast=True)
+            self.branch_out(self.current_linked_state, low_h, forecast=True)
             if not self.current_linked_state.branches_to_explore:
                 print("No branches to explore, backtracking...")
                 self.backtrack()
@@ -199,7 +199,7 @@ class OrderedLandmarksPlanner:
                 print(f"GOAL REACHED using lazy heuristic in {self.current_linked_state.state_id} steps!")
                 self.current_linked_state.goal = True
                 goal_state = self.current_linked_state
-                if h == HEURISTIC.LAZY:
+                if high_h == HEURISTIC.LAZY:
                     lazy=True
                 else:
                     lazy=False
@@ -209,8 +209,8 @@ class OrderedLandmarksPlanner:
                     best_cost = upper_bound
                     self.goal_linked_state = self.current_linked_state
                     print(f"New best cost found: {best_cost}.")
-                else:
-                    print(f"New bound {upper_bound} is not better than current best cost {best_cost}.")
+                # else:
+                    # print(f"New bound {upper_bound} is not better than current best cost {best_cost}.")
 
                 self.mb_costs.append(upper_bound)
                 if self.monitor.should_stop(upper_bound):
