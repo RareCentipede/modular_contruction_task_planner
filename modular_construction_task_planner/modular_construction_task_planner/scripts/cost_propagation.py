@@ -49,30 +49,30 @@ def perform_cost_propagation(world: World, shadow_boxes: Dict[str, ShadowBox]) -
         obj_to_goal_vec = goal_pos - obj_pos
         dists, scalings = compute_dists_from_points_to_vector(entity_positions, obj_to_goal_vec, obj_pos)
 
-        dists[(scalings >= 0) & (scalings <= 1)] = -1 # Set a false value to filter out irrelevant entities in the next step
+        dists[(scalings < 0) | (scalings > 1)] = -1 # Set a false value to filter out irrelevant entities in the next step
 
         for i, dist in enumerate(dists):
-            if dist < 0: 
+            if dist < 0:
                 continue  # Skip irrelevant entities
 
-            if dist < (OBJ_WIDTH + ROBOT_WIDTH):
+            if dist < (OBJ_WIDTH/2 + ROBOT_WIDTH):
                 nusance = list(all_entities.values())[i]
-                if nusance.name == obj.name:
-                    continue  # Skip self
+                if nusance.name == obj.name or nusance.name == obj.name + "_shadow_box":
+                    continue  # Skip self and own shadow box
 
+                print(f"Object '{obj.name}' has a nusance '{nusance.name}' at index {i} with distance {dist:.2f} to its path.")
                 if nusance.name in shadow_boxes_names:
                     shadow_nusnace = all_entities[nusance.name]
                     shadow_nusnace = cast(ShadowBox, shadow_nusnace)
                     host_obj_name = shadow_nusnace.host.value
                     host_obj = world.entities.get_entities(host_obj_name) # type: ignore
                     host_obj = cast(Object, host_obj)
-                    host_obj.propagated_cost += dist
+                    host_obj.propagated_cost += 1 - (dist / (OBJ_WIDTH/2 + ROBOT_WIDTH))
                 else:
                     host_obj_name = nusance.name
-                    print(f"Object '{obj.name}' has a nusance '{host_obj_name}' with distance {dist:.2f} to its path.")
                     host_obj = world.entities.get_entities(host_obj_name) # type: ignore
                     host_obj = cast(Object, host_obj)
-                    host_obj.propagated_cost -= dist
+                    host_obj.propagated_cost -= 1 - (dist / (OBJ_WIDTH/2 + ROBOT_WIDTH))
 
 def extract_available_positions_from_world(world: World, shadow_boxes: Dict[str, ShadowBox]) -> \
     Tuple[List[Object], Dict[str, Object], List[Tuple[float, float]]]:
@@ -127,14 +127,23 @@ def visualize_cost_propagation(world: World) -> None:
         goal_pos = world.pose_dict[goal_pos_val].position
         cost = entity.propagated_cost
         color = random_colors[i]
-        host = patches.Rectangle((pos[0] - OBJ_WIDTH/2, pos[1] - OBJ_WIDTH/2), OBJ_WIDTH, OBJ_WIDTH, color=color) # type: ignore
+        collision_threshold = OBJ_WIDTH/2 + ROBOT_WIDTH
+        collision_region = patches.Circle((pos[0], pos[1]), collision_threshold, color=color, alpha=0.2, linewidth=2)
+        collision_region_shadow = patches.Circle((goal_pos[0], goal_pos[1]), collision_threshold, color=color, alpha=0.2,
+                                                 linestyle='--', linewidth=2)
+
+        host = patches.Rectangle((pos[0] - OBJ_WIDTH/2, pos[1] - OBJ_WIDTH/2), OBJ_WIDTH, OBJ_WIDTH, color=color,
+                                 alpha=0.8, linewidth=2)
         shadow = patches.Rectangle((goal_pos[0] - OBJ_WIDTH/2, goal_pos[1] - OBJ_WIDTH/2), OBJ_WIDTH, OBJ_WIDTH,
-                                   color=color, alpha=0.5, linestyle='--') # type: ignore
+                                   alpha=0.5, linestyle='--', linewidth=2, facecolor='none', edgecolor=color)
+
+        plt.gca().add_patch(collision_region)
+        plt.gca().add_patch(collision_region_shadow)
         plt.gca().add_patch(host)
         plt.gca().add_patch(shadow)
-        plt.arrow(pos[0], pos[1], goal_pos[0] - pos[0], goal_pos[1] - pos[1],
-                  linestyle='--', color=color, alpha=0.7, head_width=0.05) # type: ignore
-        plt.text(pos[0], pos[1], f"{entity.name}\nCost: {cost:.2f}", fontsize=9, ha='right', va='bottom') # type: ignore
+        plt.arrow(pos[0], pos[1], goal_pos[0] - pos[0], goal_pos[1] - pos[1], linestyle='--', color=color, alpha=0.7,
+                  head_width=0.05, linewidth=2)
+        plt.text(pos[0], pos[1] + OBJ_WIDTH/2, f"{entity.name}\nCost: {cost:.2f}", fontsize=9, ha='right', va='bottom')
         # plt.scatter(pos[0], pos[1], color=color, s=100, label=f"{entity.name} (Cost: {cost:.2f})")
         # plt.scatter(goal_pos[0], goal_pos[1], color=color, alpha=0.5, s=100, marker='X') # type: ignore
         # plt.plot([pos[0], goal_pos[0]], [pos[1], goal_pos[1]], linestyle='--')
