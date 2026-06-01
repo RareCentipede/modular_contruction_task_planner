@@ -12,9 +12,10 @@ from modular_construction_task_planner.eas.core import (
     Entity, StateStatus, World
 )
 from modular_construction_task_planner.scripts.block_domain import (
-    Action, Object, PosEntity, Robot,
+    Action, Object, PosEntity, Robot, ShadowBox
 )
 from modular_construction_task_planner.scripts.stability import SupportNode, compute_placement_stability
+# from modular_construction_task_planner.scripts.cost_propagation import spawn_shadow_boxes
 from path_planner.path_planner_node import GridGraph, OCCUPANCY
 
 HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT ANTICIPATORY STABLE_DISCRETE STABLE STABLE_NAV')
@@ -29,6 +30,9 @@ HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT ANTICIPATORY STABL
     STABLE: For place actions, uses the stability score as a heuristic.
     STABLE_NAV: For place actions, uses the stability score as a heuristic and considers navigation.
 """
+
+OBJ_WIDTH = 0.15
+ROBOT_WIDTH = 0.3
 
 class OrderedLandmarksPlanner:
     def __init__(self, world: World, action_dict: Dict[str, Action], gg: Optional[GridGraph] = None) -> None:
@@ -75,6 +79,8 @@ class OrderedLandmarksPlanner:
             # print(f"Block {block.name} can be reached from {len(block.reachable_from)} positions")
             # self.num_potential_solutions *= len(block.reachable_from)
         # print(f"Number of potential solutions: {self.num_potential_solutions}")
+
+        # self.shadow_boxes = spawn_shadow_boxes(self.world)
 
     def reset(self, solution_count: int = 100) -> None:
         self.world = self.original_world
@@ -511,6 +517,12 @@ class OrderedLandmarksPlanner:
             evaluated_branches.append((action_name, branches[0], 0.0, additional_properties))
             return evaluated_branches
 
+        # objs = self.world.entities.get_entities(Object)
+        # objs = cast(List[Object], objs)
+        # for obj in objs:
+        #     obj.propagated_cost = 0.0
+        # perform_cost_propagation(self.world, self.shadow_boxes)
+
         for transit_branch in branches:
             obj_entity = cast(Object, transit_branch['object'])
             transit_start_pos_name = transit_branch['start_pose'].name
@@ -566,8 +578,7 @@ class OrderedLandmarksPlanner:
                 case HEURISTIC.ANTICIPATORY:
                     cost = np.linalg.norm(np.array(transit_start_pos) - np.array(transit_target_pos)).item()
                     cost += np.linalg.norm(np.array(transit_target_pos) - np.array(goal_pos)).item()
-                    cost += obj_entity.propagated_cost * (self.blocks_to_place / self.num_blocks)
-                    self.blocks_to_place -= 1
+                    cost += obj_entity.propagated_cost
                 case _:
                     print(f"Unknown heuristic: {heuristic}, defaulting to lazy.")
                     cost = np.linalg.norm(np.array(transit_start_pos) - np.array(transit_target_pos)).item()
@@ -894,6 +905,72 @@ def compute_arc_length(start_pos: List[float], target_pos: List[float], obj_pos:
     arc_length = angle_at_obstacle * col_radius
 
     return arc_length
+
+def perform_cost_propagation(world: World, shadow_boxes: Dict[str, ShadowBox], verbose: bool = False) -> None:
+    available_entities, all_entities, entity_positions = extract_available_positions_from_world(world, shadow_boxes)
+    entity_positions = np.array(entity_positions)
+    shadow_boxes_names = [sb.name for sb in shadow_boxes.values()]
+
+    for obj in available_entities:
+        obj = cast(Object, obj)
+        obj_pos = np.array(world.pose_dict[obj.at.value].position) # type: ignore
+        goal_pos = np.array(world.pose_dict[obj.goal.value].position) # type: ignore
+        obj_to_goal_vec = goal_pos - obj_pos
+        dists, scalings = compute_dists_from_points_to_vector(entity_positions, obj_to_goal_vec, obj_pos)
+
+        dists[(scalings < 0) | (scalings > 1)] = -1 # Set a false value to filter out irrelevant entities in the next step
+
+        for i, dist in enumerate(dists):
+            if dist < 0:
+                continue  # Skip irrelevant entities
+
+            if dist < (OBJ_WIDTH/2 + ROBOT_WIDTH):
+                nusance = list(all_entities.values())[i]
+                if nusance.name == obj.name or nusance.name == obj.name + "_shadow_box":
+                    continue  # Skip self and own shadow box
+
+                if verbose:
+                    print(f"Object '{obj.name}' has a nusance '{nusance.name}' at index {i} with distance {dist:.2f} to its path.")
+                if nusance.name in shadow_boxes_names:
+                    shadow_nusnace = all_entities[nusance.name]
+                    shadow_nusnace = cast(ShadowBox, shadow_nusnace)
+                    host_obj_name = shadow_nusnace.host.value
+                    host_obj = world.entities.get_entities(host_obj_name) # type: ignore
+                    host_obj = cast(Object, host_obj)
+                    host_obj.propagated_cost += 1 - (dist / (OBJ_WIDTH/2 + ROBOT_WIDTH))
+                else:
+                    host_obj_name = nusance.name
+                    host_obj = world.entities.get_entities(host_obj_name) # type: ignore
+                    host_obj = cast(Object, host_obj)
+                    host_obj.propagated_cost -= 1 - (dist / (OBJ_WIDTH/2 + ROBOT_WIDTH))
+
+def extract_available_positions_from_world(world: World, shadow_boxes: Dict[str, ShadowBox]) -> \
+    Tuple[List[Object], Dict[str, Object], List[Tuple[float, float]]]:
+    available_entities = []
+    entity_positions = []
+    all_entities = {}
+
+    for box_host_name, shadow_box in shadow_boxes.items():
+        goal_pos = shadow_box.at.value
+        if not goal_pos:
+            continue
+
+        host_entity = world.entities.get_entities(box_host_name)
+        host_entity = cast(Object, host_entity)
+        if host_entity.at.value == goal_pos or not host_entity.at.value:
+            continue  # Skip if the object is already at its goal position
+
+        pos_val = host_entity.at.value
+        pos = world.pose_dict[pos_val].position
+        shadow_pos = world.pose_dict[goal_pos].position
+
+        available_entities.append(host_entity)
+        entity_positions.append(pos)
+        entity_positions.append(shadow_pos)
+        all_entities[host_entity.name] = host_entity
+        all_entities[shadow_box.name] = shadow_box
+
+    return available_entities, all_entities, entity_positions
 
 class SearchMonitor:
     def __init__(self, patience: int = 5, min_delta: float = 0.1):
