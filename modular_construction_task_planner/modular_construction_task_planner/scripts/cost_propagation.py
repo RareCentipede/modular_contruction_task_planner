@@ -1,15 +1,16 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 from typing import Dict, List, Tuple, cast
 from scipy.spatial import cKDTree
 
-from eas.core import World
+from modular_construction_task_planner.eas.core import World
 from modular_construction_task_planner.scripts.block_domain import Object, PosEntity, ShadowBox
 from modular_construction_task_planner.scripts.ordered_landmarks_planner import compute_dists_from_points_to_vector
 
-OBJ_WIDTH = 0.15
-ROBOT_WIDTH = 0.3
+OBJ_WIDTH = 0.15 * 3
+ROBOT_WIDTH = 0.3 * 3
 
 def spawn_shadow_boxes(world: World) -> Dict[str, ShadowBox]:
     """
@@ -39,7 +40,7 @@ def spawn_shadow_boxes(world: World) -> Dict[str, ShadowBox]:
 def perform_cost_propagation(world: World, shadow_boxes: Dict[str, ShadowBox]) -> None:
     available_entities, all_entities, entity_positions = extract_available_positions_from_world(world, shadow_boxes)
     entity_positions = np.array(entity_positions)
-    shadow_boxes_names = list(shadow_boxes.keys())
+    shadow_boxes_names = [sb.name for sb in shadow_boxes.values()]
 
     for obj in available_entities:
         obj = cast(Object, obj)
@@ -60,12 +61,15 @@ def perform_cost_propagation(world: World, shadow_boxes: Dict[str, ShadowBox]) -
                     continue  # Skip self
 
                 if nusance.name in shadow_boxes_names:
-                    host_obj_name = shadow_boxes[nusance.name].host.value
+                    shadow_nusnace = all_entities[nusance.name]
+                    shadow_nusnace = cast(ShadowBox, shadow_nusnace)
+                    host_obj_name = shadow_nusnace.host.value
                     host_obj = world.entities.get_entities(host_obj_name) # type: ignore
                     host_obj = cast(Object, host_obj)
                     host_obj.propagated_cost += dist
                 else:
                     host_obj_name = nusance.name
+                    print(f"Object '{obj.name}' has a nusance '{host_obj_name}' with distance {dist:.2f} to its path.")
                     host_obj = world.entities.get_entities(host_obj_name) # type: ignore
                     host_obj = cast(Object, host_obj)
                     host_obj.propagated_cost -= dist
@@ -97,3 +101,55 @@ def extract_available_positions_from_world(world: World, shadow_boxes: Dict[str,
         all_entities[shadow_box.name] = shadow_box
 
     return available_entities, all_entities, entity_positions
+
+def visualize_cost_propagation(world: World) -> None:
+    obj_entities = world.entities.get_entities(Object)
+    obj_entities = cast(List[Object], obj_entities)
+    entity_positions = np.array([p.position[:2] for p in world.pose_dict.values()])
+
+    # Choose a nice qualitative or sequential colormap
+    cmap = plt.get_cmap('turbo') # type: ignore
+
+    # Pick 5 random positions along the colormap (from 0.0 to 1.0)
+    num_colors = len(obj_entities)
+    random_indices = np.random.rand(num_colors)
+    random_colors = cmap(random_indices)
+    plt.figure(figsize=(10, 10))
+
+    for i, entity in enumerate(obj_entities):
+        entity = cast(Object, entity)
+        pos_val = entity.at.value
+        goal_pos_val = entity.goal.value
+        if not pos_val or not goal_pos_val:
+            continue
+
+        pos = world.pose_dict[pos_val].position
+        goal_pos = world.pose_dict[goal_pos_val].position
+        cost = entity.propagated_cost
+        color = random_colors[i]
+        host = patches.Rectangle((pos[0] - OBJ_WIDTH/2, pos[1] - OBJ_WIDTH/2), OBJ_WIDTH, OBJ_WIDTH, color=color) # type: ignore
+        shadow = patches.Rectangle((goal_pos[0] - OBJ_WIDTH/2, goal_pos[1] - OBJ_WIDTH/2), OBJ_WIDTH, OBJ_WIDTH,
+                                   color=color, alpha=0.5, linestyle='--') # type: ignore
+        plt.gca().add_patch(host)
+        plt.gca().add_patch(shadow)
+        plt.arrow(pos[0], pos[1], goal_pos[0] - pos[0], goal_pos[1] - pos[1],
+                  linestyle='--', color=color, alpha=0.7, head_width=0.05) # type: ignore
+        plt.text(pos[0], pos[1], f"{entity.name}\nCost: {cost:.2f}", fontsize=9, ha='right', va='bottom') # type: ignore
+        # plt.scatter(pos[0], pos[1], color=color, s=100, label=f"{entity.name} (Cost: {cost:.2f})")
+        # plt.scatter(goal_pos[0], goal_pos[1], color=color, alpha=0.5, s=100, marker='X') # type: ignore
+        # plt.plot([pos[0], goal_pos[0]], [pos[1], goal_pos[1]], linestyle='--')
+
+    x_max = max(entity_positions[:, 0]) + 1
+    y_max = max(entity_positions[:, 1]) + 1
+    x_min = min(entity_positions[:, 0]) - 1
+    y_min = min(entity_positions[:, 1]) - 1
+    l = max(x_max, abs(x_min), y_max, abs(y_min))
+    plt.xlim(-l, l)
+    plt.ylim(-l, l)
+
+    plt.title("Cost Propagation Visualization")
+    plt.xlabel("X Position")
+    plt.ylabel("Y Position")
+    plt.legend()
+    plt.grid()
+    plt.show()

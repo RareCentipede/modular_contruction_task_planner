@@ -14,17 +14,21 @@ from modular_construction_task_planner.scripts.block_domain import (
     Robot
 )
 
-def parse_configs_to_world(config_name: str, problem_config_path: str) -> World:
-    init_path = problem_config_path + config_name + "/init.yaml"
-    goal_path = problem_config_path + config_name + "/goal.yaml"
+def parse_configs_to_world(config_name: str | Dict, problem_config_path: str | Dict) -> World:
+    if isinstance(config_name, str) and isinstance(problem_config_path, str):
+        init_path = problem_config_path + config_name + "/init.yaml"
+        goal_path = problem_config_path + config_name + "/goal.yaml"
 
-    with open(init_path, 'r') as f:
-        init_config = safe_load(f)
-        f.close()
+        with open(init_path, 'r') as f:
+            init_config = safe_load(f)
+            f.close()
 
-    with open(goal_path, 'r') as f:
-        goal_config = safe_load(f)
-        f.close()
+        with open(goal_path, 'r') as f:
+            goal_config = safe_load(f)
+            f.close()
+    elif isinstance(config_name, Dict) and isinstance(problem_config_path, Dict):
+        init_config = config_name
+        goal_config = problem_config_path
 
     domains = create_domains(init_config, goal_config)
     load_domains(domains)
