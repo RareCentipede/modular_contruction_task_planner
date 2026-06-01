@@ -85,7 +85,7 @@ def test_planner():
             obj_list = world.entities.get_entities(Object)
             obj_list = cast(List[Object], obj_list)
             blocks = parse_objects_to_blocks(obj_list, world.pose_dict)
-            block_size = 0.3
+            block_size = 1.0
             grid_graph = GridGraph(blocks, block_size)
 
             planner = OrderedLandmarksPlanner(world, action_dict, grid_graph)

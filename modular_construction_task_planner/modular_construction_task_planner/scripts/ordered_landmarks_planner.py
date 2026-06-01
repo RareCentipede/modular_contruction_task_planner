@@ -30,7 +30,7 @@ HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT ANTICIPATORY STABL
     STABLE_NAV: For place actions, uses the stability score as a heuristic and considers navigation.
 """
 
-OBJ_WIDTH = 0.15
+OBJ_WIDTH = 1.0
 ROBOT_WIDTH = 0.3
 
 class OrderedLandmarksPlanner:
