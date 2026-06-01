@@ -37,7 +37,7 @@ def spawn_shadow_boxes(world: World) -> Dict[str, ShadowBox]:
 
     return shadow_boxes
 
-def perform_cost_propagation(world: World, shadow_boxes: Dict[str, ShadowBox]) -> None:
+def perform_cost_propagation(world: World, shadow_boxes: Dict[str, ShadowBox], verbose: bool = False) -> None:
     available_entities, all_entities, entity_positions = extract_available_positions_from_world(world, shadow_boxes)
     entity_positions = np.array(entity_positions)
     shadow_boxes_names = [sb.name for sb in shadow_boxes.values()]
@@ -60,7 +60,8 @@ def perform_cost_propagation(world: World, shadow_boxes: Dict[str, ShadowBox]) -
                 if nusance.name == obj.name or nusance.name == obj.name + "_shadow_box":
                     continue  # Skip self and own shadow box
 
-                print(f"Object '{obj.name}' has a nusance '{nusance.name}' at index {i} with distance {dist:.2f} to its path.")
+                if verbose:
+                    print(f"Object '{obj.name}' has a nusance '{nusance.name}' at index {i} with distance {dist:.2f} to its path.")
                 if nusance.name in shadow_boxes_names:
                     shadow_nusnace = all_entities[nusance.name]
                     shadow_nusnace = cast(ShadowBox, shadow_nusnace)

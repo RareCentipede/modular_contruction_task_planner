@@ -65,14 +65,16 @@ class OrderedLandmarksPlanner:
         self.place_positions = [pos for sublist in self.place_positions for pos in sublist]
 
         self.num_potential_solutions = factorial(len(blocks)-2)
-        print(f"Blocks: {[block.name for block in blocks]}")
-        print(f"Number of blocks: {len(blocks)-2}")
-        for block in blocks:
-            if not block.goal.value:
-                continue
-            print(f"Block {block.name} can be reached from {len(block.reachable_from)} positions")
-            self.num_potential_solutions *= len(block.reachable_from)
-        print(f"Number of potential solutions: {self.num_potential_solutions}")
+        self.num_blocks = len(blocks)-1
+        self.blocks_to_place = self.num_blocks
+        # print(f"Blocks: {[block.name for block in blocks]}")
+        # print(f"Number of blocks: {len(blocks)-2}")
+        # for block in blocks:
+            # if not block.goal.value:
+                # continue
+            # print(f"Block {block.name} can be reached from {len(block.reachable_from)} positions")
+            # self.num_potential_solutions *= len(block.reachable_from)
+        # print(f"Number of potential solutions: {self.num_potential_solutions}")
 
     def reset(self, solution_count: int = 100) -> None:
         self.world = self.original_world
@@ -149,11 +151,11 @@ class OrderedLandmarksPlanner:
             self.generate_new_linked_state(action_name, action_params, self.current_cost, additional_properties)
 
             if self.world.goal_reached:
-                print("GOAL REACHED using lazy heuristic!")
+                print(f"GOAL REACHED using {heuristic.name} heuristic!")
                 self.current_linked_state.goal = True
                 self.goal_linked_states.append(self.current_linked_state)
-                print(f"{len(self.goal_linked_states)} goal linked states found so far. {len(self.goal_linked_states)}/"
-                      f"{self.num_potential_solutions} potential solutions explored.")
+                # print(f"{len(self.goal_linked_states)} goal linked states found so far. {len(self.goal_linked_states)}/"
+                #       f"{self.num_potential_solutions} potential solutions explored.")
                 break
 
         return self.goal_linked_states
@@ -562,7 +564,10 @@ class OrderedLandmarksPlanner:
                         transport_path_length = np.sum(np.linalg.norm(np.diff(path_to_transport, axis=0), axis=1))
                         cost = transit_path_length.item() + transport_path_length.item()
                 case HEURISTIC.ANTICIPATORY:
-                    pass
+                    cost = np.linalg.norm(np.array(transit_start_pos) - np.array(transit_target_pos)).item()
+                    cost += np.linalg.norm(np.array(transit_target_pos) - np.array(goal_pos)).item()
+                    cost += obj_entity.propagated_cost * (self.blocks_to_place / self.num_blocks)
+                    self.blocks_to_place -= 1
                 case _:
                     print(f"Unknown heuristic: {heuristic}, defaulting to lazy.")
                     cost = np.linalg.norm(np.array(transit_start_pos) - np.array(transit_target_pos)).item()
@@ -797,7 +802,7 @@ class OrderedLandmarksPlanner:
                     print(f"Unknown action {action_name} in plan. Skipping...")
         return pp_cost
 
-    def compute_full_nav_cost(self, plan: List[Tuple[str, Tuple[str, ...]]]) -> float:
+    def compute_full_nav_cost(self, plan: List[Tuple[str, Tuple[str, ...]]], verbose: bool = False) -> float:
         self.gg = cast(GridGraph, self.gg)  # Type hint for better code completion
         pp_cost = 0.0
         for action_name, params in plan:
@@ -817,8 +822,10 @@ class OrderedLandmarksPlanner:
                     else:
                         path_length = np.sum(np.linalg.norm(np.diff(path, axis=0), axis=1))
                         pp_cost += path_length
-                        print(f"Path found for action {action_name} from {start_pos} to {target_pos} "
-                              f"with length {path_length:.2f}.")
+
+                        if verbose:
+                            print(f"Path found for action {action_name} from {start_pos} to {target_pos} "
+                                  f"with length {path_length:.2f}.")
                         # Optionally, visualize the path here using RViz or another tool
                 case _:
                     print(f"Unknown action {action_name} in plan. Skipping...")
