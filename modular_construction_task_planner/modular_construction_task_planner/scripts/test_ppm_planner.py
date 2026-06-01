@@ -73,7 +73,7 @@ def test_planner():
             # --- 3. Spawn Shadow Boxes for Cost Propagation ---
             shadow_boxes = spawn_shadow_boxes(world)
 
-            # --- 4. Perform Cost Propagation ---
+            # # --- 4. Perform Cost Propagation ---
             perform_cost_propagation(world, shadow_boxes)
 
             action_dict = {

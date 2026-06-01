@@ -15,7 +15,6 @@ from modular_construction_task_planner.scripts.block_domain import (
     Action, Object, PosEntity, Robot, ShadowBox
 )
 from modular_construction_task_planner.scripts.stability import SupportNode, compute_placement_stability
-# from modular_construction_task_planner.scripts.cost_propagation import spawn_shadow_boxes
 from path_planner.path_planner_node import GridGraph, OCCUPANCY
 
 HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT ANTICIPATORY STABLE_DISCRETE STABLE STABLE_NAV')
@@ -74,13 +73,13 @@ class OrderedLandmarksPlanner:
         # print(f"Blocks: {[block.name for block in blocks]}")
         # print(f"Number of blocks: {len(blocks)-2}")
         # for block in blocks:
-            # if not block.goal.value:
-                # continue
-            # print(f"Block {block.name} can be reached from {len(block.reachable_from)} positions")
-            # self.num_potential_solutions *= len(block.reachable_from)
+        #     if not block.goal.value:
+        #         continue
+        #     print(f"Block {block.name} can be reached from {len(block.reachable_from)} positions")
+        #     self.num_potential_solutions *= len(block.reachable_from)
         # print(f"Number of potential solutions: {self.num_potential_solutions}")
 
-        # self.shadow_boxes = spawn_shadow_boxes(self.world)
+        self.shadow_boxes = spawn_shadow_boxes(self.world)
 
     def reset(self, solution_count: int = 100) -> None:
         self.world = self.original_world
@@ -905,6 +904,31 @@ def compute_arc_length(start_pos: List[float], target_pos: List[float], obj_pos:
     arc_length = angle_at_obstacle * col_radius
 
     return arc_length
+
+def spawn_shadow_boxes(world: World) -> Dict[str, ShadowBox]:
+    """
+        Shadow boxes: [host_entity_name] -> ShadowBox: Object
+    """
+
+    shadow_boxes = {}
+    obj_entities = world.entities.get_entities(Object)
+
+    if not obj_entities:
+        raise ValueError("No object entities found in the world to spawn shadow boxes.")
+
+    obj_entities = cast(List[Object], obj_entities)
+    for obj in obj_entities:
+        if not obj.goal:
+            continue  # Skip objects without a goal position
+
+        obj_name = obj.name
+        shadow_box_name = f"{obj_name}_shadow_box"
+        shadow_box = ShadowBox(shadow_box_name)
+        shadow_box.host.value = obj_name
+        shadow_box.at.value = obj.goal.value
+        shadow_boxes[obj.name] = shadow_box
+
+    return shadow_boxes
 
 def perform_cost_propagation(world: World, shadow_boxes: Dict[str, ShadowBox], verbose: bool = False) -> None:
     available_entities, all_entities, entity_positions = extract_available_positions_from_world(world, shadow_boxes)
