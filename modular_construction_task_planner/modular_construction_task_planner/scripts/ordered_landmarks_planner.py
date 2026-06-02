@@ -17,7 +17,7 @@ from modular_construction_task_planner.scripts.block_domain import (
 from modular_construction_task_planner.scripts.stability import SupportNode, compute_placement_stability
 from path_planner.path_planner_node import GridGraph, OCCUPANCY
 
-HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT ANTICIPATORY STABLE_DISCRETE STABLE STABLE_NAV')
+HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT MIXED ANTICIPATORY ANTICIPATORY_ONCE STABLE_DISCRETE STABLE STABLE_NAV')
 """
     LAZY: Only considers the euclidean distance to the target for the preferred action.
     SIMPLE_COLLISION: Checks for collisions and adds lazy collision cost if applicable. Lazy collision cost is the arc length
@@ -25,6 +25,7 @@ HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT ANTICIPATORY STABL
                        half with of the robot base.
     DILIGENT: Runs full path planning for evaluation.
     ANTICIPATORY: Considers the hindrance the current action places onto future actions.
+    ANTICIPATORY_ONCE: Similar to ANTICIPATORY, but run ACP only once at the beginning of the search.
     STABLE_DISCRETE: For place actions, just checks if the place action can be performed, use lazy cost.
     STABLE: For place actions, uses the stability score as a heuristic.
     STABLE_NAV: For place actions, uses the stability score as a heuristic and considers navigation.
@@ -128,7 +129,7 @@ class OrderedLandmarksPlanner:
 
         return self.goal_linked_states
 
-    def run_heuristic_planner(self, heuristic: HEURISTIC = HEURISTIC.LAZY) -> List[LinkedState]:
+    def run_heuristic_planner(self, heuristic: HEURISTIC = HEURISTIC.LAZY) -> LinkedState | None:
         while self.current_linked_state.status == StateStatus.ALIVE:
             self.branch_out(self.current_linked_state, heuristic, forecast=True)
             if not self.current_linked_state.branches_to_explore:
@@ -159,17 +160,18 @@ class OrderedLandmarksPlanner:
                 print(f"GOAL REACHED using {heuristic.name} heuristic!")
                 self.current_linked_state.goal = True
                 self.goal_linked_states.append(self.current_linked_state)
+                self.goal_linked_state = self.current_linked_state
                 # print(f"{len(self.goal_linked_states)} goal linked states found so far. {len(self.goal_linked_states)}/"
                 #       f"{self.num_potential_solutions} potential solutions explored.")
                 break
 
-        return self.goal_linked_states
+        return self.goal_linked_state
 
     def run_multi_bound_planner(self, low_h: HEURISTIC = HEURISTIC.LAZY, high_h: HEURISTIC = HEURISTIC.DILIGENT) -> Optional[LinkedState]:
         best_cost = float('inf')
         home_state = self.s0
         while self.current_linked_state.status == StateStatus.ALIVE:
-            self.branch_out(self.current_linked_state, low_h)
+            self.branch_out(self.current_linked_state, low_h, forecast=True)
             if not self.current_linked_state.branches_to_explore:
                 print("No branches to explore, backtracking...")
                 self.backtrack()
@@ -516,11 +518,12 @@ class OrderedLandmarksPlanner:
             evaluated_branches.append((action_name, branches[0], 0.0, additional_properties))
             return evaluated_branches
 
-        # objs = self.world.entities.get_entities(Object)
-        # objs = cast(List[Object], objs)
-        # for obj in objs:
-        #     obj.propagated_cost = 0.0
-        # perform_cost_propagation(self.world, self.shadow_boxes)
+        if heuristic == HEURISTIC.ANTICIPATORY:
+            objs = self.world.entities.get_entities(Object)
+            objs = cast(List[Object], objs)
+            for obj in objs:
+                obj.propagated_cost = 0.0
+            perform_cost_propagation(self.world, self.shadow_boxes)
 
         for transit_branch in branches:
             obj_entity = cast(Object, transit_branch['object'])
@@ -574,7 +577,7 @@ class OrderedLandmarksPlanner:
                         transit_path_length = np.sum(np.linalg.norm(np.diff(path_to_transit, axis=0), axis=1))
                         transport_path_length = np.sum(np.linalg.norm(np.diff(path_to_transport, axis=0), axis=1))
                         cost = transit_path_length.item() + transport_path_length.item()
-                case HEURISTIC.ANTICIPATORY:
+                case HEURISTIC.ANTICIPATORY | HEURISTIC.ANTICIPATORY_ONCE:
                     cost = np.linalg.norm(np.array(transit_start_pos) - np.array(transit_target_pos)).item()
                     cost += np.linalg.norm(np.array(transit_target_pos) - np.array(goal_pos)).item()
                     cost += obj_entity.propagated_cost
