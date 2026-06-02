@@ -93,19 +93,20 @@ def test_planner():
             original_world = deepcopy(world)
             original_gg = deepcopy(grid_graph)
 
-            goal_state = planner.run_heuristic_planner(HEURISTIC.ANTICIPATORY)
-            plan, cost = ModularConstructionTaskPlanner.retrace_best_plan(goal_state)
-            ant_cost = planner.compute_full_nav_cost(plan)
+            goal_state = planner.run_multi_bound_planner()
+            if goal_state:
+                plan, cost = ModularConstructionTaskPlanner.retrace_best_plan(goal_state)
+                mb_cost = planner.compute_full_nav_cost(plan)
 
             planner = OrderedLandmarksPlanner(original_world, action_dict, original_gg)
             goal_state = planner.run_heuristic_planner(HEURISTIC.LAZY)
             plan, cost = ModularConstructionTaskPlanner.retrace_best_plan(goal_state)
             lazy_cost = planner.compute_full_nav_cost(plan)
 
-            print(f"Anticipatory Heuristic Cost: {ant_cost}")
+            print(f"Anticipatory Heuristic Cost: {mb_cost}")
             print(f"Lazy Heuristic Cost: {lazy_cost}")
 
-            total_ant_cost += ant_cost
+            total_ant_cost += mb_cost
             total_lazy_cost += lazy_cost
 
         ant_costs.append(total_ant_cost / num_trials)

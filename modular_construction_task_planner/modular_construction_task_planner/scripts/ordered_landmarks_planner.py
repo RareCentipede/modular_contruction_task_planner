@@ -53,7 +53,7 @@ class OrderedLandmarksPlanner:
         self.current_cost = 0.0
         self.solution_count = 100
         self.mb_costs = []
-        self.monitor = SearchMonitor(patience=1000)
+        self.monitor = SearchMonitor(patience=100)
 
         robot = self.world.entities.get_entities("robot")
         self.robot = cast(Robot, robot)
@@ -583,6 +583,7 @@ class OrderedLandmarksPlanner:
                     cost = np.linalg.norm(np.array(transit_start_pos) - np.array(transit_target_pos)).item()
                     cost += np.linalg.norm(np.array(transit_target_pos) - np.array(goal_pos)).item()
 
+            cost += self.current_linked_state.cost
             evaluated_branches.append((action_name, transit_branch, cost, additional_properties))
 
         return evaluated_branches
