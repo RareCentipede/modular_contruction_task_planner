@@ -3,7 +3,7 @@ import uuid
 import numpy as np
 
 def generate_random_tamp_configs(num_objects: int, 
-                                 workspace_bounds: tuple = ((-6.0, 6.0), (-6.0, 6.0)), 
+                                 workspace_bounds: tuple = ((-20.0, 20.0), (-20.0, 20.0)), 
                                  min_dist: float = 0.6) -> tuple:
     """
     Generates random initialization and goal configuration dictionaries.

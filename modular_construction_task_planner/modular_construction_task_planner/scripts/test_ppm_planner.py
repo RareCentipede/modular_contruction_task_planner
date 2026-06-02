@@ -34,7 +34,7 @@ from modular_construction_task_planner.scripts.block_domain import (
 )
 from mpnp_interfaces.msg import Block
 
-PLANNER_TYPE = Enum('PLANNER_TYPE', 'HEURISTIC MULTI_BOUND')
+PLANNER_TYPE = Enum('PLANNER_TYPE', 'HEURISTIC MULTI_BOUND MULTI_BOUND_G')
 
 def parse_objects_to_blocks(objs: List[Object], pose_dict: Dict[str, Pose]) -> List[Block]:
     blocks = []
@@ -59,7 +59,7 @@ def parse_objects_to_blocks(objs: List[Object], pose_dict: Dict[str, Pose]) -> L
         blocks.append(block)
     return blocks
 
-def test_planner(world: World, planner_type: PLANNER_TYPE, heuristic: HEURISTIC, num_objects: int = 5, num_trials: int = 10):
+def test_planner(world: World, planner_type: PLANNER_TYPE, heuristic: HEURISTIC):
     # --- 1. Generate Random TAMP Configurations ---
     est_costs = []
     full_costs = []
@@ -73,53 +73,44 @@ def test_planner(world: World, planner_type: PLANNER_TYPE, heuristic: HEURISTIC,
             'place': PlaceAction
         }
 
-    original_world = deepcopy(world)
+    obj_list = world.entities.get_entities(Object)
+    obj_list = cast(List[Object], obj_list)
+    blocks = parse_objects_to_blocks(obj_list, world.pose_dict)
+    block_size = 1.0
 
-    tqdm.write(f"\nTesting {planner_type.name} + {heuristic.name} with {num_objects} objects...")
-    for trial in tqdm(range(num_trials)):
-        world = deepcopy(original_world)
+    grid_graph = GridGraph(blocks, block_size)
+    planner = OrderedLandmarksPlanner(world, action_dict, grid_graph)
 
-        obj_list = world.entities.get_entities(Object)
-        obj_list = cast(List[Object], obj_list)
-        blocks = parse_objects_to_blocks(obj_list, world.pose_dict)
-        block_size = 1.0
-
-        grid_graph = GridGraph(blocks, block_size)
-        planner = OrderedLandmarksPlanner(world, action_dict, grid_graph)
-        print(f"\n--- Trial {trial+1}/{num_trials} ---")
-
-        start_time = time.perf_counter_ns()
+    start_time = time.perf_counter_ns()
+    try:
         match planner_type:
             case PLANNER_TYPE.MULTI_BOUND:
                 goal_state = planner.run_multi_bound_planner()
+            case PLANNER_TYPE.MULTI_BOUND_G:
+                goal_state = planner.run_multi_bound_planner_g()
             case PLANNER_TYPE.HEURISTIC:
                 goal_state = planner.run_heuristic_planner(heuristic)
             case _:
                 raise ValueError("Invalid planner type specified.")
-        end_time = time.perf_counter_ns()
-        time_taken = (end_time - start_time) / 1e9  # Convert
-        times.append(time_taken)
+    except Exception as e:
+        print(f"Planner encountered an error: {e}")
+        return np.nan, np.nan, np.nan, np.nan
 
-        if not goal_state:
-            print("No plan found for this trial.")
-            est_costs.append(np.nan)
-            full_costs.append(np.nan)
-            states_explored.append(planner.state_counter)
-            times.append(np.nan)
-            continue
+    end_time = time.perf_counter_ns()
+    time_taken = (end_time - start_time) / 1e9  # Convert
+    times.append(time_taken)
 
-        plan, cost = ModularConstructionTaskPlanner.retrace_best_plan(goal_state)
-        full_cost = planner.compute_full_nav_cost(plan)
-        est_costs.append(cost)
-        full_costs.append(full_cost)
-        states_explored.append(planner.state_counter)
+    if not goal_state:
+        print("No plan found for this trial.")
+        return np.nan, np.nan, np.nan, time_taken
 
-    avg_est_cost = np.nanmean(est_costs)
-    avg_full_cost = np.nanmean(full_costs)
-    avg_states_explored = np.nanmean(states_explored)
-    avg_time = np.nanmean(times)
+    plan, cost = ModularConstructionTaskPlanner.retrace_best_plan(goal_state)
+    full_cost = planner.compute_full_nav_cost(plan)
+    est_costs.append(cost)
+    full_costs.append(full_cost)
+    states_explored.append(planner.state_counter)
 
-    return avg_est_cost, avg_full_cost, avg_states_explored, avg_time
+    return cost, full_cost, states_explored, time_taken
 
 if __name__ == "__main__":
     num_objects_list = [5, 10, 25, 50, 100, 250]
@@ -133,27 +124,44 @@ if __name__ == "__main__":
             (PLANNER_TYPE.HEURISTIC, HEURISTIC.DILIGENT),
             (PLANNER_TYPE.HEURISTIC, HEURISTIC.ANTICIPATORY),
             (PLANNER_TYPE.HEURISTIC, HEURISTIC.ANTICIPATORY_ONCE),
-            (PLANNER_TYPE.MULTI_BOUND, HEURISTIC.MIXED)
+            (PLANNER_TYPE.MULTI_BOUND, HEURISTIC.MIXED),
+            (PLANNER_TYPE.MULTI_BOUND_G, HEURISTIC.MIXED)
         ]
 
     idx = 0
 
     for num_objects in num_objects_list:
-        init_dict, goal_dict = generate_random_tamp_configs(num_objects)
-        world = parse_configs_to_world(init_dict, goal_dict)
-
         for planner_type, heuristic in settings:
-            if heuristic == HEURISTIC.ANTICIPATORY_ONCE:
-                shadow_boxes = spawn_shadow_boxes(world)
-                perform_cost_propagation(world, shadow_boxes)
-            results = test_planner(world, planner_type, heuristic, num_objects=num_objects, num_trials=num_trials)
-            avg_est_cost, avg_full_cost, avg_states_explored, avg_time = results
+            tqdm.write(f"\nTesting {planner_type.name} + {heuristic.name} with {num_objects} objects...")
+            est_costs = []
+            full_costs = []
+            states_explored_hist = []
+            times = []
+
+            for trial in tqdm(range(num_trials)):
+                print(f"\n--- Trial {trial+1}/{num_trials} ---")
+                init_dict, goal_dict = generate_random_tamp_configs(num_objects)
+                world = parse_configs_to_world(init_dict, goal_dict)
+                if heuristic == HEURISTIC.ANTICIPATORY_ONCE:
+                    shadow_boxes = spawn_shadow_boxes(world)
+                    perform_cost_propagation(world, shadow_boxes)
+                results = test_planner(world, planner_type, heuristic)
+                est_cost, full_cost, states_explored, time_taken = results
+                est_costs.append(est_cost)
+                full_costs.append(full_cost)
+                states_explored_hist.append(states_explored)
+                times.append(time_taken)
+
+            avg_est_cost = np.nanmean(est_costs)
+            avg_full_cost = np.nanmean(full_costs)
+            avg_states_explored = np.nanmean(states_explored_hist)
+            avg_time = np.nanmean(times)
 
             res_row = [planner_type.name, heuristic.name, num_objects, avg_est_cost, avg_full_cost, avg_states_explored, avg_time]
             res_df.loc[idx] = res_row
             idx += 1
 
-    res_df.to_csv(res_path + 'planner_comparison_results.csv', index=False)
+    res_df.to_csv(res_path + 'new_planner_comp_results.csv', index=False)
 
     # print(f"\nAverage Anticipatory Heuristic Cost over {num_trials} trials: {total_ant_cost / num_trials:.2f}")
     # print(f"Average Lazy Heuristic Cost over {num_trials} trials: {total_lazy_cost / num_trials:.2f}")

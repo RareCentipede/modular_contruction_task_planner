@@ -54,7 +54,7 @@ class OrderedLandmarksPlanner:
         self.current_cost = 0.0
         self.solution_count = 100
         self.mb_costs = []
-        self.monitor = SearchMonitor(patience=100)
+        self.monitor = SearchMonitor(patience=10000)
 
         robot = self.world.entities.get_entities("robot")
         self.robot = cast(Robot, robot)
@@ -183,6 +183,11 @@ class OrderedLandmarksPlanner:
             action_name, action_params, cost, additional_properties = weighted_branch
             action = self.action_dict[action_name]
             self.current_cost += cost
+
+            if self.goal_linked_state:
+                if self.monitor.should_stop(best_cost):
+                    break
+
             if self.current_cost > best_cost:
                 # print(f"Current cost {self.current_cost} exceeds best cost {best_cost}, skipping action {action_name}, "
                     #   f"removing cost {cost} and backtracking...")
@@ -205,7 +210,7 @@ class OrderedLandmarksPlanner:
             self.generate_new_linked_state(action_name, action_params, self.current_cost, additional_properties)
 
             if self.world.goal_reached:
-                # print(f"GOAL REACHED using lazy heuristic in {self.current_linked_state.state_id} steps!")
+                print(f"GOAL REACHED in {self.current_linked_state.state_id} steps!")
                 self.current_linked_state.goal = True
                 goal_state = self.current_linked_state
                 if high_h == HEURISTIC.LAZY:
@@ -225,6 +230,89 @@ class OrderedLandmarksPlanner:
                 if self.monitor.should_stop(upper_bound):
                     break
 
+                self.backtrack()
+                home_state = self.current_linked_state
+
+        return self.goal_linked_state
+
+    def run_multi_bound_planner_g(self, low_h: HEURISTIC = HEURISTIC.LAZY, high_h: HEURISTIC = HEURISTIC.DILIGENT) -> Optional[LinkedState]:
+        best_cost = float('inf')
+        home_state = self.s0
+        
+        # FIX 1: Use a persistent execution flag instead of letting local node statuses break the loop container
+        search_active = True
+        
+        while search_active:
+            self.branch_out(self.current_linked_state, low_h)
+            
+            # If backtracking hits the absolute root ceiling and everything is dead, terminate safely
+            if self.current_linked_state.status == StateStatus.DEAD:
+                print("Search tree fully exhausted or terminated.")
+                break
+
+            if not self.current_linked_state.branches_to_explore:
+                print("No branches to explore, backtracking...")
+                self.backtrack()
+                home_state = self.current_linked_state
+                # Check immediately if backtrack found nothing alive
+                if self.current_linked_state.status == StateStatus.DEAD:
+                    break
+                continue
+
+            # Pop the best local branch
+            weighted_branch = min(self.current_linked_state.branches_to_explore, key=lambda x: x[2])
+            self.current_linked_state.branches_to_explore.remove(weighted_branch)
+            action_name, action_params, edge_cost, additional_properties = weighted_branch
+            
+            # Accumulate tentative node path cost based on the current baseline
+            tentative_cost = self.current_linked_state.cost + edge_cost
+
+            if self.goal_linked_state:
+                if self.monitor.should_stop(best_cost):
+                    break
+
+            if tentative_cost > best_cost:
+                # Bounding prune step: If this option exceeds our limit, discard it
+                if not self.current_linked_state.branches_to_explore:
+                    self.backtrack()
+                    home_state = self.current_linked_state
+                continue
+
+            # Execute actions to step forward in the continuous world state
+            action = self.action_dict[action_name]
+            action.execute(action_params)
+            
+            if self.gg:
+                if action_name == 'pick':
+                    obj_pos = self.world.pose_dict[action_params['target_pose'].name].position[:2]
+                    self.gg.update_block_move(obj_pos, OCCUPANCY.FREE)
+                elif action_name == 'place':
+                    obj_pos = self.world.pose_dict[action_params['target_pose'].name].position[:2]
+                    self.gg.update_block_move(obj_pos, OCCUPANCY.OCCUPIED)
+
+            self.world.update_state()
+            
+            self.current_cost = tentative_cost
+            self.generate_new_linked_state(action_name, action_params, self.current_cost, additional_properties)
+
+            if self.world.goal_reached:
+                self.current_linked_state.goal = True
+                goal_state = self.current_linked_state
+                lazy = (high_h == HEURISTIC.LAZY)
+                
+                nav_cost = self.nav_cost_from_home_to_target(home_state, goal_state, lazy=lazy)
+                upper_bound = nav_cost + home_state.cost
+                
+                if upper_bound < best_cost:
+                    best_cost = upper_bound
+                    self.goal_linked_state = self.current_linked_state
+                    print(f"New best cost found: {best_cost}.")
+
+                self.mb_costs.append(upper_bound)
+                # if self.monitor.should_stop(upper_bound):
+                    # break
+
+                # Force a backtrack to explore alternative pathways
                 self.backtrack()
                 home_state = self.current_linked_state
 
@@ -306,7 +394,7 @@ class OrderedLandmarksPlanner:
         """
         if linked_state.branches_to_explore:
             # Need to check the branches again after backtacking, since the state of the world is different.
-            for branch in linked_state.branches_to_explore:
+            for branch in list(linked_state.branches_to_explore):
                 action_name, branch_params, _, _ = branch
                 if not self.action_dict[action_name].check(branch_params):
                     linked_state.branches_to_explore.remove(branch)
@@ -665,7 +753,7 @@ class OrderedLandmarksPlanner:
             Backtrack until current state is alive and has branches to explore.
         """
         # print("----------Backtracking----------")
-        while not self.current_linked_state.branches_to_explore:
+        while len(self.current_linked_state.branches_to_explore) == 0:
             parent_action_linked_state = self.current_linked_state.parent
             parent = parent_action_linked_state[1] if parent_action_linked_state is not None else None
 
@@ -682,8 +770,8 @@ class OrderedLandmarksPlanner:
                 if self.gg:
                     action_from_parent = parent.action_from_parent
                     if action_from_parent is None:
-                        print(f"No action from parent for linked state with id {parent.state_id}, cannot update grid graph.")
-                        continue
+                        # print(f"No action from parent for linked state with id {parent.state_id}, cannot update grid graph.")
+                        break
                     action_name, action_params = action_from_parent
                     if action_name == 'pick':
                         obj_pos = self.world.pose_dict[action_params[2]].position[:2]
@@ -1016,9 +1104,11 @@ class SearchMonitor:
 
     def should_stop(self, new_plan_cost: float) -> bool:
         """
-        Checks if the search should be terminated due to cost stagnation.
-        Call this every time a valid, complete plan is found.
+            Checks if the search should be terminated due to cost stagnation.
+            Call this every time a valid, complete plan is found.
         """
+        if self.stagnation_counter % 100 == 0:  # Print status every 100 stagnation increments
+            print(f"[Search Monitor] Stagnation counter: {self.stagnation_counter}, patience: {self.patience}")
         if new_plan_cost < self.best_cost:
             # Calculate how much it actually improved relative to the best cost
             if self.best_cost == float('inf'):
@@ -1030,6 +1120,7 @@ class SearchMonitor:
             if improvement > self.min_delta:
                 self.best_cost = new_plan_cost
                 self.stagnation_counter = 0  # Reset counter on significant progress
+                print(f"[Search Monitor] New best plan found with cost {new_plan_cost:.4f} (improvement: {improvement:.2%}). Resetting stagnation counter.")
                 return False
             else:
                 # Cost went down, but not by enough to matter
