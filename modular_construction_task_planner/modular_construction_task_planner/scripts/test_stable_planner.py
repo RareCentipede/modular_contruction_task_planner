@@ -12,7 +12,8 @@ from modular_construction_task_planner.scripts.stability import (
     create_support_relation_graph,
     visualize_support_node_graph,
     animate_construction_sequence,
-    find_feasible_block_sequence
+    find_feasible_block_sequence,
+    generate_nice_colors
 )
 from modular_construction_task_planner.scripts.block_sequence_animator import TrimeshBlockAnimator
 from path_planner.path_planner_node import GridGraph, OCCUPANCY
@@ -29,8 +30,10 @@ def main(problem_name:str = "scaffolding_tower", show: bool = False, animate: bo
     ground_mesh, support_graph = create_support_relation_graph(world)
     seq = find_feasible_block_sequence(support_graph)
 
+    colors = generate_nice_colors(len(goal_config))
+
     if show:
-        colors = visualize_goal_structure(goal_config, title=problem_name, show=show)
+        visualize_goal_structure(goal_config, title=problem_name, show=show)
         visualize_support_node_graph(support_graph, colors=colors, show=show)
 
     if not seq:
@@ -90,19 +93,19 @@ if __name__ == "__main__":
     h = HEURISTIC.LAZY
     for problem in problems:
         print(f"Testing problem: {problem}")
-        supp_results = main(problem_name=problem, h=h)
+        supp_results = main(problem_name=problem, h=h, animate=True)
         supp_results_lazy[problem] = supp_results
 
     h = HEURISTIC.STABLE
     for problem in problems:
         print(f"Testing problem: {problem}")
-        supp_results = main(problem_name=problem, h=h)
+        supp_results = main(problem_name=problem, h=h, animate=True)
         supp_results_stab[problem] = supp_results
 
     h = HEURISTIC.STABLE_NAV
     for problem in problems:
         print(f"Testing problem: {problem}")
-        supp_results = main(problem_name=problem, h=h)
+        supp_results = main(problem_name=problem, h=h, animate=True)
         supp_results_stab_nav[problem] = supp_results
 
     fig, ax = plt.subplots(len(supp_results_lazy), 1, figsize=(6, 3 * len(supp_results_lazy)))

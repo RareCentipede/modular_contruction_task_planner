@@ -113,7 +113,7 @@ def test_planner(world: World, planner_type: PLANNER_TYPE, heuristic: HEURISTIC)
     return cost, full_cost, states_explored, time_taken
 
 if __name__ == "__main__":
-    num_objects_list = [5, 10, 25, 50, 100, 250]
+    num_objects_list = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
     num_trials = 10
     res_df_col = ['planner', 'heuristic', 'num_objects', 'est_cost', 'cost', 'states_explored', 'time_taken']
     res_df = pd.DataFrame(columns=res_df_col)
@@ -161,7 +161,7 @@ if __name__ == "__main__":
             res_df.loc[idx] = res_row
             idx += 1
 
-    res_df.to_csv(res_path + 'new_planner_comp_results.csv', index=False)
+    res_df.to_csv(res_path + 'planner_comp_results_low_many.csv', index=False)
 
     # print(f"\nAverage Anticipatory Heuristic Cost over {num_trials} trials: {total_ant_cost / num_trials:.2f}")
     # print(f"Average Lazy Heuristic Cost over {num_trials} trials: {total_lazy_cost / num_trials:.2f}")

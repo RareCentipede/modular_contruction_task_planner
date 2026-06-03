@@ -201,7 +201,8 @@ def make_box_mesh(size: list, position: list) -> trimesh.Trimesh:
     mesh.apply_translation(position)
     return mesh
 
-def visualize_goal_structure(goal_data: dict, title: str = "Target Goal Structure Layout", show: bool = True) -> List[List[float]]:
+def visualize_goal_structure(goal_data: dict, unique_colors: List[Tuple[float, float, float]],
+                             title: str = "Target Goal Structure Layout", show: bool = True):
     """
         Visualizes the parsed goal.yaml structure in 3D.
         
@@ -217,7 +218,6 @@ def visualize_goal_structure(goal_data: dict, title: str = "Target Goal Structur
     all_vertices = []
     # Track unique colors for the legend if needed
     legends = []
-    unique_colors = generate_nice_colors(len(goal_data))
 
     # Iterate and draw each block
     for (name, data), random_color in zip(goal_data.items(), unique_colors):
@@ -293,8 +293,6 @@ def visualize_goal_structure(goal_data: dict, title: str = "Target Goal Structur
     plt.tight_layout()
     if show:
         plt.show()
-
-    return unique_colors
 
 def visualize_support_node_graph(support_graph: Dict[str, 'SupportNode'],
                                  goal_data: Optional[Dict] = None,
