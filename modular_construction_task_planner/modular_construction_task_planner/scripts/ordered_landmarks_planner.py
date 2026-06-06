@@ -296,7 +296,7 @@ class OrderedLandmarksPlanner:
                 lazy = (high_h == HEURISTIC.LAZY)
 
                 nav_cost = self.nav_cost_from_home_to_target(home_state, goal_state, lazy=lazy)
-                upper_bound = nav_cost + home_state.cost
+                upper_bound = nav_cost
 
                 if upper_bound < best_cost:
                     best_cost = upper_bound
@@ -304,8 +304,8 @@ class OrderedLandmarksPlanner:
                     print(f"New best cost found: {best_cost}.")
 
                 self.mb_costs.append(upper_bound)
-                # if self.monitor.should_stop(upper_bound):
-                    # break
+                if self.monitor.should_stop(upper_bound):
+                    break
 
                 # Force a backtrack to explore alternative pathways
                 self.backtrack()
@@ -377,7 +377,7 @@ class OrderedLandmarksPlanner:
         action_log = (action_name, tuple(f"{ent.name}" for ent in action_params.values()))
         new_linked_state = LinkedState(self.state_counter, new_state, parent=(action_name, self.current_linked_state),
                                         cost=cost, action_from_parent=action_log, properties=additional_properties)
-        self.current_linked_state.children.append((action_name, new_linked_state))
+        self.current_linked_state.children.update({new_linked_state.state_id: (action_name, new_linked_state)})
         self.current_linked_state = new_linked_state
         self.current_state = new_state
 
@@ -598,7 +598,8 @@ class OrderedLandmarksPlanner:
         support_score = 0.0
 
         if action_name != 'transit':
-            evaluated_branches.append((action_name, branches[0], 0.0, additional_properties))
+            cost = self.current_linked_state.cost
+            evaluated_branches.append((action_name, branches[0], cost, additional_properties))
             return evaluated_branches
 
         if heuristic == HEURISTIC.ANTICIPATORY:
@@ -674,6 +675,7 @@ class OrderedLandmarksPlanner:
                     cost += np.linalg.norm(np.array(transit_target_pos) - np.array(goal_pos)).item()
 
             cost += self.current_linked_state.cost
+            # print(f"cost: {cost}, current cost: {self.current_linked_state.cost}, heuristic cost: {cost - self.current_linked_state.cost}")
             evaluated_branches.append((action_name, transit_branch, cost, additional_properties))
 
         return evaluated_branches
@@ -810,7 +812,7 @@ class OrderedLandmarksPlanner:
         state_id_path.reverse()
         parent = home_linked_state
         for state_id in state_id_path:
-            child_linked_state = next((child for child in parent.children if child[1].state_id == state_id), None)
+            child_linked_state = parent.children.get(state_id, None)
             if child_linked_state is not None:
                 action_from_parent = child_linked_state[1].action_from_parent
                 if action_from_parent is None:
@@ -840,6 +842,9 @@ class OrderedLandmarksPlanner:
                         child_linked_state[1].cost = cost
 
                 parent = child_linked_state[1]
+            else:
+                print(f"No child linked state with id {state_id} found under parent with id {parent.state_id}.")
+                break
 
         return cost
 

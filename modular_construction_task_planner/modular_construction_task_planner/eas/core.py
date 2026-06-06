@@ -250,7 +250,7 @@ class LinkedState:
     state_id: int
     state: State
     parent: Optional[Tuple[str, 'LinkedState']] = None
-    children: List[Tuple[str, 'LinkedState']] = field(default_factory=list) # List of expanded (action_name, LinkedState) pairs
+    children: Dict[int, Tuple[str, 'LinkedState']] = field(default_factory=dict) # List of expanded (action_name, LinkedState) pairs
     cost: float = 0.0
     goal: bool = False
     action_from_parent: Optional[Tuple[str, Tuple[str, ...]]] = None # (action_name, involved_entities) that led to this state from parent
