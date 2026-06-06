@@ -17,7 +17,8 @@ from modular_construction_task_planner.scripts.block_domain import (
 from modular_construction_task_planner.scripts.stability import SupportNode, compute_placement_stability
 from path_planner.path_planner_node import GridGraph, OCCUPANCY
 
-HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT MIXED ANTICIPATORY ANTICIPATORY_ONCE STABLE_DISCRETE STABLE STABLE_NAV')
+HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT MIXED MIXED_G ANTICIPATORY ANTICIPATORY_ONCE\
+                 ANTICIPATORY_ONCE_DISCOUNT STABLE_DISCRETE STABLE STABLE_NAV')
 """
     LAZY: Only considers the euclidean distance to the target for the preferred action.
     SIMPLE_COLLISION: Checks for collisions and adds lazy collision cost if applicable. Lazy collision cost is the arc length
@@ -26,6 +27,7 @@ HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT MIXED ANTICIPATORY
     DILIGENT: Runs full path planning for evaluation.
     ANTICIPATORY: Considers the hindrance the current action places onto future actions.
     ANTICIPATORY_ONCE: Similar to ANTICIPATORY, but run ACP only once at the beginning of the search.
+    ANTICIPATORY_ONCE_DISCOUNT: Similar to ANTICIPATORY_ONCE, but with discounted future costs.
     STABLE_DISCRETE: For place actions, just checks if the place action can be performed, use lazy cost.
     STABLE: For place actions, uses the stability score as a heuristic.
     STABLE_NAV: For place actions, uses the stability score as a heuristic and considers navigation.
@@ -238,13 +240,13 @@ class OrderedLandmarksPlanner:
     def run_multi_bound_planner_g(self, low_h: HEURISTIC = HEURISTIC.LAZY, high_h: HEURISTIC = HEURISTIC.DILIGENT) -> Optional[LinkedState]:
         best_cost = float('inf')
         home_state = self.s0
-        
+
         # FIX 1: Use a persistent execution flag instead of letting local node statuses break the loop container
         search_active = True
-        
+
         while search_active:
-            self.branch_out(self.current_linked_state, low_h)
-            
+            self.branch_out(self.current_linked_state, low_h, forecast=True)
+
             # If backtracking hits the absolute root ceiling and everything is dead, terminate safely
             if self.current_linked_state.status == StateStatus.DEAD:
                 print("Search tree fully exhausted or terminated.")
@@ -263,7 +265,7 @@ class OrderedLandmarksPlanner:
             weighted_branch = min(self.current_linked_state.branches_to_explore, key=lambda x: x[2])
             self.current_linked_state.branches_to_explore.remove(weighted_branch)
             action_name, action_params, edge_cost, additional_properties = weighted_branch
-            
+
             # Accumulate tentative node path cost based on the current baseline
             tentative_cost = self.current_linked_state.cost + edge_cost
 
@@ -281,7 +283,7 @@ class OrderedLandmarksPlanner:
             # Execute actions to step forward in the continuous world state
             action = self.action_dict[action_name]
             action.execute(action_params)
-            
+
             if self.gg:
                 if action_name == 'pick':
                     obj_pos = self.world.pose_dict[action_params['target_pose'].name].position[:2]
@@ -291,7 +293,7 @@ class OrderedLandmarksPlanner:
                     self.gg.update_block_move(obj_pos, OCCUPANCY.OCCUPIED)
 
             self.world.update_state()
-            
+
             self.current_cost = tentative_cost
             self.generate_new_linked_state(action_name, action_params, self.current_cost, additional_properties)
 
@@ -299,10 +301,10 @@ class OrderedLandmarksPlanner:
                 self.current_linked_state.goal = True
                 goal_state = self.current_linked_state
                 lazy = (high_h == HEURISTIC.LAZY)
-                
+
                 nav_cost = self.nav_cost_from_home_to_target(home_state, goal_state, lazy=lazy)
                 upper_bound = nav_cost + home_state.cost
-                
+
                 if upper_bound < best_cost:
                     best_cost = upper_bound
                     self.goal_linked_state = self.current_linked_state
@@ -665,10 +667,14 @@ class OrderedLandmarksPlanner:
                         transit_path_length = np.sum(np.linalg.norm(np.diff(path_to_transit, axis=0), axis=1))
                         transport_path_length = np.sum(np.linalg.norm(np.diff(path_to_transport, axis=0), axis=1))
                         cost = transit_path_length.item() + transport_path_length.item()
-                case HEURISTIC.ANTICIPATORY | HEURISTIC.ANTICIPATORY_ONCE:
+                case HEURISTIC.ANTICIPATORY | HEURISTIC.ANTICIPATORY_ONCE | HEURISTIC.ANTICIPATORY_ONCE_DISCOUNT:
                     cost = np.linalg.norm(np.array(transit_start_pos) - np.array(transit_target_pos)).item()
                     cost += np.linalg.norm(np.array(transit_target_pos) - np.array(goal_pos)).item()
-                    cost += obj_entity.propagated_cost
+                    if heuristic == HEURISTIC.ANTICIPATORY_ONCE_DISCOUNT:
+                        cost += obj_entity.propagated_cost * (self.blocks_to_place/self.num_blocks)  # Apply discount factor
+                        self.blocks_to_place -= 1
+                    else:
+                        cost += obj_entity.propagated_cost
                 case _:
                     print(f"Unknown heuristic: {heuristic}, defaulting to lazy.")
                     cost = np.linalg.norm(np.array(transit_start_pos) - np.array(transit_target_pos)).item()
@@ -779,6 +785,7 @@ class OrderedLandmarksPlanner:
                     elif action_name == 'place':
                         obj_pos = self.world.pose_dict[action_params[2]].position[:2]
                         self.gg.update_block_move(obj_pos, OCCUPANCY.FREE)
+                        self.blocks_to_place += 1
 
                 # print(
                 #     f"Backtracking to state id: {self.current_linked_state.state_id},"
@@ -1107,7 +1114,7 @@ class SearchMonitor:
             Checks if the search should be terminated due to cost stagnation.
             Call this every time a valid, complete plan is found.
         """
-        if self.stagnation_counter % 100 == 0:  # Print status every 100 stagnation increments
+        if self.stagnation_counter % 1000 == 0:  # Print status every 1000 stagnation increments
             print(f"[Search Monitor] Stagnation counter: {self.stagnation_counter}, patience: {self.patience}")
         if new_plan_cost < self.best_cost:
             # Calculate how much it actually improved relative to the best cost
@@ -1115,7 +1122,7 @@ class SearchMonitor:
                 improvement = float('inf')
             else:
                 improvement = (self.best_cost - new_plan_cost) / self.best_cost
-            
+
             # Check if the improvement is worth noting
             if improvement > self.min_delta:
                 self.best_cost = new_plan_cost
@@ -1134,5 +1141,5 @@ class SearchMonitor:
             print(f"[Early Stopping] Search terminated. Cost stagnated at {self.best_cost:.4f} "
                   f"for {self.stagnation_counter} iterations.")
             return True
-            
+
         return False

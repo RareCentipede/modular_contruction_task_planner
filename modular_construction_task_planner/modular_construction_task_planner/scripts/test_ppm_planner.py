@@ -113,7 +113,7 @@ def test_planner(world: World, planner_type: PLANNER_TYPE, heuristic: HEURISTIC)
     return cost, full_cost, states_explored, time_taken
 
 if __name__ == "__main__":
-    num_objects_list = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
+    num_objects_list = [10, 30, 50, 100, 150, 200, 250, 300]
     num_trials = 10
     res_df_col = ['planner', 'heuristic', 'num_objects', 'est_cost', 'cost', 'states_explored', 'time_taken']
     res_df = pd.DataFrame(columns=res_df_col)
@@ -124,8 +124,9 @@ if __name__ == "__main__":
             (PLANNER_TYPE.HEURISTIC, HEURISTIC.DILIGENT),
             (PLANNER_TYPE.HEURISTIC, HEURISTIC.ANTICIPATORY),
             (PLANNER_TYPE.HEURISTIC, HEURISTIC.ANTICIPATORY_ONCE),
+            (PLANNER_TYPE.HEURISTIC, HEURISTIC.ANTICIPATORY_ONCE_DISCOUNT),
             (PLANNER_TYPE.MULTI_BOUND, HEURISTIC.MIXED),
-            (PLANNER_TYPE.MULTI_BOUND_G, HEURISTIC.MIXED)
+            (PLANNER_TYPE.MULTI_BOUND_G, HEURISTIC.MIXED_G)
         ]
 
     idx = 0
@@ -142,7 +143,7 @@ if __name__ == "__main__":
                 print(f"\n--- Trial {trial+1}/{num_trials} ---")
                 init_dict, goal_dict = generate_random_tamp_configs(num_objects)
                 world = parse_configs_to_world(init_dict, goal_dict)
-                if heuristic == HEURISTIC.ANTICIPATORY_ONCE:
+                if heuristic == HEURISTIC.ANTICIPATORY_ONCE or heuristic == HEURISTIC.ANTICIPATORY_ONCE_DISCOUNT:
                     shadow_boxes = spawn_shadow_boxes(world)
                     perform_cost_propagation(world, shadow_boxes)
                 results = test_planner(world, planner_type, heuristic)
@@ -161,7 +162,7 @@ if __name__ == "__main__":
             res_df.loc[idx] = res_row
             idx += 1
 
-    res_df.to_csv(res_path + 'planner_comp_results_low_many.csv', index=False)
+    res_df.to_csv(res_path + 'planner_comp_results_all.csv', index=False)
 
     # print(f"\nAverage Anticipatory Heuristic Cost over {num_trials} trials: {total_ant_cost / num_trials:.2f}")
     # print(f"Average Lazy Heuristic Cost over {num_trials} trials: {total_lazy_cost / num_trials:.2f}")

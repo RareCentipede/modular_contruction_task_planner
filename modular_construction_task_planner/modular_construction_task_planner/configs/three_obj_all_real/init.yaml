@@ -1,0 +1,19 @@
+block1:
+  position: [3.0, 0.0, 0.0]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+
+block2:
+  position: [0.0, 0.0, 0.0]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+
+block3:
+  position: [1.5, 1.5, 0.0]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+
+robot:
+  type: "robot"
+  position: [-12.0, 0.0, 0.0]
+  orientation: [0.0, 0.0, 0.0]
