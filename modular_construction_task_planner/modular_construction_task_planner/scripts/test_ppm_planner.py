@@ -61,10 +61,7 @@ def parse_objects_to_blocks(objs: List[Object], pose_dict: Dict[str, Pose]) -> L
 
 def test_planner(world: World, planner_type: PLANNER_TYPE, heuristic: HEURISTIC):
     # --- 1. Generate Random TAMP Configurations ---
-    est_costs = []
-    full_costs = []
-    states_explored = []
-    times = []
+    mb_cost_hist = []
 
     action_dict = {
             'transit': TransitAction,
@@ -86,38 +83,38 @@ def test_planner(world: World, planner_type: PLANNER_TYPE, heuristic: HEURISTIC)
         match planner_type:
             case PLANNER_TYPE.MULTI_BOUND:
                 goal_state = planner.run_multi_bound_planner()
+                mb_cost_hist = planner.mb_costs
             case PLANNER_TYPE.MULTI_BOUND_G:
                 goal_state = planner.run_multi_bound_planner_g()
+                mb_cost_hist = planner.mb_costs
             case PLANNER_TYPE.HEURISTIC:
                 goal_state = planner.run_heuristic_planner(heuristic)
             case _:
                 raise ValueError("Invalid planner type specified.")
     except Exception as e:
         print(f"Planner encountered an error: {e}")
-        return np.nan, np.nan, np.nan, np.nan
+        return np.nan, np.nan, np.nan, np.nan, mb_cost_hist
 
     end_time = time.perf_counter_ns()
     time_taken = (end_time - start_time) / 1e9  # Convert
-    times.append(time_taken)
 
     if not goal_state:
         print("No plan found for this trial.")
-        return np.nan, np.nan, np.nan, time_taken
+        return np.nan, np.nan, np.nan, time_taken, mb_cost_hist
 
     plan, cost = ModularConstructionTaskPlanner.retrace_best_plan(goal_state)
     full_cost = planner.compute_full_nav_cost(plan)
-    est_costs.append(cost)
-    full_costs.append(full_cost)
-    states_explored.append(planner.state_counter)
-
-    return cost, full_cost, states_explored, time_taken
+    return cost, full_cost, planner.state_counter, time_taken, mb_cost_hist
 
 if __name__ == "__main__":
     num_objects_list = [10, 30, 50, 100, 150, 200, 250, 300]
     num_trials = 10
-    res_df_col = ['planner', 'heuristic', 'num_objects', 'est_cost', 'cost', 'states_explored', 'time_taken']
+    res_df_col = ['planner', 'heuristic', 'num_objects', 'trial_num', 'est_cost', 'cost', 'states_explored', 'time_taken']
     res_df = pd.DataFrame(columns=res_df_col)
     res_path = 'src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/results/'
+
+    mb_res_col = ['mb_type', 'num_objects', 'trial_num', 'iter', 'cost']
+    mb_res_df = pd.DataFrame(columns=mb_res_col)
 
     settings = [
             (PLANNER_TYPE.HEURISTIC, HEURISTIC.LAZY),
@@ -130,6 +127,7 @@ if __name__ == "__main__":
         ]
 
     idx = 0
+    mb_idx = 0
 
     for num_objects in num_objects_list:
         for planner_type, heuristic in settings:
@@ -147,36 +145,17 @@ if __name__ == "__main__":
                     shadow_boxes = spawn_shadow_boxes(world)
                     perform_cost_propagation(world, shadow_boxes)
                 results = test_planner(world, planner_type, heuristic)
-                est_cost, full_cost, states_explored, time_taken = results
-                est_costs.append(est_cost)
-                full_costs.append(full_cost)
-                states_explored_hist.append(states_explored)
-                times.append(time_taken)
+                est_cost, full_cost, states_explored, time_taken, mb_cost_hist = results
+                res_row = [planner_type.name, heuristic.name, num_objects, trial,
+                           est_cost, full_cost, states_explored, time_taken]
+                res_df.loc[idx] = res_row
+                idx += 1
 
-            avg_est_cost = np.nanmean(est_costs)
-            avg_full_cost = np.nanmean(full_costs)
-            avg_states_explored = np.nanmean(states_explored_hist)
-            avg_time = np.nanmean(times)
+                if planner_type != PLANNER_TYPE.HEURISTIC:
+                    for iter_num, cost in enumerate(mb_cost_hist):
+                        mb_res_row = [planner_type.name, num_objects, trial, iter_num, cost]
+                        mb_res_df.loc[mb_idx] = mb_res_row
+                        mb_idx += 1
 
-            res_row = [planner_type.name, heuristic.name, num_objects, avg_est_cost, avg_full_cost, avg_states_explored, avg_time]
-            res_df.loc[idx] = res_row
-            idx += 1
-
-    res_df.to_csv(res_path + 'planner_comp_results_all.csv', index=False)
-
-    # print(f"\nAverage Anticipatory Heuristic Cost over {num_trials} trials: {total_ant_cost / num_trials:.2f}")
-    # print(f"Average Lazy Heuristic Cost over {num_trials} trials: {total_lazy_cost / num_trials:.2f}")
-
-    # plt.scatter(num_objects_list, ant_costs, label='Anticipatory Heuristic Cost', color='blue')
-    # plt.scatter(num_objects_list, lazy_costs, label='Lazy Heuristic Cost', color='red')
-    # plt.plot(num_objects_list, ant_costs, label='Average Anticipatory Cost', color='blue', linestyle='--')
-    # plt.plot(num_objects_list, lazy_costs, label='Average Lazy Cost', color='red', linestyle='--')
-    # plt.xlabel('Number of Objects')
-    # plt.ylabel('Navigation Cost')
-    # plt.title('Navigation Costs for Anticipatory vs Lazy Heuristics')
-    # plt.legend()
-    # plt.grid()
-    # plt.show()
-
-    # --- 5. Visualize Cost Propagation Results ---
-    # visualize_cost_propagation(world)
+    res_df.to_csv(res_path + 'planner_comp_results_all_detailed.csv', index=False)
+    mb_res_df.to_csv(res_path + 'mb_planner_comp_results_all_detailed.csv', index=False)
