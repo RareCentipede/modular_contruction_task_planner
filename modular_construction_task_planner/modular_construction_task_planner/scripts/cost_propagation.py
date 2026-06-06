@@ -9,7 +9,7 @@ from modular_construction_task_planner.eas.core import World
 from modular_construction_task_planner.scripts.block_domain import Object, PosEntity, ShadowBox
 from modular_construction_task_planner.scripts.ordered_landmarks_planner import compute_dists_from_points_to_vector
 
-OBJ_WIDTH = 3.0
+OBJ_WIDTH = 1.0
 ROBOT_WIDTH = 0.3
 
 def spawn_shadow_boxes(world: World) -> Dict[str, ShadowBox]:
@@ -149,10 +149,10 @@ def visualize_cost_propagation(world: World) -> None:
         # plt.scatter(goal_pos[0], goal_pos[1], color=color, alpha=0.5, s=100, marker='X') # type: ignore
         # plt.plot([pos[0], goal_pos[0]], [pos[1], goal_pos[1]], linestyle='--')
 
-    x_max = max(entity_positions[:, 0]) + 1
-    y_max = max(entity_positions[:, 1]) + 1
-    x_min = min(entity_positions[:, 0]) - 1
-    y_min = min(entity_positions[:, 1]) - 1
+    x_max = max(entity_positions[:, 0]) + (np.sqrt(2)*OBJ_WIDTH/2 + ROBOT_WIDTH)*2
+    y_max = max(entity_positions[:, 1]) + (np.sqrt(2)*OBJ_WIDTH/2 + ROBOT_WIDTH)*2
+    x_min = min(entity_positions[:, 0]) - (np.sqrt(2)*OBJ_WIDTH/2 + ROBOT_WIDTH)*2
+    y_min = min(entity_positions[:, 1]) - (np.sqrt(2)*OBJ_WIDTH/2 + ROBOT_WIDTH)*2
     l = max(x_max, abs(x_min), y_max, abs(y_min))
     plt.xlim(-l, l)
     plt.ylim(-l, l)
@@ -161,5 +161,5 @@ def visualize_cost_propagation(world: World) -> None:
     plt.xlabel("X Position")
     plt.ylabel("Y Position")
     plt.legend()
-    plt.grid()
+    # plt.grid()
     plt.show()
