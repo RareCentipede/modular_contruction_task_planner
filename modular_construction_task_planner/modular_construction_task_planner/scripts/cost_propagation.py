@@ -9,7 +9,7 @@ from modular_construction_task_planner.eas.core import World
 from modular_construction_task_planner.scripts.block_domain import Object, PosEntity, ShadowBox
 from modular_construction_task_planner.scripts.ordered_landmarks_planner import compute_dists_from_points_to_vector
 
-OBJ_WIDTH = 1.0
+OBJ_WIDTH = 3.0
 ROBOT_WIDTH = 0.3
 
 def spawn_shadow_boxes(world: World) -> Dict[str, ShadowBox]:
@@ -68,12 +68,12 @@ def perform_cost_propagation(world: World, shadow_boxes: Dict[str, ShadowBox], v
                     host_obj_name = shadow_nusnace.host.value
                     host_obj = world.entities.get_entities(host_obj_name) # type: ignore
                     host_obj = cast(Object, host_obj)
-                    host_obj.propagated_cost += 1 - (dist / (OBJ_WIDTH/2 + ROBOT_WIDTH))
+                    host_obj.propagated_cost += 1 - (dist / (np.sqrt(2)*OBJ_WIDTH/2 + ROBOT_WIDTH))
                 else:
                     host_obj_name = nusance.name
                     host_obj = world.entities.get_entities(host_obj_name) # type: ignore
                     host_obj = cast(Object, host_obj)
-                    host_obj.propagated_cost -= 1 - (dist / (OBJ_WIDTH/2 + ROBOT_WIDTH))
+                    host_obj.propagated_cost -= 1 - (dist / (np.sqrt(2)*OBJ_WIDTH/2 + ROBOT_WIDTH))
 
 def extract_available_positions_from_world(world: World, shadow_boxes: Dict[str, ShadowBox]) -> \
     Tuple[List[Object], Dict[str, Object], List[Tuple[float, float]]]:
@@ -128,7 +128,7 @@ def visualize_cost_propagation(world: World) -> None:
         goal_pos = world.pose_dict[goal_pos_val].position
         cost = entity.propagated_cost
         color = random_colors[i]
-        collision_threshold = OBJ_WIDTH/2 + ROBOT_WIDTH
+        collision_threshold = np.sqrt(2)*OBJ_WIDTH/2 + ROBOT_WIDTH
         collision_region = patches.Circle((pos[0], pos[1]), collision_threshold, color=color, alpha=0.2, linewidth=2)
         collision_region_shadow = patches.Circle((goal_pos[0], goal_pos[1]), collision_threshold, color=color, alpha=0.2,
                                                  linestyle='--', linewidth=2)
