@@ -117,12 +117,12 @@ if __name__ == "__main__":
     mb_res_df = pd.DataFrame(columns=mb_res_col)
 
     settings = [
-            (PLANNER_TYPE.HEURISTIC, HEURISTIC.LAZY),
-            (PLANNER_TYPE.HEURISTIC, HEURISTIC.DILIGENT),
-            (PLANNER_TYPE.HEURISTIC, HEURISTIC.ANTICIPATORY),
-            (PLANNER_TYPE.HEURISTIC, HEURISTIC.ANTICIPATORY_ONCE),
-            (PLANNER_TYPE.HEURISTIC, HEURISTIC.ANTICIPATORY_ONCE_DISCOUNT),
-            (PLANNER_TYPE.MULTI_BOUND, HEURISTIC.MIXED),
+            # (PLANNER_TYPE.HEURISTIC, HEURISTIC.LAZY),
+            # (PLANNER_TYPE.HEURISTIC, HEURISTIC.DILIGENT),
+            # (PLANNER_TYPE.HEURISTIC, HEURISTIC.ANTICIPATORY),
+            # (PLANNER_TYPE.HEURISTIC, HEURISTIC.ANTICIPATORY_ONCE),
+            # (PLANNER_TYPE.HEURISTIC, HEURISTIC.ANTICIPATORY_ONCE_DISCOUNT),
+            # (PLANNER_TYPE.MULTI_BOUND, HEURISTIC.MIXED),
             (PLANNER_TYPE.MULTI_BOUND_G, HEURISTIC.MIXED_G)
         ]
 
@@ -157,5 +157,5 @@ if __name__ == "__main__":
                         mb_res_df.loc[mb_idx] = mb_res_row
                         mb_idx += 1
 
-    res_df.to_csv(res_path + 'planner_comp_results_all_detailed.csv', index=False)
+    # res_df.to_csv(res_path + 'planner_comp_results_all_detailed.csv', index=False)
     mb_res_df.to_csv(res_path + 'mb_planner_comp_results_all_detailed.csv', index=False)

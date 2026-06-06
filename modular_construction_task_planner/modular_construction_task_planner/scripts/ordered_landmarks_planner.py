@@ -241,16 +241,8 @@ class OrderedLandmarksPlanner:
         best_cost = float('inf')
         home_state = self.s0
 
-        # FIX 1: Use a persistent execution flag instead of letting local node statuses break the loop container
-        search_active = True
-
-        while search_active:
+        while self.current_linked_state.status == StateStatus.ALIVE:
             self.branch_out(self.current_linked_state, low_h, forecast=True)
-
-            # If backtracking hits the absolute root ceiling and everything is dead, terminate safely
-            if self.current_linked_state.status == StateStatus.DEAD:
-                print("Search tree fully exhausted or terminated.")
-                break
 
             if not self.current_linked_state.branches_to_explore:
                 print("No branches to explore, backtracking...")
@@ -267,7 +259,7 @@ class OrderedLandmarksPlanner:
             action_name, action_params, edge_cost, additional_properties = weighted_branch
 
             # Accumulate tentative node path cost based on the current baseline
-            tentative_cost = self.current_linked_state.cost + edge_cost
+            tentative_cost = edge_cost
 
             if self.goal_linked_state:
                 if self.monitor.should_stop(best_cost):
@@ -278,6 +270,7 @@ class OrderedLandmarksPlanner:
                 if not self.current_linked_state.branches_to_explore:
                     self.backtrack()
                     home_state = self.current_linked_state
+                    self.mb_costs.append(tentative_cost)
                 continue
 
             # Execute actions to step forward in the continuous world state
