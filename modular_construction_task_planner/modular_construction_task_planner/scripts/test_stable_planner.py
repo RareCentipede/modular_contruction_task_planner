@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
+import pandas as pd
 
 from copy import deepcopy
 from yaml import safe_load
@@ -90,22 +92,25 @@ if __name__ == "__main__":
     colors = ['b', 'r', 'g']
     heuristics = [HEURISTIC.LAZY, HEURISTIC.STABLE, HEURISTIC.STABLE_NAV]
 
+    sns.set_theme(style="whitegrid")
+    plt.rcParams.update({'font.size': 20, 'axes.labelsize': 20, 'axes.titlesize': 20})
+
     h = HEURISTIC.LAZY
     for problem in problems:
         print(f"Testing problem: {problem}")
-        supp_results = main(problem_name=problem, h=h, animate=True)
+        supp_results = main(problem_name=problem, h=h)
         supp_results_lazy[problem] = supp_results
 
     h = HEURISTIC.STABLE
     for problem in problems:
         print(f"Testing problem: {problem}")
-        supp_results = main(problem_name=problem, h=h, animate=True)
+        supp_results = main(problem_name=problem, h=h)
         supp_results_stab[problem] = supp_results
 
     h = HEURISTIC.STABLE_NAV
     for problem in problems:
         print(f"Testing problem: {problem}")
-        supp_results = main(problem_name=problem, h=h, animate=True)
+        supp_results = main(problem_name=problem, h=h)
         supp_results_stab_nav[problem] = supp_results
 
     fig, ax = plt.subplots(len(supp_results_lazy), 1, figsize=(6, 3 * len(supp_results_lazy)))
@@ -115,37 +120,37 @@ if __name__ == "__main__":
         steps = np.arange(0, len(stab_per_step), 1, dtype=int)
         ax[i].plot(steps, stab_per_step, label=problem, color=colors[i])  # Stability score at each step
         ax[i].scatter(steps, stab_per_step, s=100, c=colors[i])  # Highlight block placements
-        ax[i].set_ylabel("Stability Score")
+        ax[1].set_ylabel("Stability Score")
         ax[i].legend()
         print(f"{problem} - Average Support Score: {res[2]}, Total Support Score: {res[1]}, nav cost: {res[3]}, all scores: {res[0]}")
     ax[0].set_title(f"Stability Score at Each Step")
     ax[i].set_xlabel("Step")
 
-    fig, ax = plt.subplots(len(supp_results_stab), 1, figsize=(6, 3 * len(supp_results_stab)))
-    for i, (problem, res) in enumerate(supp_results_stab.items()):
-        print(f"Results for {problem} with STABLE heuristic:")
-        stab_per_step = res[0]
-        steps = np.arange(0, len(stab_per_step), 1, dtype=int)
-        ax[i].plot(steps, stab_per_step, label=problem, color=colors[i])  # Stability score at each step
-        ax[i].scatter(steps, stab_per_step, s=100, c=colors[i])  # Highlight block placements
-        ax[i].set_ylabel("Stability Score")
-        ax[i].legend()
-        print(f"{problem} - Average Support Score: {res[2]}, Total Support Score: {res[1]}, nav cost: {res[3]}, all scores: {res[0]}")
-    ax[0].set_title(f"Stability Score at Each Step")
-    ax[i].set_xlabel("Step")
+    # fig, ax = plt.subplots(len(supp_results_stab), 1, figsize=(6, 3 * len(supp_results_stab)))
+    # for i, (problem, res) in enumerate(supp_results_stab.items()):
+    #     print(f"Results for {problem} with STABLE heuristic:")
+    #     stab_per_step = res[0]
+    #     steps = np.arange(0, len(stab_per_step), 1, dtype=int)
+    #     ax[i].plot(steps, stab_per_step, label=problem, color=colors[i])  # Stability score at each step
+    #     ax[i].scatter(steps, stab_per_step, s=100, c=colors[i])  # Highlight block placements
+    #     ax[1].set_ylabel("Stability Score")
+    #     ax[i].legend()
+    #     print(f"{problem} - Average Support Score: {res[2]}, Total Support Score: {res[1]}, nav cost: {res[3]}, all scores: {res[0]}")
+    # ax[0].set_title(f"Stability Score at Each Step")
+    # ax[i].set_xlabel("Step")
 
-    fig, ax = plt.subplots(len(supp_results_stab_nav), 1, figsize=(6, 3 * len(supp_results_stab_nav)))
-    for i, (problem, res) in enumerate(supp_results_stab_nav.items()):
-        print(f"Results for {problem} using STABLE_NAV heuristic")
-        stab_per_step = res[0]
-        steps = np.arange(0, len(stab_per_step), 1, dtype=int)
-        ax[i].plot(steps, stab_per_step, label=problem, color=colors[i])  # Stability score at each step
-        ax[i].scatter(steps, stab_per_step, s=100, c=colors[i])  # Highlight block placements
-        ax[i].set_ylabel("Stability Score")
-        ax[i].legend()
-        print(f"{problem} - Average Support Score: {res[2]}, Total Support Score: {res[1]}, nav cost: {res[3]}, all scores: {res[0]}")
-    ax[0].set_title(f"Stability Score at Each Step")
-    ax[i].set_xlabel("Step")
+    # fig, ax = plt.subplots(len(supp_results_stab_nav), 1, figsize=(6, 3 * len(supp_results_stab_nav)))
+    # for i, (problem, res) in enumerate(supp_results_stab_nav.items()):
+    #     print(f"Results for {problem} using STABLE_NAV heuristic")
+    #     stab_per_step = res[0]
+    #     steps = np.arange(0, len(stab_per_step), 1, dtype=int)
+    #     ax[i].plot(steps, stab_per_step, label=problem, color=colors[i])  # Stability score at each step
+    #     ax[i].scatter(steps, stab_per_step, s=100, c=colors[i])  # Highlight block placements
+    #     ax[1].set_ylabel("Stability Score")
+    #     ax[i].legend()
+    #     print(f"{problem} - Average Support Score: {res[2]}, Total Support Score: {res[1]}, nav cost: {res[3]}, all scores: {res[0]}")
+    # ax[0].set_title(f"Stability Score at Each Step")
+    # ax[i].set_xlabel("Step")
 
     nav_cost_per_heuristic = {
         HEURISTIC.LAZY.name: [res[3] for res in supp_results_lazy.values()],
@@ -153,18 +158,29 @@ if __name__ == "__main__":
         HEURISTIC.STABLE_NAV.name: [res[3] for res in supp_results_stab_nav.values()]
     }
 
+    nav_df_col = ['problem', 'heuristic', 'nav_cost']
+    nav_df = pd.DataFrame(columns=nav_df_col)
+    idx = 0
+    for heuristic_name, nav_costs in nav_cost_per_heuristic.items():
+        for problem, nav_cost in zip(problems, nav_costs):
+            nav_df.loc[idx] = [problem, heuristic_name, nav_cost]
+            idx += 1
+
     x = np.arange(len(problems))
     width = 0.25
     multiplier = 0
     fig, ax = plt.subplots(layout='constrained', figsize=(10, 6))
 
-    for heuristic_name, nav_costs in nav_cost_per_heuristic.items():
-        offset = width * multiplier
-        rects = ax.bar(x + offset, nav_costs, width, label=heuristic_name)
-        ax.bar_label(rects, padding=3)
-        multiplier += 1
+    # for heuristic_name, nav_costs in nav_cost_per_heuristic.items():
+    #     offset = width * multiplier
+    #     ax = sns.barplot(x=x + offset, y=nav_costs, width=width, label=heuristic_name, color=colors[multiplier])  # type: ignore
+    #     # rects = ax.bar(x + offset, nav_costs, width, label=heuristic_name)
+    #     # ax.bar_label(rects, padding=3)
+    #     multiplier += 1
 
-    ax.set_xticks(x + width, problems)
+    ax = sns.barplot(data=nav_df, x='problem', y='nav_cost', hue='heuristic', palette=colors)
+
+    # ax.set_xticks(x + width, problems)
     ax.set_ylabel("Navigation Cost [m]")
     ax.set_title("Navigation Cost by Heuristic per problem")
     ax.legend()
