@@ -93,7 +93,7 @@ if __name__ == "__main__":
     heuristics = [HEURISTIC.LAZY, HEURISTIC.STABLE, HEURISTIC.STABLE_NAV]
 
     sns.set_theme(style="whitegrid")
-    plt.rcParams.update({'font.size': 20, 'axes.labelsize': 20, 'axes.titlesize': 20})
+    plt.rcParams.update({'font.size': 20, 'axes.labelsize': 20, 'axes.titlesize': 20, 'xtick.labelsize': 15, 'ytick.labelsize': 15})
 
     h = HEURISTIC.LAZY
     for problem in problems:
@@ -122,6 +122,8 @@ if __name__ == "__main__":
         ax[i].scatter(steps, stab_per_step, s=100, c=colors[i])  # Highlight block placements
         ax[1].set_ylabel("Stability Score")
         ax[i].legend()
+        if i < len(supp_results_lazy) - 1:
+            ax[i].set_xticklabels([])  # Hide x-axis labels for all but the last subplot
         print(f"{problem} - Average Support Score: {res[2]}, Total Support Score: {res[1]}, nav cost: {res[3]}, all scores: {res[0]}")
     ax[0].set_title(f"Stability Score at Each Step")
     ax[i].set_xlabel("Step")
