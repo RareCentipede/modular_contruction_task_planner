@@ -281,14 +281,14 @@ def visualize_goal_structure(goal_data: dict, unique_colors: List[Tuple[float, f
     # Initial camera view angle (isometric-leaning bird's-eye perspective)
     ax.view_init(elev=22, azim=-55)
 
-    ax.legend(
-        handles=legends,
-        loc='upper left',
-        bbox_to_anchor=(1.05, 1), # Moves the legend just to the right of the plot area
-        borderaxespad=0.,
-        title="Objects List",
-        title_fontproperties={'weight': 'bold'}
-    )
+    # ax.legend(
+    #     handles=legends,
+    #     loc='upper left',
+    #     bbox_to_anchor=(1.05, 1), # Moves the legend just to the right of the plot area
+    #     borderaxespad=0.,
+    #     title="Objects List",
+    #     title_fontproperties={'weight': 'bold'}
+    # )
 
     plt.tight_layout()
     if show:
@@ -318,7 +318,7 @@ def visualize_support_node_graph(support_graph: Dict[str, 'SupportNode'],
 
         # Build text label to show at the center of the node
         # Displays name, current support score, and required threshold
-        labels[name] = f"{name}\n({node.current_support_score:.2f}/{node.support_threshold:.2f})"
+        labels[name] = f"{name}"
 
         # Color mapping logic
         if not node_colors:
@@ -367,7 +367,7 @@ def visualize_support_node_graph(support_graph: Dict[str, 'SupportNode'],
 
     # Extract weights from the graph edges to label them
     edge_labels = {(u, v): f"{d['weight']:.2f}" for u, v, d in G.edges(data=True)}
-    nx.draw_networkx_edge_labels(G, pos_layout, edge_labels=edge_labels, font_size=8, font_color="#333333")
+    nx.draw_networkx_edge_labels(G, pos_layout, edge_labels=edge_labels, font_size=12, font_color="#333333")
 
     # Determine highly readable text contrast dynamically based on node color background brightness
     for node_name, pos in pos_layout.items():
@@ -381,7 +381,7 @@ def visualize_support_node_graph(support_graph: Dict[str, 'SupportNode'],
         plt.text(
             pos[0], pos[1], labels[node_name],
             color=text_color,
-            fontsize=8,
+            fontsize=12,
             fontweight='bold',
             horizontalalignment='center',
             verticalalignment='center'

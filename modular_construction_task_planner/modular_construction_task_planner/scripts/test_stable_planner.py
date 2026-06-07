@@ -33,7 +33,7 @@ def main(problem_name:str = "scaffolding_tower", show: bool = False, animate: bo
     colors = generate_nice_colors(len(goal_config))
 
     if show:
-        visualize_goal_structure(goal_config, title=problem_name, show=show)
+        visualize_goal_structure(goal_config, title=problem_name, show=show, unique_colors=colors)
         visualize_support_node_graph(support_graph, colors=colors, show=show)
 
     if not seq:

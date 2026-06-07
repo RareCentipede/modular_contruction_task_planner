@@ -10,21 +10,26 @@ from modular_construction_task_planner.scripts.stability import (
     create_support_relation_graph,
     visualize_goal_structure,
     visualize_support_node_graph,
-    find_feasible_block_sequence
+    find_feasible_block_sequence,
+    generate_nice_colors
 )
 
-def main():
+def main(problem_config_path: str = "src/object_rearrangement_ros2_sim/mpnp_simulation/config/problem_configs/",
+         problem_name: str = "temple_facade"):
     # Load world from config
-    problem_config_path = "src/object_rearrangement_ros2_sim/mpnp_simulation/config/problem_configs/"
-    problem_name = "temple_facade"
     world = parse_configs_to_world(problem_name, problem_config_path)
 
+    plt.rcParams.update({'font.size': 20, 'axes.labelsize': 15, 'axes.titlesize': 20})
+
     goal_config = safe_load(open(f"{problem_config_path}/{problem_name}/goal.yaml", 'r'))
-    colors = visualize_goal_structure(goal_config, show=False)
+    colors = generate_nice_colors(len(goal_config))
+    visualize_goal_structure(goal_config, show=False, unique_colors=colors, title=problem_name)
+
+    plt.savefig(f"struct_vis_{problem_name}.png")
 
     # Create support relation graph
     _, support_graph = create_support_relation_graph(world)
-    visualize_support_node_graph(support_graph, colors=colors, show=False)
+    visualize_support_node_graph(support_graph, colors=colors, show=False, title=f"Support Relation Graph - {problem_name}")
 
     feasible_seq = find_feasible_block_sequence(support_graph)
     print("Feasible block placement sequence (bottom to top):")
@@ -39,7 +44,15 @@ def main():
         print(f"  Supported by: {[f'{name} (Score: {score:.2f})' for name, (score, _) in node.supporting_objects.items()]}")
         print()
 
-    plt.show()
+    # plt.show()
+    plt.savefig(f"support_relation_graph_{problem_name}.png")
 
 if __name__ == "__main__":
-    main()
+    problems = [
+        "temple_facade",
+        "scaffolding_tower",
+        "quadriple_towers",
+        "interlocking_pyramid"
+    ]
+    for problem in problems:
+        main(problem_name=problem)
