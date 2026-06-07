@@ -103,13 +103,14 @@ def extract_available_positions_from_world(world: World, shadow_boxes: Dict[str,
 
     return available_entities, all_entities, entity_positions
 
-def visualize_cost_propagation(world: World) -> None:
+def visualize_cost_propagation(world: World, name:str = '') -> None:
+    plt.rcParams.update({'font.size': 20, 'axes.labelsize': 20, 'axes.titlesize': 20})
     obj_entities = world.entities.get_entities(Object)
     obj_entities = cast(List[Object], obj_entities)
     entity_positions = np.array([p.position[:2] for p in world.pose_dict.values()])
 
     # Choose a nice qualitative or sequential colormap
-    cmap = plt.get_cmap('turbo') # type: ignore
+    cmap = plt.get_cmap('inferno') # type: ignore
 
     # Pick 5 random positions along the colormap (from 0.0 to 1.0)
     num_colors = len(obj_entities)
@@ -142,9 +143,14 @@ def visualize_cost_propagation(world: World) -> None:
         plt.gca().add_patch(collision_region_shadow)
         plt.gca().add_patch(host)
         plt.gca().add_patch(shadow)
-        plt.arrow(pos[0], pos[1], goal_pos[0] - pos[0], goal_pos[1] - pos[1], linestyle='--', color=color, alpha=0.7,
-                  head_width=0.05, linewidth=2)
-        plt.text(pos[0], pos[1] + OBJ_WIDTH/2, f"{entity.name}\nCost: {cost:.2f}", fontsize=9, ha='right', va='bottom')
+
+        pos_goal_vec = np.array(goal_pos) - np.array(pos)
+        pos_goal_vec_dist = np.linalg.norm(pos_goal_vec)
+        pos_goal_vec = pos_goal_vec / pos_goal_vec_dist * (pos_goal_vec_dist - (np.sqrt(2)*OBJ_WIDTH/2 + ROBOT_WIDTH)*1.2)
+
+        plt.arrow(pos[0], pos[1], pos_goal_vec[0], pos_goal_vec[1], linestyle='--', color=color, alpha=1.0,
+                  head_width=0.2, linewidth=3, fill=False)
+        plt.text(pos[0], pos[1] + OBJ_WIDTH/2, f"{entity.name}\nCost: {cost:.2f}", fontsize=12, ha='right', va='bottom')
         # plt.scatter(pos[0], pos[1], color=color, s=100, label=f"{entity.name} (Cost: {cost:.2f})")
         # plt.scatter(goal_pos[0], goal_pos[1], color=color, alpha=0.5, s=100, marker='X') # type: ignore
         # plt.plot([pos[0], goal_pos[0]], [pos[1], goal_pos[1]], linestyle='--')
@@ -160,6 +166,7 @@ def visualize_cost_propagation(world: World) -> None:
     plt.title("Cost Propagation Visualization")
     plt.xlabel("X Position")
     plt.ylabel("Y Position")
-    plt.legend()
+    # plt.legend()
     # plt.grid()
-    plt.show()
+    # plt.show()
+    plt.savefig(f"cost_propagation_{name}.png")

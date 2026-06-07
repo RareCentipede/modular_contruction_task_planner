@@ -39,7 +39,7 @@ def test_acp(config_path: str = '', problem_name: str = '', vis: bool = True):
     perform_cost_propagation(world, shadow_boxes)
 
     # --- 5. Visualize Cost Propagation Results ---
-    visualize_cost_propagation(world)
+    visualize_cost_propagation(world, problem_name)
 
 if __name__ == "__main__":
     config_path = "src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/configs/"
