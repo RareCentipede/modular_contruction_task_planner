@@ -93,7 +93,8 @@ if __name__ == "__main__":
     heuristics = [HEURISTIC.LAZY, HEURISTIC.STABLE, HEURISTIC.STABLE_NAV]
 
     sns.set_theme(style="whitegrid")
-    plt.rcParams.update({'font.size': 20, 'axes.labelsize': 20, 'axes.titlesize': 20, 'xtick.labelsize': 15, 'ytick.labelsize': 15})
+    plt.rcParams.update({'font.size': 16, 'axes.labelsize': 16, 'axes.titlesize': 16, 'xtick.labelsize': 12, 'ytick.labelsize': 12})
+    figsize = (6, 4)
 
     h = HEURISTIC.LAZY
     for problem in problems:
@@ -113,7 +114,7 @@ if __name__ == "__main__":
         supp_results = main(problem_name=problem, h=h)
         supp_results_stab_nav[problem] = supp_results
 
-    fig, ax = plt.subplots(len(supp_results_lazy), 1, figsize=(6, 3 * len(supp_results_lazy)))
+    fig, ax = plt.subplots(len(supp_results_lazy), 1, figsize=figsize)
     for i, (problem, res) in enumerate(supp_results_lazy.items()):
         print(f"Results for {problem} with LAZY heuristic:")
         stab_per_step = res[0]
