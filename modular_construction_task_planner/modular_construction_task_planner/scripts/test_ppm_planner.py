@@ -130,20 +130,18 @@ if __name__ == "__main__":
     mb_idx = 0
 
     for num_objects in num_objects_list:
-        for planner_type, heuristic in settings:
-            tqdm.write(f"\nTesting {planner_type.name} + {heuristic.name} with {num_objects} objects...")
+        for trial in range(num_trials):
+            print(f"\n--- Trial {trial+1}/{num_trials} ---")
+            init_dict, goal_dict = generate_random_tamp_configs(num_objects)
+            world = parse_configs_to_world(init_dict, goal_dict)
+            original_world = deepcopy(world)
             est_costs = []
             full_costs = []
             states_explored_hist = []
             times = []
 
-            for trial in tqdm(range(num_trials)):
-                print(f"\n--- Trial {trial+1}/{num_trials} ---")
-                init_dict, goal_dict = generate_random_tamp_configs(num_objects)
-                world = parse_configs_to_world(init_dict, goal_dict)
-                if heuristic == HEURISTIC.ANTICIPATORY_ONCE or heuristic == HEURISTIC.ANTICIPATORY_ONCE_DISCOUNT:
-                    shadow_boxes = spawn_shadow_boxes(world)
-                    perform_cost_propagation(world, shadow_boxes)
+            for planner_type, heuristic in tqdm(settings):
+                tqdm.write(f"\nTesting {planner_type.name} + {heuristic.name} with {num_objects} objects...")
                 results = test_planner(world, planner_type, heuristic)
                 est_cost, full_cost, states_explored, time_taken, mb_cost_hist = results
                 res_row = [planner_type.name, heuristic.name, num_objects, trial,
@@ -156,6 +154,13 @@ if __name__ == "__main__":
                         mb_res_row = [planner_type.name, num_objects, trial, iter_num, cost]
                         mb_res_df.loc[mb_idx] = mb_res_row
                         mb_idx += 1
+
+                world = deepcopy(original_world)
+
+                if heuristic == HEURISTIC.ANTICIPATORY_ONCE or heuristic == HEURISTIC.ANTICIPATORY_ONCE_DISCOUNT:
+                    # Reset world to original state for next planner test
+                    shadow_boxes = spawn_shadow_boxes(world)
+                    perform_cost_propagation(world, shadow_boxes)
 
     res_df.to_csv(res_path + 'planner_comp_results_all_detailed.csv', index=False)
     mb_res_df.to_csv(res_path + 'mb_planner_comp_results_all_detailed.csv', index=False)

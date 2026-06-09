@@ -336,7 +336,7 @@ def visualize_support_node_graph(support_graph: Dict[str, 'SupportNode'],
                 G.add_edge(parent_name, name, weight=score)
 
     # 3. Graph Presentation and Layout
-    plt.figure(figsize=(14, 10))
+    plt.figure(figsize=(6, 4))
     plt.title(title, fontsize=14, fontweight='bold', pad=15)
 
     try:
@@ -348,26 +348,26 @@ def visualize_support_node_graph(support_graph: Dict[str, 'SupportNode'],
 
     # 4. Render Graph Elements
     nx.draw_networkx_nodes(
-        G, pos_layout, 
-        node_color=node_colors, 
-        node_size=2800, 
-        edgecolors='#222222', 
+        G, pos_layout,
+        node_color=node_colors,
+        node_size=700,
+        edgecolors='#222222',
         linewidths=1.5,
         alpha=0.9
     )
 
     nx.draw_networkx_edges(
-        G, pos_layout, 
-        edge_color='#555555', 
-        width=2.0, 
-        arrowstyle='-|>', 
-        arrowsize=22, 
+        G, pos_layout,
+        edge_color='#555555',
+        width=2.0,
+        arrowstyle='-|>',
+        arrowsize=22,
         node_size=2800
     )
 
     # Extract weights from the graph edges to label them
     edge_labels = {(u, v): f"{d['weight']:.2f}" for u, v, d in G.edges(data=True)}
-    nx.draw_networkx_edge_labels(G, pos_layout, edge_labels=edge_labels, font_size=12, font_color="#333333")
+    nx.draw_networkx_edge_labels(G, pos_layout, edge_labels=edge_labels, font_size=8, font_color="#333333")
 
     # Determine highly readable text contrast dynamically based on node color background brightness
     for node_name, pos in pos_layout.items():
@@ -381,7 +381,7 @@ def visualize_support_node_graph(support_graph: Dict[str, 'SupportNode'],
         plt.text(
             pos[0], pos[1], labels[node_name],
             color=text_color,
-            fontsize=12,
+            fontsize=8,
             fontweight='bold',
             horizontalalignment='center',
             verticalalignment='center'
