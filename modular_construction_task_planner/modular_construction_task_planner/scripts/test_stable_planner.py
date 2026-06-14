@@ -15,7 +15,8 @@ from modular_construction_task_planner.scripts.stability import (
     visualize_support_node_graph,
     animate_construction_sequence,
     find_feasible_block_sequence,
-    generate_nice_colors
+    generate_nice_colors,
+    save_construction_sequence_frames
 )
 from modular_construction_task_planner.scripts.block_sequence_animator import TrimeshBlockAnimator
 from path_planner.path_planner_node import GridGraph, OCCUPANCY
@@ -24,8 +25,8 @@ def main(problem_name:str = "scaffolding_tower", show: bool = False, animate: bo
     goal_linked_state = None
     problem_config_path = "src/object_rearrangement_ros2_sim/mpnp_simulation/config/problem_configs/"
     world = parse_configs_to_world(problem_name, problem_config_path)
-    for ent in world.entities.entities:
-        print(f"{ent.name}: {ent.state}")
+    # for ent in world.entities.entities:
+        # print(f"{ent.name}: {ent.state}")
 
     init_config = safe_load(open(f"{problem_config_path}/{problem_name}/init.yaml", 'r'))
     goal_config = safe_load(open(f"{problem_config_path}/{problem_name}/goal.yaml", 'r'))
@@ -74,11 +75,12 @@ def main(problem_name:str = "scaffolding_tower", show: bool = False, animate: bo
         block_sequences.append(block_sequence)
 
         if animate:
-            animator = TrimeshBlockAnimator(init_config, goal_config, block_sequence, colors)
-            animator.run()
+            # animator = TrimeshBlockAnimator(init_config, goal_config, block_sequence, colors)
+            # animator.run()
             # animator.save_to_video(f'src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/movies/{problem_name}.mp4')
-            # construction_animation = animate_construction_sequence(init_config, goal_config, block_sequence, colors, interval=500)
+            # construction_animation = animate_construction_sequence(init_config, goal_config, block_sequence, colors, interval=500, title=problem_name)
             # construction_animation.save(f'src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/movies/{problem_name}_full.gif', writer='pillow')
+            save_construction_sequence_frames(init_config, goal_config, block_sequence, colors, title=problem_name)
     else:
         print(f"Goal linked state not found :(.")
 
@@ -88,7 +90,8 @@ if __name__ == "__main__":
     supp_results_lazy = {}
     supp_results_stab = {}
     supp_results_stab_nav = {}
-    problems = [ "quadriple_towers", "interlocking_pyramid", "scaffolding_tower" ]
+    # problems = [ "quadruple_towers", "interlocking_pyramid", "scaffolding_tower"]
+    problems = ["temple_facade"]
     colors = ['b', 'r', 'g']
     heuristics = [HEURISTIC.LAZY, HEURISTIC.STABLE, HEURISTIC.STABLE_NAV]
 
@@ -99,7 +102,7 @@ if __name__ == "__main__":
     h = HEURISTIC.LAZY
     for problem in problems:
         print(f"Testing problem: {problem}")
-        supp_results = main(problem_name=problem, h=h)
+        supp_results = main(problem_name=problem, h=h, animate=True)
         supp_results_lazy[problem] = supp_results
 
     h = HEURISTIC.STABLE

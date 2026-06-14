@@ -169,4 +169,4 @@ def visualize_cost_propagation(world: World, name:str = '') -> None:
     # plt.legend()
     # plt.grid()
     # plt.show()
-    plt.savefig(f"cost_propagation_{name}.png")
+    plt.savefig(f"cost_propagation_{name}.pdf", bbox_inches='tight')

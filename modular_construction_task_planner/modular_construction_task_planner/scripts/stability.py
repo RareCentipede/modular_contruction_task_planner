@@ -1,6 +1,7 @@
 import trimesh
 import colorsys
 import random
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
@@ -460,7 +461,7 @@ def find_feasible_block_sequence(support_graph: Dict[str, SupportNode]) -> List[
         raise ValueError("The support graph contains cycles, no valid placement sequence exists.")
 
 def animate_construction_sequence(init_data: dict, goal_data: dict, placement_sequence: list, color_array: list, 
-                                  interval: int = 800, show: bool = False) -> FuncAnimation:
+                                  interval: int = 800, show: bool = False, title: str = "Construction Animation") -> FuncAnimation:
     """
         Animates blocks moving from initial positions to target positions.
         - Unplaced blocks wait at their initial position in full color.
@@ -473,6 +474,8 @@ def animate_construction_sequence(init_data: dict, goal_data: dict, placement_se
             placement_sequence: List of block names in assembly order.
             color_array: List of RGB(A) colors corresponding 1:1 to the placement_sequence order.
             interval: Animation step delay in milliseconds.
+            show: Whether to display the animation.
+            title: Title for the animation.
     """
     fig = plt.figure(figsize=(14, 10))
     ax = fig.add_subplot(111, projection='3d')
@@ -564,6 +567,7 @@ def animate_construction_sequence(init_data: dict, goal_data: dict, placement_se
                 poly_phantom.set_edgecolor([0.6, 0.6, 0.6, 0.2])
                 poly_phantom.set_linewidth(0.5)
                 ax.add_collection3d(poly_phantom)
+            plt.savefig(f"movies/{title}_animation_step_{frame_idx}.pdf", bbox_inches='tight')
 
     total_frames = len(placement_sequence) + 1
     anim = FuncAnimation(fig, update, frames=total_frames, interval=interval, repeat=True)
@@ -572,3 +576,120 @@ def animate_construction_sequence(init_data: dict, goal_data: dict, placement_se
     if show:
         plt.show()
     return anim
+
+def save_construction_sequence_frames(init_data: dict, goal_data: dict, placement_sequence: list, color_array: list, 
+                                      file_format: str = "pdf", title: str = "Construction") -> None:
+    """
+        Generates and saves static frame files for each step of the assembly sequence.
+        
+        Args:
+            init_data: Dict from init.yaml containing starting positions.
+            goal_data: Dict from goal.yaml containing target positions.
+            placement_sequence: List of block names in assembly order.
+            color_array: List of RGB(A) colors corresponding 1:1 to the placement_sequence order.
+            file_format: "pdf" (recommended for LaTeX vectors) or "png" (faster/smaller).
+            title: Title prefix for the saved files.
+    """
+    # 1. Ensure the output directory exists
+    output_dir = f"movies/{title}"
+    os.makedirs(output_dir, exist_ok=True)
+
+    # 2. Map blocks to their sequence color for easy lookup
+    block_colors = {name: color_array[i] for i, name in enumerate(placement_sequence)}
+
+    # Pre-calculate meshes to avoid re-generating during the loop
+    init_meshes = {}
+    goal_meshes = {}
+    all_vertices = []
+
+    for name in placement_sequence:
+        if name not in init_data or name not in goal_data:
+            continue
+        init_mesh = make_box_mesh(init_data[name]['size'], init_data[name]['position'])
+        init_meshes[name] = init_mesh
+        all_vertices.append(init_mesh.vertices)
+
+        goal_mesh = make_box_mesh(goal_data[name]['size'], goal_data[name]['position'])
+        goal_meshes[name] = goal_mesh
+        all_vertices.append(goal_mesh.vertices)
+
+    flat_verts = np.vstack(all_vertices)
+    max_x, min_x = flat_verts[:, 0].max(), flat_verts[:, 0].min()
+    max_y, min_y = flat_verts[:, 1].max(), flat_verts[:, 1].min()
+    max_z = flat_verts[:, 2].max()
+    margin = 2.0
+
+    # Calculate global grid extent
+    extent_x = max(abs(min_x), abs(max_x)) + margin
+    extent_y = max(abs(min_y), abs(max_y)) + margin
+    gx, gy = np.meshgrid(np.linspace(-extent_x, extent_x, 12), np.linspace(-extent_y, extent_y, 12))
+
+    # Total frames: from step 0 (nothing built) to len(sequence) (fully built)
+    total_steps = len(placement_sequence) + 1
+
+    print(f"Generating {total_steps} individual frames...")
+
+    # 3. Loop through each step explicitly
+    for frame_idx in range(total_steps):
+        # Create a fresh figure instance for every single frame to prevent memory accumulation
+        fig = plt.figure(figsize=(12, 9))
+        ax = fig.add_subplot(111, projection='3d')
+
+        ax.set_title(f"Assembly Sequence Map: Step {frame_idx}/{len(placement_sequence)}", 
+                     fontsize=14, fontweight='bold', pad=20)
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        ax.set_xlim(min_x - margin, max_x + margin)
+        ax.set_ylim(min_y - margin, max_y + margin)
+        ax.set_zlim(0, max_z + margin)
+        ax.view_init(elev=25, azim=-45)
+
+        # Ground Grid Floor
+        ax.plot_wireframe(gx, gy, np.zeros_like(gx), color=(0.7, 0.7, 0.7, 0.12), linewidth=0.8)
+
+        # Determine structural status at this specific step index
+        built_so_far = set(placement_sequence[:frame_idx])
+
+        for name in placement_sequence:
+            if name not in init_meshes:
+                continue
+
+            color = block_colors[name]
+            face_color = color[:3]
+            alpha_val = color[3] if len(color) == 4 else 0.8
+
+            if name in built_so_far:
+                # SCENARIO A: Block placed at GOAL position
+                tris = goal_meshes[name].vertices[goal_meshes[name].faces]
+                poly = Poly3DCollection(tris, alpha=alpha_val)
+                poly.set_facecolor(face_color)
+                poly.set_edgecolor([0.1, 0.1, 0.1])
+                poly.set_linewidth(0.8)
+                ax.add_collection3d(poly)
+            else:
+                # SCENARIO B: Block still waiting at STAGING area
+                tris_init = init_meshes[name].vertices[init_meshes[name].faces]
+                poly_init = Poly3DCollection(tris_init, alpha=alpha_val)
+                poly_init.set_facecolor(face_color)
+                poly_init.set_edgecolor([0.2, 0.2, 0.2])
+                poly_init.set_linewidth(0.8)
+                ax.add_collection3d(poly_init)
+
+                # Blueprint reference outline at target
+                tris_goal = goal_meshes[name].vertices[goal_meshes[name].faces]
+                poly_phantom = Poly3DCollection(tris_goal, alpha=0.04)
+                poly_phantom.set_facecolor([0.85, 0.85, 0.85])
+                poly_phantom.set_edgecolor([0.6, 0.6, 0.6, 0.2])
+                poly_phantom.set_linewidth(0.5)
+                ax.add_collection3d(poly_phantom)
+
+        # 4. Save the single canvas snapshot cleanly
+        filename = f"{output_dir}/{title}_step_{frame_idx:02d}.{file_format}"
+        plt.tight_layout()
+        plt.savefig(filename, bbox_inches='tight', dpi=300)
+
+        # 5. Crucial: close the figure handle completely to prevent massive RAM leaks
+        plt.close(fig)
+
+    print(f"All frames successfully saved to the '{output_dir}/' directory.")
