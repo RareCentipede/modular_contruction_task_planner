@@ -1,0 +1,208 @@
+block1:
+  position:
+  - -4.0
+  - 1.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block2:
+  position:
+  - -3.0
+  - 1.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block3:
+  position:
+  - -2.0
+  - 1.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block4:
+  position:
+  - -1.0
+  - 1.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block5:
+  position:
+  - 0.0
+  - 1.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block6:
+  position:
+  - 1.0
+  - 1.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block7:
+  position:
+  - 2.0
+  - 1.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block8:
+  position:
+  - 3.0
+  - 1.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block9:
+  position:
+  - -4.0
+  - 2.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block10:
+  position:
+  - -3.0
+  - 3.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block11:
+  position:
+  - -2.0
+  - 4.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block12:
+  position:
+  - -1.0
+  - 5.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block13:
+  position:
+  - 3.0
+  - 2.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block14:
+  position:
+  - 2.0
+  - 3.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block15:
+  position:
+  - 1.0
+  - 4.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block16:
+  position:
+  - 0.0
+  - 5.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0

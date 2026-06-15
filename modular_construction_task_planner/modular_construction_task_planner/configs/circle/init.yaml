@@ -1,0 +1,295 @@
+block1:
+  position:
+  - 4.0
+  - -6.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block2:
+  position:
+  - 7.5
+  - -2.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block3:
+  position:
+  - 10.5
+  - -10.5
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block4:
+  position:
+  - 5.5
+  - -7.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block5:
+  position:
+  - 0.0
+  - -3.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block6:
+  position:
+  - -4.0
+  - -9.5
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block7:
+  position:
+  - 0.5
+  - -7.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block8:
+  position:
+  - -1.0
+  - -1.5
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block9:
+  position:
+  - -4.0
+  - -2.5
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block10:
+  position:
+  - -6.5
+  - -10.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block11:
+  position:
+  - -3.5
+  - -5.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block12:
+  position:
+  - -10.0
+  - -5.5
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block13:
+  position:
+  - -11.0
+  - -9.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block14:
+  position:
+  - 7.5
+  - -6.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block15:
+  position:
+  - 6.0
+  - -9.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block16:
+  position:
+  - 10.5
+  - -9.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block17:
+  position:
+  - 2.0
+  - -4.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block18:
+  position:
+  - -6.5
+  - -2.5
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block19:
+  position:
+  - 7.0
+  - -3.5
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block20:
+  position:
+  - -8.0
+  - -7.5
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block21:
+  position:
+  - -6.5
+  - -6.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+block22:
+  position:
+  - -10.0
+  - -1.0
+  - 0.5
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  size:
+  - 1.0
+  - 1.0
+  - 1.0
+robot:
+  position:
+  - -6.0
+  - -6.0
+  - 0.0
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
