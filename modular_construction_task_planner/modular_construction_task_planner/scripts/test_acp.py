@@ -44,12 +44,13 @@ def test_acp(config_path: str = '', problem_name: str = '', vis: bool = True):
 if __name__ == "__main__":
     config_path = "src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/configs/"
     problems = [
-        'two_obj_real_col',
-        'two_obj_shadow_col',
-        'three_obj_all_real',
-        'three_obj_all_shadow',
-        'three_obj_real_shadow_diff',
-        'three_obj_real_shadow_same',
+        # 'two_obj_real_col',
+        # 'two_obj_shadow_col',
+        # 'three_obj_all_real',
+        # 'three_obj_all_shadow',
+        # 'three_obj_real_shadow_diff',
+        # 'three_obj_real_shadow_same',
+        'box'
     ]
 
     for problem_name in problems:
