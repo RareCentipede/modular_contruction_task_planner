@@ -1,8 +1,10 @@
+import os
 import time
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import random
 
 from tqdm import tqdm
 from copy import deepcopy
@@ -59,6 +61,73 @@ def parse_objects_to_blocks(objs: List[Object], pose_dict: Dict[str, Pose]) -> L
         blocks.append(block)
     return blocks
 
+def randomize_initial_staging(goal_data: Dict, workspace_limit: float = 15.0, grid_snap: float = 0.5, 
+                              safety_margin: float = 1.2, max_attempts: int = 2000) -> Dict:
+    """
+    Reads a goal configuration YAML, extracts the blocks, and randomizes their initial 
+    positions flat on the floor strictly within the -Y staging zone.
+    
+    Args:
+        goal_yaml_path: Path to the target structure file (e.g., 'goal.yaml').
+        workspace_limit: Maximum grid bounds along the X and Y axes.
+        grid_snap: Step resolution to round coordinates to (e.g., 0.5m increments).
+        safety_margin: Minimum clear center-to-center distance required between blocks to prevent overlap.
+        max_attempts: Loop ceiling before raising a placement saturation exception.
+    """
+    init_positions = {'robot': {
+        'position': [0.0, 0.0, 0.0],
+        'orientation': [0.0, 0.0, 0.0],
+        'size': [0.0, 0.0, 0.0]
+    }}
+
+    # Define bounds for the staging area floor
+    # We leave a 1.0m boundary buffer relative to the workspace limits so blocks don't clip walls
+    min_x, max_x = -workspace_limit + 1.0, workspace_limit - 1.0
+    min_y, max_y = -workspace_limit + 1.0, -1.0  # Strictly below the Y=0 construction border
+
+    # 2. Sequential placement loop with geometric collision checking
+    for block_name, block_attributes in goal_data.items():
+        size = block_attributes.get('size', [1.0, 1.0, 1.0])
+        z_baseline = size[2] / 2.0  # Center-of-mass elevation for a block resting flat on the ground
+
+        placed = False
+        attempts = 0
+
+        while not placed:
+            if attempts > max_attempts:
+                raise RuntimeError(
+                    f"Workspace saturation reached at '{block_name}'! "
+                    f"The staging zone is too packed. Increase your workspace_limit or reduce safety_margin."
+                )
+
+            # Generate random coordinates within the -Y staging domain
+            rand_x = round(random.uniform(min_x, max_x) / grid_snap) * grid_snap
+            rand_y = round(random.uniform(min_y, max_y) / grid_snap) * grid_snap
+            rand_yaw = random.uniform(0, 2 * np.pi)
+
+            # Intersection/Overlap test against previously committed staging nodes
+            collision = False
+            for existing_name, existing_data in init_positions.items():
+                ex, ey, _ = existing_data['position']
+                
+                # Check distance buffer on the flat ground plane
+                if abs(ex - rand_x) < safety_margin and abs(ey - rand_y) < safety_margin:
+                    collision = True
+                    break
+
+            # If the spot is clear, save it matching your schema
+            if not collision:
+                init_positions[block_name] = {
+                    'position': [float(rand_x), float(rand_y), float(z_baseline)],
+                    'orientation': [0.0, 0.0, float(rand_yaw)],
+                    'size': [float(i) for i in size]
+                }
+                placed = True
+
+            attempts += 1
+
+    return init_positions
+
 def test_planner(world: World, planner_type: PLANNER_TYPE, heuristic: HEURISTIC):
     # --- 1. Generate Random TAMP Configurations ---
     mb_cost_hist = []
@@ -109,12 +178,13 @@ def test_planner(world: World, planner_type: PLANNER_TYPE, heuristic: HEURISTIC)
 if __name__ == "__main__":
     config_path = "src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/configs/"
     problems = ['box', 'triangle', 'circle']
+    trials = 10
     # problems = ['box']
-    res_df_col = ['planner', 'heuristic', 'problem', 'est_cost', 'cost', 'states_explored', 'time_taken']
+    res_df_col = ['planner', 'heuristic', 'problem', 'trial_num', 'est_cost', 'cost', 'states_explored', 'time_taken']
     res_df = pd.DataFrame(columns=res_df_col)
     res_path = 'src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/results/'
 
-    mb_res_col = ['mb_type', 'problem', 'iter', 'cost']
+    mb_res_col = ['mb_type', 'problem', 'trial_num', 'iter', 'cost']
     mb_res_df = pd.DataFrame(columns=mb_res_col)
 
     settings = [
@@ -131,37 +201,39 @@ if __name__ == "__main__":
     mb_idx = 0
 
     for problem in problems:
-        with open(f"{config_path}/{problem}/init.yaml", "r") as f:
-            init_dict = safe_load(f)
         with open(f"{config_path}/{problem}/goal.yaml", "r") as f:
             goal_dict = safe_load(f)
-        world = parse_configs_to_world(init_dict, goal_dict)
-        original_world = deepcopy(world)
         est_costs = []
         full_costs = []
         states_explored_hist = []
         times = []
 
-        for planner_type, heuristic in tqdm(settings):
-            tqdm.write(f"\nTesting {planner_type.name} + {heuristic.name} with {problem} objects...")
-            results = test_planner(world, planner_type, heuristic)
-            est_cost, full_cost, states_explored, time_taken, mb_cost_hist = results
-            res_row = [planner_type.name, heuristic.name, problem, est_cost, full_cost, states_explored, time_taken]
-            res_df.loc[idx] = res_row
-            idx += 1
+        for trial in range(trials):
+            print(f"\n--- Trial {trial+1}/{trials} ---")
+            init_dict = randomize_initial_staging(goal_dict)
+            world = parse_configs_to_world(init_dict, goal_dict)
+            original_world = deepcopy(world)
 
-            if planner_type != PLANNER_TYPE.HEURISTIC:
-                for iter_num, cost in enumerate(mb_cost_hist):
-                    mb_res_row = [planner_type.name, problem, iter_num, cost]
-                    mb_res_df.loc[mb_idx] = mb_res_row
-                    mb_idx += 1
+            for planner_type, heuristic in tqdm(settings):
+                tqdm.write(f"\nTesting {planner_type.name} + {heuristic.name} with {problem} objects...")
+                results = test_planner(world, planner_type, heuristic)
+                est_cost, full_cost, states_explored, time_taken, mb_cost_hist = results
+                res_row = [planner_type.name, heuristic.name, problem, trial, est_cost, full_cost, states_explored, time_taken]
+                res_df.loc[idx] = res_row
+                idx += 1
 
-            world = deepcopy(original_world)
+                if planner_type != PLANNER_TYPE.HEURISTIC:
+                    for iter_num, cost in enumerate(mb_cost_hist):
+                        mb_res_row = [planner_type.name, problem, trial, iter_num, cost]
+                        mb_res_df.loc[mb_idx] = mb_res_row
+                        mb_idx += 1
 
-            if heuristic == HEURISTIC.ANTICIPATORY_ONCE or heuristic == HEURISTIC.ANTICIPATORY_ONCE_DISCOUNT:
-                # Reset world to original state for next planner test
-                shadow_boxes = spawn_shadow_boxes(world)
-                perform_cost_propagation(world, shadow_boxes)
+                world = deepcopy(original_world)
 
-    res_df.to_csv(res_path + 'planner_designed_structs.csv', index=False)
-    mb_res_df.to_csv(res_path + 'planner_mb_planner_designed_structs_costs.csv', index=False)
+                if heuristic == HEURISTIC.ANTICIPATORY_ONCE or heuristic == HEURISTIC.ANTICIPATORY_ONCE_DISCOUNT:
+                    # Reset world to original state for next planner test
+                    shadow_boxes = spawn_shadow_boxes(world)
+                    perform_cost_propagation(world, shadow_boxes)
+
+        res_df.to_csv(res_path + 'planner_designed_structs.csv', index=False)
+        mb_res_df.to_csv(res_path + 'planner_mb_planner_designed_structs_costs.csv', index=False)

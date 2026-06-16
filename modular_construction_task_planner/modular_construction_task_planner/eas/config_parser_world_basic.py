@@ -123,7 +123,7 @@ def assign_entities_variable_values_and_create_pose_dict(init_config: Dict, goal
     gnd_obj_entity = cast(Object, entities.get_entities('g'))
 
     # Parameterized distance: offset clear of the cube's geometric center (e.g., 1.5 meters)
-    approach_distance = 1.5
+    approach_distance = 0.5
 
     # --- Processing INITIAL CONFIGURATION (Pick Targets) ---
     for info, obj_entity, pos_entity in zip(init_config.values(), obj_entities[:-2], pos_entities[:-2]):
