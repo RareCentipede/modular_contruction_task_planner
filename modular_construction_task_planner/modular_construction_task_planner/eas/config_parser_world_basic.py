@@ -132,22 +132,22 @@ def assign_entities_variable_values_and_create_pose_dict(init_config: Dict, goal
         obj_entity.at.value = pos_entity.name
         obj_entity.on.value = gnd_obj_entity.name
         obj_entity.dim = info['size']
-
+    
         pos_entity.occupied_by.value = obj_entity.name
         pos_entity.on.value = gnd_pos_entity.name
         pos_entity.clear.value = False
 
         # Calculate base reachability targets and inward orientations on all four sides
         side_data = compute_side_positions_and_orientations(info['position'], info['orientation'], approach_distance)
-        
+
         pick_target_labels = []
         for side_name, data in side_data.items():
             target_key = f'{obj_entity.name}_pick_target_{side_name}'
-            
+
             # Use the calculated inward-facing orientation instead of the original block orientation
             pose_dict[target_key] = Pose(data['position'], data['orientation'])
             pick_target_labels.append(target_key)
-            
+
         obj_entity.reachable_from = pick_target_labels
 
         init_pos_vals.append(info['position'])
@@ -168,22 +168,22 @@ def assign_entities_variable_values_and_create_pose_dict(init_config: Dict, goal
             pose_dict[pos_entity.name] = pose
             pos_entity.clear.value = True
             pos_entity.on.value = gnd_pos_entity.name
-            
+
             if obj_name != "robot":
                 obj_entity = cast(Object, entities.get_entities(obj_name))
                 obj_entity.goal.value = pos_entity.name
-                
+
                 # Calculate placement approach base locations and inward orientations for the target
                 goal_side_data = compute_side_positions_and_orientations(info['position'], info['orientation'], approach_distance)
-                
+
                 place_target_labels = []
                 for side_name, data in goal_side_data.items():
                     target_key = f'{obj_entity.name}_place_target_{side_name}'
-                    
+
                     # Apply the adjusted look-at angle poses for the place configurations
                     pose_dict[target_key] = Pose(data['position'], data['orientation'])
                     place_target_labels.append(target_key)
-                    
+
                 obj_entity.placeable_from = place_target_labels
 
     return pose_dict

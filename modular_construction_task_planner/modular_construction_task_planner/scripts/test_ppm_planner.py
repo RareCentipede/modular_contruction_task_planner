@@ -177,8 +177,8 @@ def test_planner(world: World, planner_type: PLANNER_TYPE, heuristic: HEURISTIC)
 
 if __name__ == "__main__":
     config_path = "src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/configs/"
-    problems = ['box', 'triangle', 'circle']
-    trials = 10
+    problems = ['box', 'triangle', 'circle', 'house']
+    trials = 3
     # problems = ['box']
     res_df_col = ['planner', 'heuristic', 'problem', 'trial_num', 'est_cost', 'cost', 'states_explored', 'time_taken']
     res_df = pd.DataFrame(columns=res_df_col)

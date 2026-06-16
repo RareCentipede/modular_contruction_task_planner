@@ -102,13 +102,14 @@ def plot_joint_2d_layout(init_path: str, goal_path: str, workspace_limit: float 
     output_filename = "joint_workspace_2d_layout.pdf"
     print(f"2D joint plot successfully saved as a vector graphic: {output_filename}")
 
-    plt.savefig(f"plots/structured_scenarios/structured_scene_{problem_name}.pdf", bbox_inches='tight', dpi=300)
+    plt.savefig(f"new_plots/structured_scenarios/structured_scene_{problem_name}.pdf", bbox_inches='tight', dpi=300)
     # plt.show()
 
 if __name__ == "__main__":
     config_path = "src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/configs/"
-    problems = ['box', 'triangle', 'circle']
-    limits = [6.0, 6.0, 12.0]
+    # problems = ['box', 'triangle', 'circle']
+    problems = ['house']
+    limits = [12.0, 6.0, 12.0]
     for problem, limit in zip(problems, limits):
         plot_joint_2d_layout(
             init_path=f"{config_path}/{problem}/init.yaml",

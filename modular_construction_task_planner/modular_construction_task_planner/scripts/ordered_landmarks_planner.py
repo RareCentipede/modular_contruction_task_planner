@@ -69,9 +69,10 @@ class OrderedLandmarksPlanner:
         self.pick_positions = [pos for sublist in self.pick_positions for pos in sublist]
         self.place_positions = [b.placeable_from for b in blocks if b.goal.value]
         self.place_positions = [pos for sublist in self.place_positions for pos in sublist]
+        self.pp_map = {'front': 0, 'back': 1, 'left': 2, 'right': 3}
 
         self.num_potential_solutions = factorial(len(blocks)-2)
-        self.num_blocks = len(blocks)-1
+        self.num_blocks = len(blocks)
         self.blocks_to_place = self.num_blocks
         # print(f"Blocks: {[block.name for block in blocks]}")
         # print(f"Number of blocks: {len(blocks)-2}")
@@ -143,6 +144,10 @@ class OrderedLandmarksPlanner:
             action_name, action_params, cost, additional_properties = weighted_branch
             self.current_linked_state.branches_to_explore.remove(weighted_branch)
             tentative_cost = cost
+
+            if cost == float('inf'):
+                return None
+
             action = self.action_dict[action_name]
             # print(f"Executing: {action_name} with params {[str(param) + ': ' + str(ent.name) \
                 # for param, ent in action_params.items()]} and cost {cost}")
@@ -261,6 +266,8 @@ class OrderedLandmarksPlanner:
 
             # Accumulate tentative node path cost based on the current baseline
             tentative_cost = edge_cost
+            if edge_cost == float('inf'):
+                return None
 
             if self.goal_linked_state:
                 if self.monitor.should_stop(best_cost):
@@ -298,6 +305,10 @@ class OrderedLandmarksPlanner:
 
                 nav_cost = self.nav_cost_from_home_to_target(home_state, goal_state, lazy=lazy)
                 upper_bound = nav_cost
+                if nav_cost == float('inf'):
+                    self.backtrack()
+                    home_state = self.current_linked_state
+                    continue
 
                 if upper_bound < best_cost:
                     best_cost = upper_bound
@@ -489,16 +500,19 @@ class OrderedLandmarksPlanner:
                 obj_in_gripper = cast(str, self.robot.holding.value)
                 obj_entity_in_gripper = cast(Object, self.world.entities.get_entities(obj_in_gripper))
 
-                potential_target_pos_vals = obj_entity_in_gripper.placeable_from
-                for target_pos in potential_target_pos_vals:
-                    pos_entity = cast(PosEntity, self.world.entities.get_entities(target_pos))
-                    branch_params = {
-                        'robot': self.robot,
-                        'start_pose': current_pos_entity,
-                        'target_pose': pos_entity,
-                        'object': obj_entity_in_gripper
-                    }
-                    branches.append(branch_params)
+                action_from_parent = cast(Tuple, self.current_linked_state.parent)[1].action_from_parent
+                action_from_parent = cast(Tuple[str, Tuple[str, ...]], action_from_parent)
+                side = action_from_parent[1][2].split('_')[-1]
+                target_pos = obj_entity_in_gripper.placeable_from[self.pp_map[side]]
+                pos_entity = cast(PosEntity, self.world.entities.get_entities(target_pos))
+                # print(f"Pos entity: {pos_entity.name if pos_entity else 'None'}")
+                branch_params = {
+                    'robot': self.robot,
+                    'start_pose': current_pos_entity,
+                    'target_pose': pos_entity,
+                    'object': obj_entity_in_gripper
+                }
+                branches.append(branch_params)
 
             case _:
                 pass
@@ -609,6 +623,8 @@ class OrderedLandmarksPlanner:
             for obj in objs:
                 obj.propagated_cost = 0.0
             perform_cost_propagation(self.world, self.shadow_boxes)
+        elif heuristic == HEURISTIC.ANTICIPATORY_ONCE_DISCOUNT:
+            self.blocks_to_place -= 1
 
         for transit_branch in branches:
             obj_entity = cast(Object, transit_branch['object'])
@@ -617,8 +633,8 @@ class OrderedLandmarksPlanner:
             transit_start_pos = self.world.pose_dict[transit_start_pos_name].position
             transit_target_pos = self.world.pose_dict[transit_target_pos_name].position
 
-            goal_pos_name = obj_entity.goal.value
-            goal_pos_name = cast(str, goal_pos_name)
+            side = transit_target_pos_name.split('_')[-1]
+            goal_pos_name = f"{obj_entity.name}_place_target_{side}"
             goal_pos = self.world.pose_dict[goal_pos_name].position
 
             if stable_check:
@@ -656,8 +672,8 @@ class OrderedLandmarksPlanner:
 
                     path_to_transport = self.gg.plan(transit_target_pos[:2], goal_pos[:2])
                     self.gg.update_block_move(obj_pos[:2], OCCUPANCY.OCCUPIED)
-                    if path_to_transit.size == 0:
-                        continue
+                    if path_to_transit.size == 0 or path_to_transport.size == 0:
+                        cost = float('inf')
                     else:
                         transit_path_length = np.sum(np.linalg.norm(np.diff(path_to_transit, axis=0), axis=1))
                         transport_path_length = np.sum(np.linalg.norm(np.diff(path_to_transport, axis=0), axis=1))
@@ -667,7 +683,6 @@ class OrderedLandmarksPlanner:
                     cost += np.linalg.norm(np.array(transit_target_pos) - np.array(goal_pos)).item()
                     if heuristic == HEURISTIC.ANTICIPATORY_ONCE_DISCOUNT:
                         cost += obj_entity.propagated_cost * (self.blocks_to_place/self.num_blocks)  # Apply discount factor
-                        self.blocks_to_place -= 1
                     else:
                         cost += obj_entity.propagated_cost
                 case _:
@@ -765,12 +780,8 @@ class OrderedLandmarksPlanner:
             # )
 
             if parent is not None:
-                self.current_linked_state = parent
-                self.current_cost = parent.cost
-                self.current_state = self.current_linked_state.state
-
                 if self.gg:
-                    action_from_parent = parent.action_from_parent
+                    action_from_parent = self.current_linked_state.action_from_parent
                     if action_from_parent is None:
                         # print(f"No action from parent for linked state with id {parent.state_id}, cannot update grid graph.")
                         break
@@ -783,6 +794,9 @@ class OrderedLandmarksPlanner:
                         self.gg.update_block_move(obj_pos, OCCUPANCY.FREE)
                         self.blocks_to_place += 1
 
+                self.current_linked_state = parent
+                self.current_cost = parent.cost
+                self.current_state = self.current_linked_state.state
                 # print(
                 #     f"Backtracking to state id: {self.current_linked_state.state_id},"
                 #     f" with {len(self.current_linked_state.branches_to_explore)} branches to explore."
@@ -927,6 +941,7 @@ class OrderedLandmarksPlanner:
                     path = self.gg.plan(start_pos, target_pos)
                     if path.size == 0:
                         print(f"No path found for action {action_name} from {start_pos} to {target_pos}.")
+                        return np.nan
                     else:
                         path_length = np.sum(np.linalg.norm(np.diff(path, axis=0), axis=1))
                         pp_cost += path_length
@@ -1035,36 +1050,39 @@ def perform_cost_propagation(world: World, shadow_boxes: Dict[str, ShadowBox], v
 
     for obj in available_entities:
         obj = cast(Object, obj)
-        obj_pos = np.array(world.pose_dict[obj.at.value].position) # type: ignore
-        goal_pos = np.array(world.pose_dict[obj.goal.value].position) # type: ignore
-        obj_to_goal_vec = goal_pos - obj_pos
-        dists, scalings = compute_dists_from_points_to_vector(entity_positions, obj_to_goal_vec, obj_pos)
 
-        dists[(scalings < 0) | (scalings > 1)] = -1 # Set a false value to filter out irrelevant entities in the next step
+        for pick_pos_id, place_pos_id in zip(obj.reachable_from, obj.placeable_from):
+            pick_pos = np.array(world.pose_dict[pick_pos_id].position)
+            place_pos = np.array(world.pose_dict[place_pos_id].position)
+            pick_to_place_vec = place_pos - pick_pos
+            dists, scalings = compute_dists_from_points_to_vector(entity_positions, pick_to_place_vec, pick_pos)
 
-        for i, dist in enumerate(dists):
-            if dist < 0:
-                continue  # Skip irrelevant entities
+            dists[(scalings < 0) | (scalings > 1)] = -1 # Set a false value to filter out irrelevant entities in the next step
 
-            if dist < (OBJ_WIDTH/2 + ROBOT_WIDTH):
-                nusance = list(all_entities.values())[i]
-                if nusance.name == obj.name or nusance.name == obj.name + "_shadow_box":
-                    continue  # Skip self and own shadow box
+            for i, dist in enumerate(dists):
+                if dist < 0:
+                    continue  # Skip irrelevant entities
 
-                if verbose:
-                    print(f"Object '{obj.name}' has a nusance '{nusance.name}' at index {i} with distance {dist:.2f} to its path.")
-                if nusance.name in shadow_boxes_names:
-                    shadow_nusnace = all_entities[nusance.name]
-                    shadow_nusnace = cast(ShadowBox, shadow_nusnace)
-                    host_obj_name = shadow_nusnace.host.value
-                    host_obj = world.entities.get_entities(host_obj_name) # type: ignore
-                    host_obj = cast(Object, host_obj)
-                    host_obj.propagated_cost += 1 - (dist / (OBJ_WIDTH/2 + ROBOT_WIDTH))
-                else:
-                    host_obj_name = nusance.name
-                    host_obj = world.entities.get_entities(host_obj_name) # type: ignore
-                    host_obj = cast(Object, host_obj)
-                    host_obj.propagated_cost -= 1 - (dist / (OBJ_WIDTH/2 + ROBOT_WIDTH))
+                if dist < (OBJ_WIDTH/2 + ROBOT_WIDTH):
+                    nusance = list(all_entities.values())[i]
+                    if nusance.name == obj.name or nusance.name == obj.name + "_shadow_box":
+                        continue  # Skip self and own shadow box
+
+                    if verbose:
+                        print(f"Object '{obj.name}' has a nusance '{nusance.name}' at index {i} with distance {dist:.2f}"
+                              f" to its path.")
+                    if nusance.name in shadow_boxes_names:
+                        shadow_nusnace = all_entities[nusance.name]
+                        shadow_nusnace = cast(ShadowBox, shadow_nusnace)
+                        host_obj_name = shadow_nusnace.host.value
+                        host_obj = world.entities.get_entities(host_obj_name) # type: ignore
+                        host_obj = cast(Object, host_obj)
+                        host_obj.propagated_cost += 1 - (dist / (np.sqrt(2)*OBJ_WIDTH/2 + ROBOT_WIDTH))
+                    else:
+                        host_obj_name = nusance.name
+                        host_obj = world.entities.get_entities(host_obj_name) # type: ignore
+                        host_obj = cast(Object, host_obj)
+                        host_obj.propagated_cost -= 1 - (dist / (np.sqrt(2)*OBJ_WIDTH/2 + ROBOT_WIDTH))
 
 def extract_available_positions_from_world(world: World, shadow_boxes: Dict[str, ShadowBox]) -> \
     Tuple[List[Object], Dict[str, Object], List[Tuple[float, float]]]:

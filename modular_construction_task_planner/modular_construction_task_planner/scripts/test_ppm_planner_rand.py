@@ -79,21 +79,21 @@ def test_planner(world: World, planner_type: PLANNER_TYPE, heuristic: HEURISTIC)
     planner = OrderedLandmarksPlanner(world, action_dict, grid_graph)
 
     start_time = time.perf_counter_ns()
-    try:
-        match planner_type:
-            case PLANNER_TYPE.MULTI_BOUND:
-                goal_state = planner.run_multi_bound_planner()
-                mb_cost_hist = planner.mb_costs
-            case PLANNER_TYPE.MULTI_BOUND_G:
-                goal_state = planner.run_multi_bound_planner_g()
-                mb_cost_hist = planner.mb_costs
-            case PLANNER_TYPE.HEURISTIC:
-                goal_state = planner.run_heuristic_planner(heuristic)
-            case _:
-                raise ValueError("Invalid planner type specified.")
-    except Exception as e:
-        print(f"Planner encountered an error: {e}")
-        return np.nan, np.nan, np.nan, np.nan, mb_cost_hist
+    # try:
+    match planner_type:
+        case PLANNER_TYPE.MULTI_BOUND:
+            goal_state = planner.run_multi_bound_planner()
+            mb_cost_hist = planner.mb_costs
+        case PLANNER_TYPE.MULTI_BOUND_G:
+            goal_state = planner.run_multi_bound_planner_g()
+            mb_cost_hist = planner.mb_costs
+        case PLANNER_TYPE.HEURISTIC:
+            goal_state = planner.run_heuristic_planner(heuristic)
+        case _:
+            raise ValueError("Invalid planner type specified.")
+    # except Exception as e:
+        # print(f"Planner encountered an error: {e}")
+        # return np.nan, np.nan, np.nan, np.nan, mb_cost_hist
 
     end_time = time.perf_counter_ns()
     time_taken = (end_time - start_time) / 1e9  # Convert
@@ -107,8 +107,8 @@ def test_planner(world: World, planner_type: PLANNER_TYPE, heuristic: HEURISTIC)
     return cost, full_cost, planner.state_counter, time_taken, mb_cost_hist
 
 if __name__ == "__main__":
-    num_objects_list = [10, 30, 50, 100, 150, 200, 250, 300]
-    num_trials = 10
+    num_objects_list = [10, 30, 50, 100,] #150, 200, 250, 300]
+    num_trials = 3
     res_df_col = ['planner', 'heuristic', 'num_objects', 'trial_num', 'est_cost', 'cost', 'states_explored', 'time_taken']
     res_df = pd.DataFrame(columns=res_df_col)
     res_path = 'src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/results/'
