@@ -154,7 +154,10 @@ def test_planner(world: World, planner_type: PLANNER_TYPE, heuristic: HEURISTIC)
                 goal_state = planner.run_multi_bound_planner()
                 mb_cost_hist = planner.mb_costs
             case PLANNER_TYPE.MULTI_BOUND_G:
-                goal_state = planner.run_multi_bound_planner_g()
+                if heuristic == HEURISTIC.ANTICIPATORY_ONCE:
+                    goal_state = planner.run_multi_bound_planner_g(low_h=HEURISTIC.ANTICIPATORY_ONCE)
+                else:
+                    goal_state = planner.run_multi_bound_planner_g()
                 mb_cost_hist = planner.mb_costs
             case PLANNER_TYPE.HEURISTIC:
                 goal_state = planner.run_heuristic_planner(heuristic)
@@ -177,8 +180,8 @@ def test_planner(world: World, planner_type: PLANNER_TYPE, heuristic: HEURISTIC)
 
 if __name__ == "__main__":
     config_path = "src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/configs/"
-    problems = ['box', 'triangle', 'circle', 'house']
-    trials = 3
+    problems = ['box', 'circle', 'house']
+    trials = 4
     # problems = ['box']
     res_df_col = ['planner', 'heuristic', 'problem', 'trial_num', 'est_cost', 'cost', 'states_explored', 'time_taken']
     res_df = pd.DataFrame(columns=res_df_col)
@@ -189,12 +192,13 @@ if __name__ == "__main__":
 
     settings = [
             (PLANNER_TYPE.HEURISTIC, HEURISTIC.LAZY),
-            (PLANNER_TYPE.HEURISTIC, HEURISTIC.DILIGENT),
+            # (PLANNER_TYPE.HEURISTIC, HEURISTIC.DILIGENT),
             (PLANNER_TYPE.HEURISTIC, HEURISTIC.ANTICIPATORY),
             (PLANNER_TYPE.HEURISTIC, HEURISTIC.ANTICIPATORY_ONCE),
             (PLANNER_TYPE.HEURISTIC, HEURISTIC.ANTICIPATORY_ONCE_DISCOUNT),
             # (PLANNER_TYPE.MULTI_BOUND, HEURISTIC.MIXED),
-            (PLANNER_TYPE.MULTI_BOUND_G, HEURISTIC.MIXED_G)
+            (PLANNER_TYPE.MULTI_BOUND_G, HEURISTIC.MIXED_G),
+            (PLANNER_TYPE.MULTI_BOUND_G, HEURISTIC.ANTICIPATORY_ONCE),
         ]
 
     idx = 0

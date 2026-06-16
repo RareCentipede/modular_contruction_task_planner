@@ -622,7 +622,7 @@ class OrderedLandmarksPlanner:
             objs = cast(List[Object], objs)
             for obj in objs:
                 obj.propagated_cost = 0.0
-            perform_cost_propagation(self.world, self.shadow_boxes)
+            propagated_cost_map = perform_cost_propagation(self.world, self.shadow_boxes)
         elif heuristic == HEURISTIC.ANTICIPATORY_ONCE_DISCOUNT:
             self.blocks_to_place -= 1
 
@@ -678,13 +678,22 @@ class OrderedLandmarksPlanner:
                         transit_path_length = np.sum(np.linalg.norm(np.diff(path_to_transit, axis=0), axis=1))
                         transport_path_length = np.sum(np.linalg.norm(np.diff(path_to_transport, axis=0), axis=1))
                         cost = transit_path_length.item() + transport_path_length.item()
-                case HEURISTIC.ANTICIPATORY | HEURISTIC.ANTICIPATORY_ONCE | HEURISTIC.ANTICIPATORY_ONCE_DISCOUNT:
+                case HEURISTIC.ANTICIPATORY:
                     cost = np.linalg.norm(np.array(transit_start_pos) - np.array(transit_target_pos)).item()
                     cost += np.linalg.norm(np.array(transit_target_pos) - np.array(goal_pos)).item()
+
+                    # Safely extract the isolated look-ahead cost for this candidate object
+                    cost += propagated_cost_map.get(obj_entity.name, 0.0)
+                case HEURISTIC.ANTICIPATORY_ONCE | HEURISTIC.ANTICIPATORY_ONCE_DISCOUNT:
+                    cost = np.linalg.norm(np.array(transit_start_pos) - np.array(transit_target_pos)).item()
+                    cost += np.linalg.norm(np.array(transit_target_pos) - np.array(goal_pos)).item()
+
+                    # Fallback safely to the object field if using pre-cached early runs
+                    cost_val = getattr(obj_entity, 'propagated_cost', 0.0)
                     if heuristic == HEURISTIC.ANTICIPATORY_ONCE_DISCOUNT:
-                        cost += obj_entity.propagated_cost * (self.blocks_to_place/self.num_blocks)  # Apply discount factor
+                        cost += cost_val * (self.blocks_to_place / self.num_blocks)
                     else:
-                        cost += obj_entity.propagated_cost
+                        cost += cost_val
                 case _:
                     print(f"Unknown heuristic: {heuristic}, defaulting to lazy.")
                     cost = np.linalg.norm(np.array(transit_start_pos) - np.array(transit_target_pos)).item()
@@ -692,6 +701,9 @@ class OrderedLandmarksPlanner:
 
             cost += self.current_linked_state.cost
             # print(f"cost: {cost}, current cost: {self.current_linked_state.cost}, heuristic cost: {cost - self.current_linked_state.cost}")
+            if cost == float('inf'):
+                continue
+
             evaluated_branches.append((action_name, transit_branch, cost, additional_properties))
 
         return evaluated_branches
@@ -1043,46 +1055,56 @@ def spawn_shadow_boxes(world: World) -> Dict[str, ShadowBox]:
 
     return shadow_boxes
 
-def perform_cost_propagation(world: World, shadow_boxes: Dict[str, ShadowBox], verbose: bool = False) -> None:
+def perform_cost_propagation(world: World, shadow_boxes: Dict[str, ShadowBox], verbose: bool = False) -> Dict[str, float]:
+    """
+    Computes look-ahead hindrance costs safely isolated within a temporary dictionary.
+    Returns: Dict[str, float] mapping block_name -> accumulated_hindrance_cost
+    """
     available_entities, all_entities, entity_positions = extract_available_positions_from_world(world, shadow_boxes)
     entity_positions = np.array(entity_positions)
     shadow_boxes_names = [sb.name for sb in shadow_boxes.values()]
+    
+    # Initialize an isolated scoring tracking container
+    propagated_costs = {obj.name: 0.0 for obj in available_entities}
 
     for obj in available_entities:
         obj = cast(Object, obj)
-
+        
+        # Track costs specific to this block's paths
+        path_costs = 0.0
+        
         for pick_pos_id, place_pos_id in zip(obj.reachable_from, obj.placeable_from):
             pick_pos = np.array(world.pose_dict[pick_pos_id].position)
             place_pos = np.array(world.pose_dict[place_pos_id].position)
             pick_to_place_vec = place_pos - pick_pos
             dists, scalings = compute_dists_from_points_to_vector(entity_positions, pick_to_place_vec, pick_pos)
 
-            dists[(scalings < 0) | (scalings > 1)] = -1 # Set a false value to filter out irrelevant entities in the next step
+            dists[(scalings < 0) | (scalings > 1)] = -1 
 
             for i, dist in enumerate(dists):
                 if dist < 0:
-                    continue  # Skip irrelevant entities
+                    continue  
 
                 if dist < (OBJ_WIDTH/2 + ROBOT_WIDTH):
                     nusance = list(all_entities.values())[i]
                     if nusance.name == obj.name or nusance.name == obj.name + "_shadow_box":
-                        continue  # Skip self and own shadow box
+                        continue  
 
-                    if verbose:
-                        print(f"Object '{obj.name}' has a nusance '{nusance.name}' at index {i} with distance {dist:.2f}"
-                              f" to its path.")
+                    # Normalize the obstruction penalty between 0.0 and 1.0
+                    denom = (np.sqrt(2) * OBJ_WIDTH / 2 + ROBOT_WIDTH)
+                    penalty = 1.0 - (dist / denom)
+                    
                     if nusance.name in shadow_boxes_names:
-                        shadow_nusnace = all_entities[nusance.name]
-                        shadow_nusnace = cast(ShadowBox, shadow_nusnace)
-                        host_obj_name = shadow_nusnace.host.value
-                        host_obj = world.entities.get_entities(host_obj_name) # type: ignore
-                        host_obj = cast(Object, host_obj)
-                        host_obj.propagated_cost += 1 - (dist / (np.sqrt(2)*OBJ_WIDTH/2 + ROBOT_WIDTH))
+                        shadow_nusance = cast(ShadowBox, all_entities[nusance.name])
+                        host_name = shadow_nusance.host.value
+                        if host_name in propagated_costs:
+                            propagated_costs[host_name] += penalty
                     else:
-                        host_obj_name = nusance.name
-                        host_obj = world.entities.get_entities(host_obj_name) # type: ignore
-                        host_obj = cast(Object, host_obj)
-                        host_obj.propagated_cost -= 1 - (dist / (np.sqrt(2)*OBJ_WIDTH/2 + ROBOT_WIDTH))
+                        host_name = nusance.name
+                        if host_name in propagated_costs:
+                            propagated_costs[host_name] -= penalty
+
+    return propagated_costs
 
 def extract_available_positions_from_world(world: World, shadow_boxes: Dict[str, ShadowBox]) -> \
     Tuple[List[Object], Dict[str, Object], List[Tuple[float, float]]]:

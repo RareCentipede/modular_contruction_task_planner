@@ -107,7 +107,7 @@ def test_planner(world: World, planner_type: PLANNER_TYPE, heuristic: HEURISTIC)
     return cost, full_cost, planner.state_counter, time_taken, mb_cost_hist
 
 if __name__ == "__main__":
-    num_objects_list = [10, 30, 50, 100,] #150, 200, 250, 300]
+    num_objects_list = [10, 30, 50, 100, 150, 200, 250, 300]
     num_trials = 3
     res_df_col = ['planner', 'heuristic', 'num_objects', 'trial_num', 'est_cost', 'cost', 'states_explored', 'time_taken']
     res_df = pd.DataFrame(columns=res_df_col)
