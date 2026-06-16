@@ -142,7 +142,7 @@ class OrderedLandmarksPlanner:
             weighted_branch = min(self.current_linked_state.branches_to_explore, key=lambda x: x[2])
             action_name, action_params, cost, additional_properties = weighted_branch
             self.current_linked_state.branches_to_explore.remove(weighted_branch)
-            self.current_cost += cost
+            tentative_cost = cost
             action = self.action_dict[action_name]
             # print(f"Executing: {action_name} with params {[str(param) + ': ' + str(ent.name) \
                 # for param, ent in action_params.items()]} and cost {cost}")
@@ -156,6 +156,7 @@ class OrderedLandmarksPlanner:
                     self.gg.update_block_move(obj_pos, OCCUPANCY.OCCUPIED)
 
             self.world.update_state()
+            self.current_cost = tentative_cost
             self.generate_new_linked_state(action_name, action_params, self.current_cost, additional_properties)
 
             if self.world.goal_reached:
