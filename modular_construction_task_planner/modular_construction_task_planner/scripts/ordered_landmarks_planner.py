@@ -439,7 +439,6 @@ class OrderedLandmarksPlanner:
         robot_pos = cast(str, robot_pos)
         current_pos_entity = self.world.entities.get_entities(robot_pos)
         current_pos_entity = cast(PosEntity, current_pos_entity)
-        # print(f"Defining branches for action: {action_name} at robot position: {robot_pos}")
 
         match action_name:
             case "pick":
@@ -477,6 +476,7 @@ class OrderedLandmarksPlanner:
                 for potential_target_pos_sublist, potential_obj in zip(potential_target_pos_vals, potential_target_objs):
                     for target_pos in potential_target_pos_sublist:
                         pos_entity = cast(PosEntity, self.world.entities.get_entities(target_pos))
+                        # print(f"Pos entity: {pos_entity.name if pos_entity else 'None'} for potential target object {potential_obj.name} at {potential_obj.at.value}")
                         branch_params = {
                             'robot': self.robot,
                             'start_pose': current_pos_entity,
@@ -488,17 +488,17 @@ class OrderedLandmarksPlanner:
             case "transport":
                 obj_in_gripper = cast(str, self.robot.holding.value)
                 obj_entity_in_gripper = cast(Object, self.world.entities.get_entities(obj_in_gripper))
-                pose_num = robot_pos[-1]
-                place_pos_val = f"{obj_in_gripper}_place_target{pose_num}"
-                placeable_pos_entity = cast(PosEntity, self.world.entities.get_entities(place_pos_val))
 
-                branch_params = {
-                    'robot': self.robot,
-                    'start_pose': current_pos_entity,
-                    'target_pose': placeable_pos_entity,
-                    'object': obj_entity_in_gripper
-                }
-                branches.append(branch_params)
+                potential_target_pos_vals = obj_entity_in_gripper.placeable_from
+                for target_pos in potential_target_pos_vals:
+                    pos_entity = cast(PosEntity, self.world.entities.get_entities(target_pos))
+                    branch_params = {
+                        'robot': self.robot,
+                        'start_pose': current_pos_entity,
+                        'target_pose': pos_entity,
+                        'object': obj_entity_in_gripper
+                    }
+                    branches.append(branch_params)
 
             case _:
                 pass

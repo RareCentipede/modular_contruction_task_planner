@@ -44,36 +44,39 @@ def perform_cost_propagation(world: World, shadow_boxes: Dict[str, ShadowBox], v
 
     for obj in available_entities:
         obj = cast(Object, obj)
-        obj_pos = np.array(world.pose_dict[obj.at.value].position) # type: ignore
-        goal_pos = np.array(world.pose_dict[obj.goal.value].position) # type: ignore
-        obj_to_goal_vec = goal_pos - obj_pos
-        dists, scalings = compute_dists_from_points_to_vector(entity_positions, obj_to_goal_vec, obj_pos)
 
-        dists[(scalings < 0) | (scalings > 1)] = -1 # Set a false value to filter out irrelevant entities in the next step
+        for pick_pos_id, place_pos_id in zip(obj.reachable_from, obj.placeable_from):
+            pick_pos = np.array(world.pose_dict[pick_pos_id].position)
+            place_pos = np.array(world.pose_dict[place_pos_id].position)
+            pick_to_place_vec = place_pos - pick_pos
+            dists, scalings = compute_dists_from_points_to_vector(entity_positions, pick_to_place_vec, pick_pos)
 
-        for i, dist in enumerate(dists):
-            if dist < 0:
-                continue  # Skip irrelevant entities
+            dists[(scalings < 0) | (scalings > 1)] = -1 # Set a false value to filter out irrelevant entities in the next step
 
-            if dist < (OBJ_WIDTH/2 + ROBOT_WIDTH):
-                nusance = list(all_entities.values())[i]
-                if nusance.name == obj.name or nusance.name == obj.name + "_shadow_box":
-                    continue  # Skip self and own shadow box
+            for i, dist in enumerate(dists):
+                if dist < 0:
+                    continue  # Skip irrelevant entities
 
-                if verbose:
-                    print(f"Object '{obj.name}' has a nusance '{nusance.name}' at index {i} with distance {dist:.2f} to its path.")
-                if nusance.name in shadow_boxes_names:
-                    shadow_nusnace = all_entities[nusance.name]
-                    shadow_nusnace = cast(ShadowBox, shadow_nusnace)
-                    host_obj_name = shadow_nusnace.host.value
-                    host_obj = world.entities.get_entities(host_obj_name) # type: ignore
-                    host_obj = cast(Object, host_obj)
-                    host_obj.propagated_cost += 1 - (dist / (np.sqrt(2)*OBJ_WIDTH/2 + ROBOT_WIDTH))
-                else:
-                    host_obj_name = nusance.name
-                    host_obj = world.entities.get_entities(host_obj_name) # type: ignore
-                    host_obj = cast(Object, host_obj)
-                    host_obj.propagated_cost -= 1 - (dist / (np.sqrt(2)*OBJ_WIDTH/2 + ROBOT_WIDTH))
+                if dist < (OBJ_WIDTH/2 + ROBOT_WIDTH):
+                    nusance = list(all_entities.values())[i]
+                    if nusance.name == obj.name or nusance.name == obj.name + "_shadow_box":
+                        continue  # Skip self and own shadow box
+
+                    if verbose:
+                        print(f"Object '{obj.name}' has a nusance '{nusance.name}' at index {i} with distance {dist:.2f}"
+                              f" to its path.")
+                    if nusance.name in shadow_boxes_names:
+                        shadow_nusnace = all_entities[nusance.name]
+                        shadow_nusnace = cast(ShadowBox, shadow_nusnace)
+                        host_obj_name = shadow_nusnace.host.value
+                        host_obj = world.entities.get_entities(host_obj_name) # type: ignore
+                        host_obj = cast(Object, host_obj)
+                        host_obj.propagated_cost += 1 - (dist / (np.sqrt(2)*OBJ_WIDTH/2 + ROBOT_WIDTH))
+                    else:
+                        host_obj_name = nusance.name
+                        host_obj = world.entities.get_entities(host_obj_name) # type: ignore
+                        host_obj = cast(Object, host_obj)
+                        host_obj.propagated_cost -= 1 - (dist / (np.sqrt(2)*OBJ_WIDTH/2 + ROBOT_WIDTH))
 
 def extract_available_positions_from_world(world: World, shadow_boxes: Dict[str, ShadowBox]) -> \
     Tuple[List[Object], Dict[str, Object], List[Tuple[float, float]]]:
