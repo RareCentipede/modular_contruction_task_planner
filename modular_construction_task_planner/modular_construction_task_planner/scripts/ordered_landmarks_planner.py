@@ -503,7 +503,12 @@ class OrderedLandmarksPlanner:
                 action_from_parent = cast(Tuple, self.current_linked_state.parent)[1].action_from_parent
                 action_from_parent = cast(Tuple[str, Tuple[str, ...]], action_from_parent)
                 side = action_from_parent[1][2].split('_')[-1]
-                target_pos = obj_entity_in_gripper.placeable_from[self.pp_map[side]]
+
+                if side not in self.pp_map:
+                    place_pos_id = current_pos_entity.name[-1]
+                    target_pos = f"{obj_entity_in_gripper.name}_place_target{place_pos_id}"
+                else:
+                    target_pos = obj_entity_in_gripper.placeable_from[self.pp_map[side]]
                 pos_entity = cast(PosEntity, self.world.entities.get_entities(target_pos))
                 # print(f"Pos entity: {pos_entity.name if pos_entity else 'None'}")
                 branch_params = {
@@ -634,7 +639,11 @@ class OrderedLandmarksPlanner:
             transit_target_pos = self.world.pose_dict[transit_target_pos_name].position
 
             side = transit_target_pos_name.split('_')[-1]
-            goal_pos_name = f"{obj_entity.name}_place_target_{side}"
+
+            if side not in ['front', 'back', 'left', 'right']:
+                goal_pos_name = f"{obj_entity.name}_place_{side}"
+            else:
+                goal_pos_name = f"{obj_entity.name}_place_target_{side}"
             goal_pos = self.world.pose_dict[goal_pos_name].position
 
             if stable_check:
@@ -1063,21 +1072,27 @@ def perform_cost_propagation(world: World, shadow_boxes: Dict[str, ShadowBox], v
     available_entities, all_entities, entity_positions = extract_available_positions_from_world(world, shadow_boxes)
     entity_positions = np.array(entity_positions)
     shadow_boxes_names = [sb.name for sb in shadow_boxes.values()]
-    
+
     # Initialize an isolated scoring tracking container
     propagated_costs = {obj.name: 0.0 for obj in available_entities}
 
     for obj in available_entities:
         obj = cast(Object, obj)
-        
+
         # Track costs specific to this block's paths
         path_costs = 0.0
-        
+
         for pick_pos_id, place_pos_id in zip(obj.reachable_from, obj.placeable_from):
             pick_pos = np.array(world.pose_dict[pick_pos_id].position)
             place_pos = np.array(world.pose_dict[place_pos_id].position)
             pick_to_place_vec = place_pos - pick_pos
-            dists, scalings = compute_dists_from_points_to_vector(entity_positions, pick_to_place_vec, pick_pos)
+
+            ppu = pick_to_place_vec / np.linalg.norm(pick_to_place_vec)
+            extended_pick_pos = pick_pos - ppu * (np.sqrt(2) * OBJ_WIDTH / 2 + ROBOT_WIDTH)
+            extended_place_pos = place_pos + ppu * (np.sqrt(2) * OBJ_WIDTH / 2 + ROBOT_WIDTH)
+            extended_vec = extended_place_pos - extended_pick_pos
+
+            dists, scalings = compute_dists_from_points_to_vector(entity_positions, extended_vec, extended_pick_pos)
 
             dists[(scalings < 0) | (scalings > 1)] = -1 
 
@@ -1093,7 +1108,7 @@ def perform_cost_propagation(world: World, shadow_boxes: Dict[str, ShadowBox], v
                     # Normalize the obstruction penalty between 0.0 and 1.0
                     denom = (np.sqrt(2) * OBJ_WIDTH / 2 + ROBOT_WIDTH)
                     penalty = 1.0 - (dist / denom)
-                    
+
                     if nusance.name in shadow_boxes_names:
                         shadow_nusance = cast(ShadowBox, all_entities[nusance.name])
                         host_name = shadow_nusance.host.value

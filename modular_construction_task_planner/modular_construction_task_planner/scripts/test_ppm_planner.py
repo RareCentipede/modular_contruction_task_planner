@@ -144,7 +144,7 @@ def test_planner(world: World, planner_type: PLANNER_TYPE, heuristic: HEURISTIC)
     blocks = parse_objects_to_blocks(obj_list, world.pose_dict)
     block_size = 1.0
 
-    grid_graph = GridGraph(blocks, block_size)
+    grid_graph = GridGraph(blocks, block_size, margin=0.5)
     planner = OrderedLandmarksPlanner(world, action_dict, grid_graph)
 
     start_time = time.perf_counter_ns()
@@ -181,7 +181,7 @@ def test_planner(world: World, planner_type: PLANNER_TYPE, heuristic: HEURISTIC)
 if __name__ == "__main__":
     config_path = "src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/configs/"
     problems = ['box', 'circle', 'house']
-    trials = 4
+    trials = 1
     # problems = ['box']
     res_df_col = ['planner', 'heuristic', 'problem', 'trial_num', 'est_cost', 'cost', 'states_explored', 'time_taken']
     res_df = pd.DataFrame(columns=res_df_col)

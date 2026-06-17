@@ -32,8 +32,8 @@ class ModularConstructionTaskPlanner(Node):
         }
         self.gg: GridGraph | None = None
 
-        self.h = [HEURISTIC.LAZY, HEURISTIC.SIMPLE_COLLISION, HEURISTIC.DILIGENT]
-        self.planner_types = ['greedy', 'multi_bound']
+        self.h = [HEURISTIC.LAZY]
+        self.planner_types = ['greedy']
         self.columns = ['no.blocks', 'planner_type', 'heuristic', 'planning_time', 'plan_cost', 'pp_cost']
         self.res_path = 'src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/results/'
 
@@ -46,7 +46,7 @@ class ModularConstructionTaskPlanner(Node):
                 self.gg = GridGraph(list(request.blocks), block_size=0.3)
 
                 # for entity in world.entities.entities:
-                    # self.get_logger().info(f"Entity: {entity.name}, State: {entity.state}")
+                #     self.get_logger().info(f"Entity: {entity.name}, State: {entity.state}")
                 # self.get_logger().info(f"Pose dict names: {list(world.pose_dict.keys())}")
             else:
                 self.get_logger().info("Parsing configuration files to create world representation.")
@@ -97,15 +97,15 @@ class ModularConstructionTaskPlanner(Node):
                         mb_idx += 1
                     mb_costs_pd.to_csv(f"{self.res_path}forecast/intermediate/{len(blocks)-2}_{planner_type}_{heuristic}_mb_costs.csv", index=False)
 
-        planner_type = 'multi_bound'
-        world = deepcopy(original_world)
-        gg = deepcopy(original_gg)
-        pp_cost = float('inf')
-        self.get_logger().info(f"Running {planner_type} planner with {heuristic} heuristic...")
-        start_time = time.perf_counter_ns()
-        plan, cost, mb_costs = self.run_planner_type_heuristic(world, planner_type, heuristic, gg, mixed=True)
-        end_time = time.perf_counter_ns()
-        planning_time = end_time - start_time
+        # planner_type = 'multi_bound'
+        # world = deepcopy(original_world)
+        # gg = deepcopy(original_gg)
+        # pp_cost = float('inf')
+        # self.get_logger().info(f"Running {planner_type} planner with {heuristic} heuristic...")
+        # start_time = time.perf_counter_ns()
+        # plan, cost, mb_costs = self.run_planner_type_heuristic(world, planner_type, heuristic, gg, mixed=True)
+        # end_time = time.perf_counter_ns()
+        # planning_time = end_time - start_time
         if plan:
             self.get_logger().info(f"Plan found with {planner_type} planner and {heuristic} heuristic. Cost: {cost:.2f}. Time: {planning_time/1e9} seconds.")
             pp_cost = self.compute_full_nav_cost(plan, world.pose_dict, gg) # type: ignore
@@ -141,9 +141,9 @@ class ModularConstructionTaskPlanner(Node):
             goal_state = planner.run_heuristic_planner(heuristic)
         elif planner_type == 'multi_bound':
             if not mixed:
-                goal_state = planner.run_multi_bound_planner(heuristic, heuristic)
+                goal_state = planner.run_multi_bound_planner_g(heuristic, heuristic)
             else:
-                goal_state = planner.run_multi_bound_planner(HEURISTIC.LAZY, HEURISTIC.DILIGENT)
+                goal_state = planner.run_multi_bound_planner_g(HEURISTIC.LAZY, HEURISTIC.DILIGENT)
         else:
             raise ValueError(f"Unknown planner type: {planner_type}")
 
