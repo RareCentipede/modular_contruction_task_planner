@@ -15,7 +15,7 @@ from modular_construction_task_planner.block_domain import (
     Action, Object, PosEntity, Robot, ShadowBox
 )
 from modular_construction_task_planner.stability import SupportNode, compute_placement_stability
-from path_planner.path_planner_node import GridGraph, OCCUPANCY
+from astar import GridGraph, OCCUPANCY
 
 HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT MIXED MIXED_G ANTICIPATORY ANTICIPATORY_ONCE\
                  ANTICIPATORY_ONCE_DISCOUNT STABLE_DISCRETE STABLE STABLE_NAV')

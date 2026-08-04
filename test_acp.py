@@ -15,7 +15,7 @@ from modular_construction_task_planner.generate_polyhedrals import (
     generate_diced_block,
     compute_base_positions,
 )
-from path_planner.path_planner_node import GridGraph, OCCUPANCY
+from modular_construction_task_planner.astar import GridGraph, OCCUPANCY
 
 def test_acp(config_path: str = '', problem_name: str = '', vis: bool = True):
     # --- 1. Generate Random TAMP Configurations or load pre-defined configs---

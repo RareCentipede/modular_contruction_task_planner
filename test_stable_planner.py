@@ -19,7 +19,7 @@ from modular_construction_task_planner.stability import (
     save_construction_sequence_frames
 )
 from modular_construction_task_planner.block_sequence_animator import TrimeshBlockAnimator
-from path_planner.path_planner_node import GridGraph, OCCUPANCY
+from modular_construction_task_planner.astar import GridGraph, OCCUPANCY
 
 def main(problem_name:str = "scaffolding_tower", show: bool = False, animate: bool = False, h: HEURISTIC = HEURISTIC.STABLE):
     goal_linked_state = None

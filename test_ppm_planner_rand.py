@@ -11,7 +11,6 @@ from yaml import safe_load
 from enum import Enum
 
 from modular_construction_task_planner.ordered_landmarks_planner import OrderedLandmarksPlanner, HEURISTIC, Pose
-from modular_construction_task_planner import ModularConstructionTaskPlanner
 from eas.config_parser_world_basic import parse_configs_to_world
 from eas.core import World
 from modular_construction_task_planner.cost_propagation import (
@@ -24,7 +23,7 @@ from modular_construction_task_planner.generate_polyhedrals import (
     generate_diced_block,
     compute_base_positions,
 )
-from path_planner.path_planner_node import GridGraph, OCCUPANCY
+from modular_construction_task_planner.astar import GridGraph, OCCUPANCY
 from modular_construction_task_planner.block_domain import (
     PickAction,
     PlaceAction,
@@ -102,7 +101,7 @@ def test_planner(world: World, planner_type: PLANNER_TYPE, heuristic: HEURISTIC)
         print("No plan found for this trial.")
         return np.nan, np.nan, np.nan, time_taken, mb_cost_hist
 
-    plan, cost = ModularConstructionTaskPlanner.retrace_best_plan(goal_state)
+    plan, cost = OrderedLandmarksPlanner.retrace_best_plan(goal_state)
     full_cost = planner.compute_full_nav_cost(plan)
     return cost, full_cost, planner.state_counter, time_taken, mb_cost_hist
 
