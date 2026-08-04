@@ -1,6 +1,6 @@
 from copy import deepcopy
-from modular_construction_task_planner.scripts.block_domain import PosEntity, Object, Robot, PickAction, PlaceAction, MoveAction
-from modular_construction_task_planner.eas.core import (
+from modular_construction_task_planner.block_domain import PosEntity, Object, Robot, PickAction, PlaceAction, MoveAction
+from eas.core import (
     load_domains,
     Entities,
     World

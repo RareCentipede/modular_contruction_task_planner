@@ -1,19 +1,19 @@
 from typing import Dict, List, cast
 
 from geometry_msgs.msg import PoseStamped
-from modular_construction_task_planner.eas.core import (
+from eas.core import (
     load_domains,
     Entities,
     World,
     Pose
 )
-from modular_construction_task_planner.scripts.block_domain import (
+from modular_construction_task_planner.block_domain import (
     Object,
     Surface,
     PosEntity,
     Robot
 )
-from modular_construction_task_planner.eas.config_parser_world_basic import create_entities, define_goal_state
+from eas.config_parser_world_basic import create_entities, define_goal_state
 from mpnp_interfaces.msg import Block
 
 def parse_block_list_to_world(block_list: List[Block], robot_init_pose: PoseStamped, verbose: bool = False) -> World:

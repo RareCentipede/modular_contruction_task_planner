@@ -4,7 +4,7 @@ import networkx as nx
 from scipy.spatial import KDTree
 from typing import List, Optional, Tuple
 from mpnp_interfaces.msg import Block
-from scripts.mapping import OCCUPANCY, partition_block_space
+from modular_construction_task_planner.mapping import OCCUPANCY, partition_block_space
 
 class GridGraph:
     def __init__(self, blocks: List[Block], block_size: float, margin: float = 0.1, connectivity: int = 8):

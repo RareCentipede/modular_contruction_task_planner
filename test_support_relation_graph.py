@@ -5,8 +5,8 @@ from shapely.geometry import Polygon
 from typing import Optional, Dict, Tuple, List
 from yaml import safe_load
 
-from modular_construction_task_planner.eas.config_parser_world_basic import parse_configs_to_world
-from modular_construction_task_planner.scripts.stability import (
+from eas.config_parser_world_basic import parse_configs_to_world
+from modular_construction_task_planner.stability import (
     create_support_relation_graph,
     visualize_goal_structure,
     visualize_support_node_graph,

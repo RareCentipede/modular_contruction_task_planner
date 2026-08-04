@@ -16,8 +16,8 @@ from shapely.ops import unary_union
 from typing import Dict, List, Tuple, cast, Optional
 from dataclasses import dataclass, field
 
-from modular_construction_task_planner.eas.core import World
-from modular_construction_task_planner.scripts.block_domain import Object
+from eas.core import World
+from modular_construction_task_planner.block_domain import Object
 
 @dataclass
 class SupportNode:

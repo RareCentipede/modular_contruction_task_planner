@@ -5,9 +5,9 @@ import matplotlib.patches as patches
 from typing import Dict, List, Tuple, cast
 from scipy.spatial import KDTree
 
-from modular_construction_task_planner.eas.core import World
-from modular_construction_task_planner.scripts.block_domain import Object, PosEntity, ShadowBox
-from modular_construction_task_planner.scripts.ordered_landmarks_planner import compute_dists_from_points_to_vector
+from eas.core import World
+from modular_construction_task_planner.block_domain import Object, PosEntity, ShadowBox
+from modular_construction_task_planner.ordered_landmarks_planner import compute_dists_from_points_to_vector
 
 OBJ_WIDTH = 1.0
 ROBOT_WIDTH = 0.3

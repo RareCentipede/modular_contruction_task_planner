@@ -4,7 +4,7 @@ from typing import List, Dict
 from scipy.spatial import KDTree
 from enum import Enum
 
-from modular_construction_task_planner.eas.core import Pose
+from eas.core import Pose
 from mpnp_interfaces.msg import Block
 
 OCCUPANCY = Enum('OCCUPANCY', 'FREE OCCUPIED')

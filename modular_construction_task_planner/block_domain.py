@@ -3,7 +3,7 @@ import numpy as np
 from trimesh import Trimesh, creation
 from typing import List, Tuple, Callable
 from dataclasses import dataclass, field
-from modular_construction_task_planner.eas.core import (
+from eas.core import (
     Variable, Entity, State, Condition, ComputedCondition, Effect, Action, Pose
 )
 

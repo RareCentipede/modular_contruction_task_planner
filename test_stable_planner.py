@@ -6,10 +6,10 @@ import pandas as pd
 from copy import deepcopy
 from yaml import safe_load
 
-from modular_construction_task_planner.scripts.ordered_landmarks_planner import OrderedLandmarksPlanner, HEURISTIC
-from modular_construction_task_planner.eas.config_parser_world_basic import parse_configs_to_world
-from modular_construction_task_planner.scripts.block_domain import PickAction, PlaceAction, TransitAction, TransportAction
-from modular_construction_task_planner.scripts.stability import (
+from modular_construction_task_planner.ordered_landmarks_planner import OrderedLandmarksPlanner, HEURISTIC
+from eas.config_parser_world_basic import parse_configs_to_world
+from modular_construction_task_planner.block_domain import PickAction, PlaceAction, TransitAction, TransportAction
+from modular_construction_task_planner.stability import (
     visualize_goal_structure,
     create_support_relation_graph,
     visualize_support_node_graph,
@@ -18,7 +18,7 @@ from modular_construction_task_planner.scripts.stability import (
     generate_nice_colors,
     save_construction_sequence_frames
 )
-from modular_construction_task_planner.scripts.block_sequence_animator import TrimeshBlockAnimator
+from modular_construction_task_planner.block_sequence_animator import TrimeshBlockAnimator
 from path_planner.path_planner_node import GridGraph, OCCUPANCY
 
 def main(problem_name:str = "scaffolding_tower", show: bool = False, animate: bool = False, h: HEURISTIC = HEURISTIC.STABLE):

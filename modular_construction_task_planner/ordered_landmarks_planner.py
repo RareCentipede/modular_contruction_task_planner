@@ -7,14 +7,14 @@ from enum import Enum
 from math import factorial
 from typing import Tuple, Dict, cast, List, Any
 from scipy.spatial import KDTree
-from modular_construction_task_planner.eas.core import (
+from eas.core import (
     Optional, Pose, State, LinkedState,
     Entity, StateStatus, World
 )
-from modular_construction_task_planner.scripts.block_domain import (
+from modular_construction_task_planner.block_domain import (
     Action, Object, PosEntity, Robot, ShadowBox
 )
-from modular_construction_task_planner.scripts.stability import SupportNode, compute_placement_stability
+from modular_construction_task_planner.stability import SupportNode, compute_placement_stability
 from path_planner.path_planner_node import GridGraph, OCCUPANCY
 
 HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT MIXED MIXED_G ANTICIPATORY ANTICIPATORY_ONCE\

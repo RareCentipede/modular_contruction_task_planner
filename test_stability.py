@@ -22,7 +22,7 @@ import matplotlib.patches as mpatches
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from shapely.geometry import Polygon
 from typing import Optional, Dict, Tuple, List
-from modular_construction_task_planner.scripts.stability import compute_placement_stability, get_contact_polygon
+from modular_construction_task_planner.stability import compute_placement_stability, get_contact_polygon
 
 # ---------------------------------------------------------------------------
 # Mesh helpers

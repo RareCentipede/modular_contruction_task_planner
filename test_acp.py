@@ -4,14 +4,14 @@ import numpy as np
 from copy import deepcopy
 from yaml import safe_load
 
-from modular_construction_task_planner.eas.config_parser_world_basic import parse_configs_to_world
-from modular_construction_task_planner.scripts.cost_propagation import (
+from eas.config_parser_world_basic import parse_configs_to_world
+from modular_construction_task_planner.cost_propagation import (
     spawn_shadow_boxes,
     perform_cost_propagation,
     visualize_cost_propagation
 )
-from modular_construction_task_planner.scripts.generate_random_configs import generate_random_tamp_configs
-from modular_construction_task_planner.scripts.generate_polyhedrals import (
+from modular_construction_task_planner.generate_random_configs import generate_random_tamp_configs
+from modular_construction_task_planner.generate_polyhedrals import (
     generate_diced_block,
     compute_base_positions,
 )

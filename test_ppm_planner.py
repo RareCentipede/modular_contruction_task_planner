@@ -12,22 +12,22 @@ from typing import List, Dict, cast
 from yaml import safe_load
 from enum import Enum
 
-from modular_construction_task_planner.scripts.ordered_landmarks_planner import OrderedLandmarksPlanner, HEURISTIC, Pose
+from modular_construction_task_planner.ordered_landmarks_planner import OrderedLandmarksPlanner, HEURISTIC, Pose
 from modular_construction_task_planner import ModularConstructionTaskPlanner
-from modular_construction_task_planner.eas.config_parser_world_basic import parse_configs_to_world
-from modular_construction_task_planner.eas.core import World
-from modular_construction_task_planner.scripts.cost_propagation import (
+from eas.config_parser_world_basic import parse_configs_to_world
+from eas.core import World
+from modular_construction_task_planner.cost_propagation import (
     spawn_shadow_boxes,
     perform_cost_propagation,
     visualize_cost_propagation
 )
-from modular_construction_task_planner.scripts.generate_random_configs import generate_random_tamp_configs
-from modular_construction_task_planner.scripts.generate_polyhedrals import (
+from modular_construction_task_planner.generate_random_configs import generate_random_tamp_configs
+from modular_construction_task_planner.generate_polyhedrals import (
     generate_diced_block,
     compute_base_positions,
 )
 from path_planner.path_planner_node import GridGraph, OCCUPANCY
-from modular_construction_task_planner.scripts.block_domain import (
+from modular_construction_task_planner.block_domain import (
     PickAction,
     PlaceAction,
     TransitAction,

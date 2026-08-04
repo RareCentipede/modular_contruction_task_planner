@@ -3,14 +3,14 @@ import numpy as np
 from yaml import safe_load
 from typing import Dict, List, Tuple, cast
 
-from modular_construction_task_planner.eas.core import (
+from eas.core import (
     load_domains,
     Entities,
     World,
     Pose,
     State
 )
-from modular_construction_task_planner.scripts.block_domain import (
+from modular_construction_task_planner.block_domain import (
     Object,
     PosEntity,
     Robot
