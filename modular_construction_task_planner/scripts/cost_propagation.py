@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 from typing import Dict, List, Tuple, cast
-from scipy.spatial import cKDTree
+from scipy.spatial import KDTree
 
 from modular_construction_task_planner.eas.core import World
 from modular_construction_task_planner.scripts.block_domain import Object, PosEntity, ShadowBox

@@ -6,7 +6,7 @@ import numpy as np
 from enum import Enum
 from math import factorial
 from typing import Tuple, Dict, cast, List, Any
-from scipy.spatial import cKDTree
+from scipy.spatial import KDTree
 from modular_construction_task_planner.eas.core import (
     Optional, Pose, State, LinkedState,
     Entity, StateStatus, World
