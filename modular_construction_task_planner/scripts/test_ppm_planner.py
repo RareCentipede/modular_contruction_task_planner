@@ -13,7 +13,7 @@ from yaml import safe_load
 from enum import Enum
 
 from modular_construction_task_planner.scripts.ordered_landmarks_planner import OrderedLandmarksPlanner, HEURISTIC, Pose
-from modular_construction_task_planner.modular_construction_task_planner import ModularConstructionTaskPlanner
+from modular_construction_task_planner import ModularConstructionTaskPlanner
 from modular_construction_task_planner.eas.config_parser_world_basic import parse_configs_to_world
 from modular_construction_task_planner.eas.core import World
 from modular_construction_task_planner.scripts.cost_propagation import (
