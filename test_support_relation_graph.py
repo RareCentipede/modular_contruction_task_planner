@@ -14,7 +14,7 @@ from modular_construction_task_planner.stability import (
     generate_nice_colors
 )
 
-def main(problem_config_path: str = "src/object_rearrangement_ros2_sim/mpnp_simulation/config/problem_configs/",
+def main(problem_config_path: str = "configs/problem_configs/",
          problem_name: str = "temple_facade"):
     # Load world from config
     world = parse_configs_to_world(problem_name, problem_config_path)
@@ -25,7 +25,7 @@ def main(problem_config_path: str = "src/object_rearrangement_ros2_sim/mpnp_simu
     colors = generate_nice_colors(len(goal_config))
     visualize_goal_structure(goal_config, show=False, unique_colors=colors, title=problem_name)
 
-    plt.savefig(f"struct_vis_{problem_name}.png")
+    plt.savefig(f"plots/struct_vis_{problem_name}.png")
 
     # Create support relation graph
     _, support_graph = create_support_relation_graph(world)
@@ -45,13 +45,13 @@ def main(problem_config_path: str = "src/object_rearrangement_ros2_sim/mpnp_simu
         print()
 
     # plt.show()
-    plt.savefig(f"support_relation_graph_{problem_name}.png")
+    plt.savefig(f"plots/support_relation_graph_{problem_name}.png")
 
 if __name__ == "__main__":
     problems = [
         "temple_facade",
         "scaffolding_tower",
-        "quadriple_towers",
+        "quadruple_towers",
         "interlocking_pyramid"
     ]
     for problem in problems:
