@@ -15,19 +15,14 @@ from modular_construction_task_planner.block_domain import (
     Action, Object, PosEntity, Robot, ShadowBox
 )
 from modular_construction_task_planner.stability import SupportNode, compute_placement_stability
-from astar import GridGraph, OCCUPANCY
 
-HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION DILIGENT MIXED MIXED_G ANTICIPATORY ANTICIPATORY_ONCE\
-                 ANTICIPATORY_ONCE_DISCOUNT STABLE_DISCRETE STABLE STABLE_NAV')
+HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION STABLE_DISCRETE STABLE STABLE_NAV')
 """
     LAZY: Only considers the euclidean distance to the target for the preferred action.
     SIMPLE_COLLISION: Checks for collisions and adds lazy collision cost if applicable. Lazy collision cost is the arc length
                        the robot needs to travel around the obstacle. The radius will be the the radius of the obstacle + the
                        half with of the robot base.
     DILIGENT: Runs full path planning for evaluation.
-    ANTICIPATORY: Considers the hindrance the current action places onto future actions.
-    ANTICIPATORY_ONCE: Similar to ANTICIPATORY, but run ACP only once at the beginning of the search.
-    ANTICIPATORY_ONCE_DISCOUNT: Similar to ANTICIPATORY_ONCE, but with discounted future costs.
     STABLE_DISCRETE: For place actions, just checks if the place action can be performed, use lazy cost.
     STABLE: For place actions, uses the stability score as a heuristic.
     STABLE_NAV: For place actions, uses the stability score as a heuristic and considers navigation.
@@ -37,14 +32,11 @@ OBJ_WIDTH = 1.0
 ROBOT_WIDTH = 0.3
 
 class OrderedLandmarksPlanner:
-    def __init__(self, world: World, action_dict: Dict[str, Action], gg: Optional[GridGraph] = None) -> None:
+    def __init__(self, world: World, action_dict: Dict[str, Action]) -> None:
         self.world: World = world
         self.original_world = deepcopy(world)
         self.action_dict: Dict[str, Action] = action_dict
-        self.gg: Optional[GridGraph] = gg
         self.support_graph: Dict[str, SupportNode] = {}
-        if self.gg:
-            self.original_gg = deepcopy(gg)
 
         self.state_counter: int = 0
 
@@ -87,8 +79,6 @@ class OrderedLandmarksPlanner:
 
     def reset(self, solution_count: int = 100) -> None:
         self.world = self.original_world
-        if self.gg:
-            self.gg = self.original_gg
         if self.support_graph and self.original_support_graph:
             print("Resetting support graph to original state.")
             self.support_graph = self.original_support_graph
@@ -152,13 +142,6 @@ class OrderedLandmarksPlanner:
             # print(f"Executing: {action_name} with params {[str(param) + ': ' + str(ent.name) \
                 # for param, ent in action_params.items()]} and cost {cost}")
             action.execute(action_params)
-            if self.gg:
-                if action_name == 'pick':
-                    obj_pos = self.world.pose_dict[action_params['target_pose'].name].position[:2]
-                    self.gg.update_block_move(obj_pos, OCCUPANCY.FREE)
-                elif action_name == 'place':
-                    obj_pos = self.world.pose_dict[action_params['target_pose'].name].position[:2]
-                    self.gg.update_block_move(obj_pos, OCCUPANCY.OCCUPIED)
 
             self.world.update_state()
             self.current_cost = tentative_cost
@@ -175,7 +158,7 @@ class OrderedLandmarksPlanner:
 
         return self.goal_linked_state
 
-    def run_multi_bound_planner(self, low_h: HEURISTIC = HEURISTIC.LAZY, high_h: HEURISTIC = HEURISTIC.DILIGENT) -> Optional[LinkedState]:
+    def run_multi_bound_planner(self, low_h: HEURISTIC = HEURISTIC.LAZY, high_h: HEURISTIC = HEURISTIC.LAZY) -> Optional[LinkedState]:
         best_cost = float('inf')
         home_state = self.s0
         while self.current_linked_state.status == StateStatus.ALIVE:
@@ -206,13 +189,6 @@ class OrderedLandmarksPlanner:
             # print(f"Executing: {action_name} with params {[str(param) + ': ' + str(ent.name) \
                 # for param, ent in action_params.items()]} and cost {cost}")
             action.execute(action_params)
-            if self.gg:
-                if action_name == 'pick':
-                    obj_pos = self.world.pose_dict[action_params['target_pose'].name].position[:2]
-                    self.gg.update_block_move(obj_pos, OCCUPANCY.FREE)
-                elif action_name == 'place':
-                    obj_pos = self.world.pose_dict[action_params['target_pose'].name].position[:2]
-                    self.gg.update_block_move(obj_pos, OCCUPANCY.OCCUPIED)
 
             self.world.update_state()
             self.generate_new_linked_state(action_name, action_params, self.current_cost, additional_properties)
@@ -243,7 +219,7 @@ class OrderedLandmarksPlanner:
 
         return self.goal_linked_state
 
-    def run_multi_bound_planner_g(self, low_h: HEURISTIC = HEURISTIC.LAZY, high_h: HEURISTIC = HEURISTIC.DILIGENT) -> Optional[LinkedState]:
+    def run_multi_bound_planner_g(self, low_h: HEURISTIC = HEURISTIC.LAZY, high_h: HEURISTIC = HEURISTIC.LAZY) -> Optional[LinkedState]:
         best_cost = float('inf')
         home_state = self.s0
 
@@ -284,14 +260,6 @@ class OrderedLandmarksPlanner:
             # Execute actions to step forward in the continuous world state
             action = self.action_dict[action_name]
             action.execute(action_params)
-
-            if self.gg:
-                if action_name == 'pick':
-                    obj_pos = self.world.pose_dict[action_params['target_pose'].name].position[:2]
-                    self.gg.update_block_move(obj_pos, OCCUPANCY.FREE)
-                elif action_name == 'place':
-                    obj_pos = self.world.pose_dict[action_params['target_pose'].name].position[:2]
-                    self.gg.update_block_move(obj_pos, OCCUPANCY.OCCUPIED)
 
             self.world.update_state()
 
@@ -349,13 +317,6 @@ class OrderedLandmarksPlanner:
             # print(f"Executing: {action_name} with params {[str(param) + ' : ' + str(ent.name) \
                 # for param, ent in action_params.items()]} and cost {cost}")
             action.execute(action_params)
-            if self.gg:
-                if action_name == 'pick':
-                    obj_pos = self.world.pose_dict[action_params['target_pose'].name].position[:2]
-                    self.gg.update_block_move(obj_pos, OCCUPANCY.FREE)
-                elif action_name == 'place':
-                    obj_pos = self.world.pose_dict[action_params['target_pose'].name].position[:2]
-                    self.gg.update_block_move(obj_pos, OCCUPANCY.OCCUPIED)
 
             self.world.update_state()
             self.generate_new_linked_state(action_name, action_params, self.current_cost, additional_properties)
@@ -578,17 +539,6 @@ class OrderedLandmarksPlanner:
                             continue
                     case HEURISTIC.SIMPLE_COLLISION:
                         cost = self.simple_collision_heuristic(start_pos, target_pos)
-                    case HEURISTIC.DILIGENT:
-                        if not self.gg:
-                            raise ValueError("GridGraph is not initialized for diligent heuristic.")
-                        path = self.gg.plan(start_pos[:2], target_pos[:2])
-                        if path.size == 0:
-                            cost = float('inf')
-                        else:
-                            path_length = np.sum(np.linalg.norm(np.diff(path, axis=0), axis=1))
-                            cost = path_length
-                    case HEURISTIC.ANTICIPATORY:
-                        pass
                     case _:
                         print(f"Unknown heuristic: {heuristic}, defaulting to lazy.")
                         cost = np.linalg.norm(np.array(start_pos) - np.array(target_pos))
@@ -621,15 +571,6 @@ class OrderedLandmarksPlanner:
             cost = self.current_linked_state.cost
             evaluated_branches.append((action_name, branches[0], cost, additional_properties))
             return evaluated_branches
-
-        if heuristic == HEURISTIC.ANTICIPATORY:
-            objs = self.world.entities.get_entities(Object)
-            objs = cast(List[Object], objs)
-            for obj in objs:
-                obj.propagated_cost = 0.0
-            propagated_cost_map = perform_cost_propagation(self.world, self.shadow_boxes)
-        elif heuristic == HEURISTIC.ANTICIPATORY_ONCE_DISCOUNT:
-            self.blocks_to_place -= 1
 
         for transit_branch in branches:
             obj_entity = cast(Object, transit_branch['object'])
@@ -671,38 +612,6 @@ class OrderedLandmarksPlanner:
                 case HEURISTIC.SIMPLE_COLLISION:
                     cost = self.simple_collision_heuristic(transit_start_pos, transit_target_pos)
                     cost += self.simple_collision_heuristic(transit_target_pos, goal_pos)
-                case HEURISTIC.DILIGENT:
-                    if not self.gg:
-                        raise ValueError("GridGraph is not initialized for diligent heuristic.")
-                    path_to_transit = self.gg.plan(transit_start_pos[:2], transit_target_pos[:2])
-                    obj_pos = cast(str, obj_entity.at.value)
-                    obj_pos = self.world.pose_dict[obj_pos].position
-                    self.gg.update_block_move(obj_pos[:2], OCCUPANCY.FREE)
-
-                    path_to_transport = self.gg.plan(transit_target_pos[:2], goal_pos[:2])
-                    self.gg.update_block_move(obj_pos[:2], OCCUPANCY.OCCUPIED)
-                    if path_to_transit.size == 0 or path_to_transport.size == 0:
-                        cost = float('inf')
-                    else:
-                        transit_path_length = np.sum(np.linalg.norm(np.diff(path_to_transit, axis=0), axis=1))
-                        transport_path_length = np.sum(np.linalg.norm(np.diff(path_to_transport, axis=0), axis=1))
-                        cost = transit_path_length.item() + transport_path_length.item()
-                case HEURISTIC.ANTICIPATORY:
-                    cost = np.linalg.norm(np.array(transit_start_pos) - np.array(transit_target_pos)).item()
-                    cost += np.linalg.norm(np.array(transit_target_pos) - np.array(goal_pos)).item()
-
-                    # Safely extract the isolated look-ahead cost for this candidate object
-                    cost += propagated_cost_map.get(obj_entity.name, 0.0)
-                case HEURISTIC.ANTICIPATORY_ONCE | HEURISTIC.ANTICIPATORY_ONCE_DISCOUNT:
-                    cost = np.linalg.norm(np.array(transit_start_pos) - np.array(transit_target_pos)).item()
-                    cost += np.linalg.norm(np.array(transit_target_pos) - np.array(goal_pos)).item()
-
-                    # Fallback safely to the object field if using pre-cached early runs
-                    cost_val = getattr(obj_entity, 'propagated_cost', 0.0)
-                    if heuristic == HEURISTIC.ANTICIPATORY_ONCE_DISCOUNT:
-                        cost += cost_val * (self.blocks_to_place / self.num_blocks)
-                    else:
-                        cost += cost_val
                 case _:
                     print(f"Unknown heuristic: {heuristic}, defaulting to lazy.")
                     cost = np.linalg.norm(np.array(transit_start_pos) - np.array(transit_target_pos)).item()
@@ -801,20 +710,6 @@ class OrderedLandmarksPlanner:
             # )
 
             if parent is not None:
-                if self.gg:
-                    action_from_parent = self.current_linked_state.action_from_parent
-                    if action_from_parent is None:
-                        # print(f"No action from parent for linked state with id {parent.state_id}, cannot update grid graph.")
-                        break
-                    action_name, action_params = action_from_parent
-                    if action_name == 'pick':
-                        obj_pos = self.world.pose_dict[action_params[2]].position[:2]
-                        self.gg.update_block_move(obj_pos, OCCUPANCY.OCCUPIED)
-                    elif action_name == 'place':
-                        obj_pos = self.world.pose_dict[action_params[2]].position[:2]
-                        self.gg.update_block_move(obj_pos, OCCUPANCY.FREE)
-                        self.blocks_to_place += 1
-
                 self.current_linked_state = parent
                 self.current_cost = parent.cost
                 self.current_state = self.current_linked_state.state
@@ -834,7 +729,6 @@ class OrderedLandmarksPlanner:
                                      home_linked_state: LinkedState,
                                      target_linked_state:LinkedState,
                                      lazy: bool = False) -> float:
-        self.gg = cast(GridGraph, self.gg)  # Type hint for better code completion
         cost = home_linked_state.cost
         current_linked_state = target_linked_state
         parent = current_linked_state.parent
@@ -855,27 +749,12 @@ class OrderedLandmarksPlanner:
                     print(f"No action from parent for linked state with id {child_linked_state[1].state_id}")
                     continue
                 action_name, action_params = action_from_parent
-                if action_name == 'pick':
-                    obj_pos = self.world.pose_dict[action_params[2]].position[:2]
-                    self.gg.update_block_move(obj_pos, OCCUPANCY.FREE)
-                elif action_name == 'place':
-                    obj_pos = self.world.pose_dict[action_params[2]].position[:2]
-                    self.gg.update_block_move(obj_pos, OCCUPANCY.OCCUPIED)
-                elif action_name == 'transit' or action_name == 'transport':
+                if action_name == 'transit' or action_name == 'transport':
                     start_pos = self.world.pose_dict[action_params[1]].position
                     target_pos = self.world.pose_dict[action_params[2]].position
-                    if not lazy:
-                        path = self.gg.plan(start_pos[:2], target_pos[:2])
-                        if path.size == 0:
-                            cost = float('inf')
-                        else:
-                            path_length = np.sum(np.linalg.norm(np.diff(path, axis=0), axis=1))
-                            cost += path_length
-                            child_linked_state[1].cost = cost
-                    else:
-                        path_length = np.linalg.norm(np.array(start_pos) - np.array(target_pos)).item()
-                        cost += path_length
-                        child_linked_state[1].cost = cost
+                    path_length = np.linalg.norm(np.array(start_pos) - np.array(target_pos)).item()
+                    cost += path_length
+                    child_linked_state[1].cost = cost
 
                 parent = child_linked_state[1]
             else:
@@ -943,37 +822,6 @@ class OrderedLandmarksPlanner:
                     pp_cost += path_length
                 case _:
                     print(f"Unknown action {action_name} in plan. Skipping...")
-        return pp_cost
-
-    def compute_full_nav_cost(self, plan: List[Tuple[str, Tuple[str, ...]]], verbose: bool = False) -> float:
-        self.gg = cast(GridGraph, self.gg)  # Type hint for better code completion
-        pp_cost = 0.0
-        for action_name, params in plan:
-            match action_name:
-                case 'pick':
-                    obj_pos = self.world.pose_dict[params[2]].position[:2]
-                    self.gg.update_block_move(obj_pos, OCCUPANCY.FREE)
-                case 'place':
-                    obj_pos = self.world.pose_dict[params[2]].position[:2]
-                    self.gg.update_block_move(obj_pos, OCCUPANCY.OCCUPIED)
-                case 'transit' | 'transport':
-                    start_pos = self.world.pose_dict[params[1]].position[:2]
-                    target_pos = self.world.pose_dict[params[2]].position[:2]
-                    path = self.gg.plan(start_pos, target_pos)
-                    if path.size == 0:
-                        print(f"No path found for action {action_name} from {start_pos} to {target_pos}.")
-                        return np.nan
-                    else:
-                        path_length = np.sum(np.linalg.norm(np.diff(path, axis=0), axis=1))
-                        pp_cost += path_length
-
-                        if verbose:
-                            print(f"Path found for action {action_name} from {start_pos} to {target_pos} "
-                                  f"with length {path_length:.2f}.")
-                        # Optionally, visualize the path here using RViz or another tool
-                case _:
-                    print(f"Unknown action {action_name} in plan. Skipping...")
-
         return pp_cost
 
 def compute_dists_from_points_to_vector(points: np.ndarray, vector: np.ndarray, start_point: np.ndarray, 
@@ -1063,63 +911,6 @@ def spawn_shadow_boxes(world: World) -> Dict[str, ShadowBox]:
         shadow_boxes[obj.name] = shadow_box
 
     return shadow_boxes
-
-def perform_cost_propagation(world: World, shadow_boxes: Dict[str, ShadowBox], verbose: bool = False) -> Dict[str, float]:
-    """
-    Computes look-ahead hindrance costs safely isolated within a temporary dictionary.
-    Returns: Dict[str, float] mapping block_name -> accumulated_hindrance_cost
-    """
-    available_entities, all_entities, entity_positions = extract_available_positions_from_world(world, shadow_boxes)
-    entity_positions = np.array(entity_positions)
-    shadow_boxes_names = [sb.name for sb in shadow_boxes.values()]
-
-    # Initialize an isolated scoring tracking container
-    propagated_costs = {obj.name: 0.0 for obj in available_entities}
-
-    for obj in available_entities:
-        obj = cast(Object, obj)
-
-        # Track costs specific to this block's paths
-        path_costs = 0.0
-
-        for pick_pos_id, place_pos_id in zip(obj.reachable_from, obj.placeable_from):
-            pick_pos = np.array(world.pose_dict[pick_pos_id].position)
-            place_pos = np.array(world.pose_dict[place_pos_id].position)
-            pick_to_place_vec = place_pos - pick_pos
-
-            ppu = pick_to_place_vec / np.linalg.norm(pick_to_place_vec)
-            extended_pick_pos = pick_pos - ppu * (np.sqrt(2) * OBJ_WIDTH / 2 + ROBOT_WIDTH)
-            extended_place_pos = place_pos + ppu * (np.sqrt(2) * OBJ_WIDTH / 2 + ROBOT_WIDTH)
-            extended_vec = extended_place_pos - extended_pick_pos
-
-            dists, scalings = compute_dists_from_points_to_vector(entity_positions, extended_vec, extended_pick_pos)
-
-            dists[(scalings < 0) | (scalings > 1)] = -1 
-
-            for i, dist in enumerate(dists):
-                if dist < 0:
-                    continue  
-
-                if dist < (OBJ_WIDTH/2 + ROBOT_WIDTH):
-                    nusance = list(all_entities.values())[i]
-                    if nusance.name == obj.name or nusance.name == obj.name + "_shadow_box":
-                        continue  
-
-                    # Normalize the obstruction penalty between 0.0 and 1.0
-                    denom = (np.sqrt(2) * OBJ_WIDTH / 2 + ROBOT_WIDTH)
-                    penalty = 1.0 - (dist / denom)
-
-                    if nusance.name in shadow_boxes_names:
-                        shadow_nusance = cast(ShadowBox, all_entities[nusance.name])
-                        host_name = shadow_nusance.host.value
-                        if host_name in propagated_costs:
-                            propagated_costs[host_name] += penalty
-                    else:
-                        host_name = nusance.name
-                        if host_name in propagated_costs:
-                            propagated_costs[host_name] -= penalty
-
-    return propagated_costs
 
 def extract_available_positions_from_world(world: World, shadow_boxes: Dict[str, ShadowBox]) -> \
     Tuple[List[Object], Dict[str, Object], List[Tuple[float, float]]]:
