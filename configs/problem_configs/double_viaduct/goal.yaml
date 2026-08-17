@@ -1,0 +1,105 @@
+# --- Bridge 1: Pillars ---
+block1:
+  position: [2.0, -1.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+
+block2:
+  position: [2.0, 1.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+
+block3:
+  position: [2.0, -1.0, 1.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+
+block4:
+  position: [2.0, 1.0, 1.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+
+# --- Bridge 1: Overhanging Archway Spans ---
+block5: 
+  position: [3.0, -1.0, 2.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [2.0, 2.0, 1.0]
+
+block6:
+  position: [3.0, 1.0, 2.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [2.0, 2.0, 1.0]
+
+# block7:
+#   position: [2.0, 2.0, 2.5]
+#   orientation: [0.0, 0.0, 0.0]
+#   size: [1.0, 1.0, 1.0]
+
+# --- Bridge 2: Pillars ---
+block8:
+  position: [4.0, -1.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+
+block9:
+  position: [4.0, 1.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+
+block10:
+  position: [4.0, -1.0, 1.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+
+block11:
+  position: [4.0, 1.0, 1.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+
+# --- Bridge 2: Overhanging Archway Spans ---
+# block12:
+#   position: [4.0, 0.0, 2.5]
+#   orientation: [0.0, 0.0, 0.0]
+#   size: [1.0, 1.0, 1.0]
+
+# block13:
+#   position: [4.0, -2.0, 2.5]
+#   orientation: [0.0, 0.0, 0.0]
+#   size: [1.0, 1.0, 1.0]
+
+# block14:
+#   position: [4.0, 2.0, 2.5]
+#   orientation: [0.0, 0.0, 0.0]
+#   size: [1.0, 1.0, 1.0]
+
+# --- Upper Interlocking Layer (Connects Bridge 1 & Bridge 2) ---
+block15:
+  position: [3.0, -1.0, 3.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+
+block16:
+  position: [3.0, 1.0, 3.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+
+block17:
+  position: [3.0, 0.0, 3.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+
+# --- Peak Crest Layer ---
+block18:
+  position: [3.0, -0.5, 4.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+
+block19:
+  position: [3.0, 0.5, 4.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+
+block20:
+  position: [3.0, 0.0, 5.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]

@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
 import numpy as np
 import seaborn as sns
 import pandas as pd
@@ -22,7 +23,8 @@ from modular_construction_task_planner.block_sequence_animator import TrimeshBlo
 
 def main(problem_name:str = "scaffolding_tower", show: bool = False, animate: bool = False, h: HEURISTIC = HEURISTIC.STABLE):
     goal_linked_state = None
-    problem_config_path = "src/object_rearrangement_ros2_sim/mpnp_simulation/config/problem_configs/"
+    lazy_nav_cost = np.nan
+    problem_config_path = "configs/problem_configs/"
     world = parse_configs_to_world(problem_name, problem_config_path)
     # for ent in world.entities.entities:
         # print(f"{ent.name}: {ent.state}")
@@ -90,7 +92,7 @@ if __name__ == "__main__":
     supp_results_stab = {}
     supp_results_stab_nav = {}
     # problems = [ "quadruple_towers", "interlocking_pyramid", "scaffolding_tower"]
-    problems = ["temple_facade"]
+    problems = ["scaffolding_tower"]
     colors = ['b', 'r', 'g']
     heuristics = [HEURISTIC.LAZY, HEURISTIC.STABLE, HEURISTIC.STABLE_NAV]
 
@@ -117,13 +119,16 @@ if __name__ == "__main__":
         supp_results_stab_nav[problem] = supp_results
 
     fig, ax = plt.subplots(len(supp_results_lazy), 1, figsize=figsize)
+    if isinstance(ax, Axes):
+        ax = [ax]  # Ensure ax is always a list for consistent indexing
+        print("Converted to list for consistent indexing.")
     for i, (problem, res) in enumerate(supp_results_lazy.items()):
-        print(f"Results for {problem} with LAZY heuristic:")
+        print(f"Results {i} for {problem} with LAZY heuristic:")
         stab_per_step = res[0]
         steps = np.arange(0, len(stab_per_step), 1, dtype=int)
         ax[i].plot(steps, stab_per_step, label=problem, color=colors[i])  # Stability score at each step
         ax[i].scatter(steps, stab_per_step, s=100, c=colors[i])  # Highlight block placements
-        ax[1].set_ylabel("Stability Score")
+        ax[i].set_ylabel("Stability Score")
         ax[i].legend()
         if i < len(supp_results_lazy) - 1:
             ax[i].set_xticklabels([])  # Hide x-axis labels for all but the last subplot

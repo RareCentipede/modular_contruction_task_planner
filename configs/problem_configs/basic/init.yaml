@@ -1,0 +1,39 @@
+block1:
+  type: "static"
+  position: [-5.0, 0.0, 0.0]
+  orientation: [0.0, 0.0, 0.0]
+  color: [0.0, 0.0, 0.0]
+  size: 0.3
+
+block2:
+  type: "dynamic"
+  position: [3.0, 5.0, 0.0]
+  orientation: [0.0, 0.0, 0.0]
+  color: [1.0, 0.0, 0.0]
+  size: 0.3
+
+block3:
+  type: "dynamic"
+  position: [5.0, -3.0, 0.0]
+  orientation: [0.0, 0.0, 0.0]
+  color: [0.0, 1.0, 0.0]
+  size: 0.3
+
+block4:
+  type: "dynamic"
+  position: [-3.0, 3.0, 0.0]
+  orientation: [0.0, 0.0, 0.0]
+  color: [0.0, 0.0, 1.0]
+  size: 0.3
+
+block5:
+  type: "dynamic"
+  position: [-3.0, 0.0, 0.0]
+  orientation: [0.0, 0.0, 0.0]
+  color: [1.0, 1.0, 0.0]
+  size: 0.3
+
+robot:
+  type: "robot"
+  position: [8.0, -3.0, 0.0]
+  orientation: [0.0, 0.0, 0.0]

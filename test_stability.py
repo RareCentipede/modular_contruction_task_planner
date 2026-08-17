@@ -188,8 +188,8 @@ def run_scenarios():
         mpatches.Patch(color=COLORS['contact'][:3],  alpha=0.9, label='Contact polygon'),
     ]
     fig.legend(handles=legend_patches, loc='lower center', ncol=4, fontsize=9)
-    plt.tight_layout(rect=[0, 0.05, 1, 1])
-    plt.savefig('src/modular_contruction_task_planner/modular_construction_task_planner/modular_construction_task_planner/plots/stability_test.png', dpi=150, bbox_inches='tight')
+    plt.tight_layout(rect=[0, 0.05, 1, 1]) # type: ignore
+    plt.savefig('plots/stability_test.png', dpi=150, bbox_inches='tight')
     print("\nFigure saved.")
     plt.show()
 

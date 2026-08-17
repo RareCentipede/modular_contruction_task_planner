@@ -1,0 +1,15 @@
+block2:
+  position: [5.0, 0.0, 0.0]
+  orientation: [0.0, 0.0, 0.0]
+
+# block3:
+#   position: [5.0, 3.0, 0.0]
+#   orientation: [0.0, 0.0, 0.0]
+
+# block4:
+#   position: [5.0, 5.0, 0.0]
+#   orientation: [0.0, 0.0, 0.0]
+
+# block5:
+#   position: [0.0, 0.0, 0.0]
+#   orientation: [0.0, 0.0, 0.0]

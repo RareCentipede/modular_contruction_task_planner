@@ -1,0 +1,105 @@
+# --- Ground Base Grid (Z = 0.5) ---
+block1:
+  position: [-1.0, -1.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+block2:
+  position: [1.0, -1.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+block3:
+  position: [-1.0, 1.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+block4:
+  position: [1.0, 1.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+
+# --- Tier 1 Pillars (Z = 1.5, Height = 1.0) ---
+block5:
+  position: [-1.0, -1.0, 1.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [0.8, 0.8, 1.0]
+block6:
+  position: [1.0, -1.0, 1.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [0.8, 0.8, 1.0]
+block7:
+  position: [-1.0, 1.0, 1.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [0.8, 0.8, 1.0]
+block8:
+  position: [1.0, 1.0, 1.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [0.8, 0.8, 1.0]
+
+# --- Tier 2 Planks Running Along Y-Axis (Z = 2.25) ---
+block9:
+  position: [-1.0, 0.0, 2.25]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 3.0, 0.5]
+block10:
+  position: [1.0, 0.0, 2.25]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 3.0, 0.5]
+
+# --- Tier 3 Intermediate Spacers (Z = 3.0) ---
+block11:
+  position: [-1.0, 0.0, 3.0]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 3.0, 1.0]
+block12:
+  position: [1.0, 0.0, 3.0]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 3.0, 1.0]
+
+# --- Tier 4 Planks Rotated Crosswise Along X-Axis (Z = 3.75) ---
+block13:
+  position: [0.0, 0.0, 3.75]
+  orientation: [0.0, 0.0, 0.0]
+  size: [3.0, 2.0, 0.5]
+# block14:
+#   position: [0.0, 1.0, 3.75]
+#   orientation: [0.0, 0.0, 0.0]
+#   size: [3.0, 1.0, 0.5]
+
+# --- Tier 5 Core Central Pillars (Z = 4.5, Height = 1.0) ---
+block15:
+  position: [0.0, -0.5, 4.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [0.5, 0.5, 1.0]
+block16:
+  position: [0.0, 0.5, 4.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [0.5, 0.5, 1.0]
+
+# --- Upper Platform (Z = 5.25) ---
+block17:
+  position: [0.0, 0.0, 5.25]
+  orientation: [0.0, 0.0, 0.0]
+  size: [3.0, 1.0, 0.5]
+
+# --- Spire Crown Blocks ---
+block18:
+  position: [-0.5, 0.0, 6.0]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+block19:
+  position: [0.5, 0.0, 6.0]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+block20:
+  position: [0.0, 0.0, 7.0]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+
+block21:
+  position: [1.25, 0.0, 4.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [0.5, 0.5, 1.0]
+
+block22:
+  position: [-1.25, 0.0, 4.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [0.5, 0.5, 1.0]

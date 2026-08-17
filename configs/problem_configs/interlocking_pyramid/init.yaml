@@ -1,0 +1,144 @@
+block1:
+  type: "dynamic"
+  position: [-9.0, -4.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  color: [0.3, 0.3, 0.3]
+  size: [1.0, 1.0, 1.0]
+
+block2:
+  type: "dynamic"
+  position: [-9.0, -2.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  color: [0.3, 0.3, 0.3]
+  size: [1.0, 1.0, 1.0]
+
+block3:
+  type: "dynamic"
+  position: [-9.0, 0.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  color: [0.3, 0.3, 0.3]
+  size: [1.0, 1.0, 1.0]
+
+block4:
+  type: "dynamic"
+  position: [-9.0, 2.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  color: [0.3, 0.3, 0.3]
+  size: [1.0, 1.0, 1.0]
+
+block5:
+  type: "dynamic"
+  position: [-9.0, 4.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  color: [0.3, 0.3, 0.3]
+  size: [1.0, 1.0, 1.0]
+
+block6:
+  type: "dynamic"
+  position: [-6.0, -4.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  color: [0.3, 0.3, 0.3]
+  size: [1.0, 1.0, 1.0]
+
+block7:
+  type: "dynamic"
+  position: [-6.0, -2.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  color: [0.2, 0.5, 0.7]
+  size: [1.0, 1.0, 1.0]
+
+block8:
+  type: "dynamic"
+  position: [-6.0, 0.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  color: [0.2, 0.5, 0.7]
+  size: [1.0, 1.0, 1.0]
+
+block9:
+  type: "dynamic"
+  position: [-6.0, 2.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  color: [0.2, 0.5, 0.7]
+  size: [1.0, 1.0, 1.0]
+
+block10:
+  type: "dynamic"
+  position: [-6.0, 4.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  color: [0.2, 0.5, 0.7]
+  size: [1.0, 1.0, 1.0]
+
+block11:
+  type: "dynamic"
+  position: [-3.0, -4.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  color: [0.2, 0.5, 0.7]
+  size: [1.0, 1.0, 1.0]
+
+block12:
+  type: "dynamic"
+  position: [-3.0, -2.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  color: [0.6, 0.3, 0.6]
+  size: [1.0, 1.0, 1.0]
+
+block13:
+  type: "dynamic"
+  position: [-3.0, 0.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  color: [0.6, 0.3, 0.6]
+  size: [1.0, 1.0, 1.0]
+
+block14:
+  type: "dynamic"
+  position: [-3.0, 2.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  color: [0.6, 0.3, 0.6]
+  size: [1.0, 1.0, 1.0]
+
+block15:
+  type: "dynamic"
+  position: [-3.0, 4.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  color: [0.6, 0.3, 0.6]
+  size: [1.0, 1.0, 1.0]
+
+block16:
+  type: "dynamic"
+  position: [1.0, -4.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  color: [0.8, 0.4, 0.2]
+  size: [1.0, 1.0, 1.0]
+
+block17:
+  type: "dynamic"
+  position: [1.0, -3.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  color: [0.8, 0.4, 0.2]
+  size: [1.0, 1.0, 1.0]
+
+block18:
+  type: "dynamic"
+  position: [1.0, 6.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  color: [0.8, 0.4, 0.2]
+  size: [1.0, 1.0, 1.0]
+
+block19:
+  type: "dynamic"
+  position: [1.0, 5.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  color: [0.8, 0.2, 0.2]
+  size: [1.0, 1.0, 1.0]
+
+block20:
+  type: "dynamic"
+  position: [1.0, 4.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  color: [0.8, 0.2, 0.2]
+  size: [1.0, 1.0, 1.0]
+
+robot:
+  type: "robot"
+  position: [-12.0, 0.0, 0.0]
+  orientation: [0.0, 0.0, 0.0]
