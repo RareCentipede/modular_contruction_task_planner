@@ -295,63 +295,82 @@ def visualize_goal_structure(goal_data: dict, unique_colors: List[Tuple[float, f
     if show:
         plt.show()
 
-def visualize_support_node_graph(support_graph: Dict[str, 'SupportNode'],
+def visualize_support_node_graph(support_graph: Dict[str, SupportNode],
                                  goal_data: Optional[Dict] = None,
                                  colors: List[List[float]] = [],
                                  title: str = "Structural Support & Stability Graph",
                                  show: bool = True):
     """
-        Visualizes the support relations using a dictionary of SupportNode objects.
-
-        Args:
-            support_graph: Dict[str, SupportNode] mapping block names to their SupportNode.
-            goal_data: Optional dictionary from goal.yaml containing 'color' properties. 
-                    If omitted, nodes are color-coded by their stability status.
-            title: Title of the generated graph plot.
+        Visualizes the support relations using a structured hierarchical layout.
     """
     G = nx.DiGraph()
-    node_colors = colors
     labels = {}
 
-    # 1. Build nodes and determine coloring strategy
+    # 1. Build nodes and default labels
     for name, node in support_graph.items():
         G.add_node(name)
-
-        # Build text label to show at the center of the node
-        # Displays name, current support score, and required threshold
         labels[name] = f"{name}"
 
-        # Color mapping logic
-        if not node_colors:
+    # Default colors if not provided
+    if not colors:
+        colors = []
+        for name, node in support_graph.items():
             if node.supported:
-                node_colors.append([0.2, 0.65, 0.3]) # Stable Green
+                colors.append([0.2, 0.65, 0.3])  # Stable Green
             else:
-                node_colors.append([0.85, 0.3, 0.2]) # Unstable Red
+                colors.append([0.85, 0.3, 0.2])  # Unstable Red
 
-    # 2. Extract directed edges
-    # Standardizing direction: 'supporting_objects' means Parent -> Child (This object)
+    # 2. Extract directed edges (Parent/Supporting -> Child/Supported)
     for name, node in support_graph.items():
-        for parent_name, (score, is_placed) in node.supporting_objects.items():
-            # Add edge from the block that provides support to the block receiving it
+        for parent_name, (score, _) in node.supporting_objects.items():
             if parent_name in support_graph:
                 G.add_edge(parent_name, name, weight=score)
 
-    # 3. Graph Presentation and Layout
-    plt.figure(figsize=(6, 4))
-    plt.title(title, fontsize=14, fontweight='bold', pad=15)
+    # 3. Compute Deterministic Hierarchical Layer Layout (Bottom-Up)
+    # Determine the depth/level of each node
+    levels: Dict[str, int] = {}
+    
+    # Base nodes (supported by ground 'g' or no parents in the object graph)
+    for node_name in G.nodes():
+        parents = list(G.predecessors(node_name))
+        if not parents:
+            levels[node_name] = 0
 
-    try:
-        # Hierarchical layout prioritizing bottom-up structure mapping
-        pos_layout = nx.drawing.nx_agraph.graphviz_layout(G, prog='dot', args='-Grankdir=BT')
-    except (ImportError, OSError):
-        # Reliable spring/force-directed layout fallback
-        pos_layout = nx.spring_layout(G, k=1.5, seed=42)
+    # Propagate levels upward using longest path calculation
+    changed = True
+    while changed:
+        changed = False
+        for node_name in G.nodes():
+            parents = list(G.predecessors(node_name))
+            if parents:
+                max_parent_level = max(levels.get(p, 0) for p in parents)
+                new_level = max_parent_level + 1
+                if levels.get(node_name) != new_level:
+                    levels[node_name] = new_level
+                    changed = True
+
+    # Group nodes by their calculated hierarchy level
+    level_groups: Dict[int, List[str]] = {}
+    for node_name, lvl in levels.items():
+        level_groups.setdefault(lvl, []).append(node_name)
+
+    # Assign explicit (x, y) coordinates for a structured tree layout
+    pos_layout = {}
+    for lvl, nodes_in_lvl in level_groups.items():
+        num_nodes = len(nodes_in_lvl)
+        # Evenly space nodes horizontally across x-axis for each tier level
+        x_coords = np.linspace(-1.0, 1.0, num_nodes) if num_nodes > 1 else [0.0]
+        for idx, node_name in enumerate(nodes_in_lvl):
+            pos_layout[node_name] = (x_coords[idx], float(lvl))
 
     # 4. Render Graph Elements
+    plt.figure(figsize=(7, 5))
+    plt.title(title, fontsize=14, fontweight='bold', pad=15)
+
     nx.draw_networkx_nodes(
         G, pos_layout,
-        node_color=node_colors, # type: ignore
-        node_size=700,
+        node_color=colors, # type: ignore
+        node_size=1200,
         edgecolors='#222222',
         linewidths=1.5,
         alpha=0.9
@@ -362,27 +381,26 @@ def visualize_support_node_graph(support_graph: Dict[str, 'SupportNode'],
         edge_color='#555555',
         width=2.0,
         arrowstyle='-|>',
-        arrowsize=22,
-        node_size=2800
+        arrowsize=20,
+        node_size=1400
     )
 
-    # Extract weights from the graph edges to label them
+    # Label edges with support weight ratios
     edge_labels = {(u, v): f"{d['weight']:.2f}" for u, v, d in G.edges(data=True)}
-    nx.draw_networkx_edge_labels(G, pos_layout, edge_labels=edge_labels, font_size=8, font_color="#333333")
+    nx.draw_networkx_edge_labels(G, pos_layout, edge_labels=edge_labels, font_size=9, font_color="#333333")
 
-    # Determine highly readable text contrast dynamically based on node color background brightness
+    # High-contrast label text overlay
     for node_name, pos in pos_layout.items():
         idx = list(G.nodes()).index(node_name)
-        bg_color = node_colors[idx]
+        bg_color = colors[idx]
 
-        # Compute simple luminance to pick text color
         luminance = 0.299 * bg_color[0] + 0.587 * bg_color[1] + 0.114 * bg_color[2]
         text_color = 'white' if luminance < 0.6 else 'black'
 
         plt.text(
             pos[0], pos[1], labels[node_name],
             color=text_color,
-            fontsize=8,
+            fontsize=9,
             fontweight='bold',
             horizontalalignment='center',
             verticalalignment='center'
