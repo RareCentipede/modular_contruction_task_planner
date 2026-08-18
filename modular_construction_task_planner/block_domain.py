@@ -1,11 +1,13 @@
 import numpy as np
 
 from trimesh import Trimesh, creation
-from typing import List, Tuple, Callable
+from typing import Dict, List, Tuple, Callable
 from dataclasses import dataclass, field
 from eas.core import (
     Variable, Entity, State, Condition, ComputedCondition, Effect, Action, Pose
 )
+# Add this import to block_domain.py
+from modular_construction_task_planner.rbe_solver import compute_stablelego_equilibrium
 
 # Block variables
 @dataclass
@@ -157,6 +159,28 @@ def robot_can_reach_object_grasp(robot: Robot, obj: Object) -> bool:
 def robot_can_reach_object_place(robot: Robot, obj: Object) -> bool:
     return robot.at.value in obj.placeable_from
 
+def check_placement_stability(obj: Object,
+                              target_pose: PosEntity,
+                              world_objects: List[Object],
+                              world_poses: Dict[str, Pose]) -> bool:
+    """
+    ComputedCondition computer function: Temporarily assigns the target pose to the object 
+    and checks if the entire resulting structure remains in static equilibrium.
+    """
+    # Store original position
+    orig_at = obj.at.value
+    
+    # Temporarily set object location
+    obj.at.value = target_pose.name
+    
+    # Evaluate global multi-body equilibrium
+    is_stable, _ = compute_stablelego_equilibrium(world_objects, world_poses)
+    
+    # Revert temporary assignment
+    obj.at.value = orig_at
+    
+    return is_stable
+
 # Action definitions
 transit_parameters = {
     'robot': Robot,
@@ -224,7 +248,9 @@ place_conditions = [
     ComputedCondition('robot_can_reach_object', robot_can_reach_object_place, ('robot', 'object')),
     Condition('gripper_holding_object', 'robot', 'holding', 'object'),
     Condition('target_pose_clear', 'target_pose', 'clear', True),
-    Condition('object_supported', 'object', 'supported', True)
+    Condition('object_supported', 'object', 'supported', True),
+    # Integrated StableLego Force Equilibrium Precondition
+    ComputedCondition('stack_statically_stable', check_placement_stability, ('object', 'target_pose', 'world_objects', 'world_poses'))
 ]
 place_effects = [
     Effect('place_object', 'robot', 'holding', None),

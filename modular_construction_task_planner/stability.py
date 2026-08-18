@@ -350,7 +350,7 @@ def visualize_support_node_graph(support_graph: Dict[str, 'SupportNode'],
     # 4. Render Graph Elements
     nx.draw_networkx_nodes(
         G, pos_layout,
-        node_color=node_colors,
+        node_color=node_colors, # type: ignore
         node_size=700,
         edgecolors='#222222',
         linewidths=1.5,
@@ -570,7 +570,7 @@ def animate_construction_sequence(init_data: dict, goal_data: dict, placement_se
             plt.savefig(f"movies/{title}_animation_step_{frame_idx}.pdf", bbox_inches='tight')
 
     total_frames = len(placement_sequence) + 1
-    anim = FuncAnimation(fig, update, frames=total_frames, interval=interval, repeat=True)
+    anim = FuncAnimation(fig, update, frames=total_frames, interval=interval, repeat=True) # type: ignore
 
     plt.tight_layout()
     if show:

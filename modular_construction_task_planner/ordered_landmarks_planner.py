@@ -12,7 +12,7 @@ from eas.core import (
     Entity, StateStatus, World
 )
 from modular_construction_task_planner.block_domain import (
-    Action, Object, PosEntity, Robot, ShadowBox
+    Action, Object, PosEntity, Robot
 )
 from modular_construction_task_planner.stability import SupportNode, compute_placement_stability
 
@@ -74,8 +74,6 @@ class OrderedLandmarksPlanner:
         #     print(f"Block {block.name} can be reached from {len(block.reachable_from)} positions")
         #     self.num_potential_solutions *= len(block.reachable_from)
         # print(f"Number of potential solutions: {self.num_potential_solutions}")
-
-        self.shadow_boxes = spawn_shadow_boxes(self.world)
 
     def reset(self, solution_count: int = 100) -> None:
         self.world = self.original_world
@@ -886,59 +884,6 @@ def compute_arc_length(start_pos: List[float], target_pos: List[float], obj_pos:
     arc_length = angle_at_obstacle * col_radius
 
     return arc_length
-
-def spawn_shadow_boxes(world: World) -> Dict[str, ShadowBox]:
-    """
-        Shadow boxes: [host_entity_name] -> ShadowBox: Object
-    """
-
-    shadow_boxes = {}
-    obj_entities = world.entities.get_entities(Object)
-
-    if not obj_entities:
-        raise ValueError("No object entities found in the world to spawn shadow boxes.")
-
-    obj_entities = cast(List[Object], obj_entities)
-    for obj in obj_entities:
-        if not obj.goal:
-            continue  # Skip objects without a goal position
-
-        obj_name = obj.name
-        shadow_box_name = f"{obj_name}_shadow_box"
-        shadow_box = ShadowBox(shadow_box_name)
-        shadow_box.host.value = obj_name
-        shadow_box.at.value = obj.goal.value
-        shadow_boxes[obj.name] = shadow_box
-
-    return shadow_boxes
-
-def extract_available_positions_from_world(world: World, shadow_boxes: Dict[str, ShadowBox]) -> \
-    Tuple[List[Object], Dict[str, Object], List[Tuple[float, float]]]:
-    available_entities = []
-    entity_positions = []
-    all_entities = {}
-
-    for box_host_name, shadow_box in shadow_boxes.items():
-        goal_pos = shadow_box.at.value
-        if not goal_pos:
-            continue
-
-        host_entity = world.entities.get_entities(box_host_name)
-        host_entity = cast(Object, host_entity)
-        if host_entity.at.value == goal_pos or not host_entity.at.value:
-            continue  # Skip if the object is already at its goal position
-
-        pos_val = host_entity.at.value
-        pos = world.pose_dict[pos_val].position
-        shadow_pos = world.pose_dict[goal_pos].position
-
-        available_entities.append(host_entity)
-        entity_positions.append(pos)
-        entity_positions.append(shadow_pos)
-        all_entities[host_entity.name] = host_entity
-        all_entities[shadow_box.name] = shadow_box
-
-    return available_entities, all_entities, entity_positions
 
 class SearchMonitor:
     def __init__(self, patience: int = 5, min_delta: float = 0.1):
