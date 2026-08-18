@@ -53,7 +53,6 @@ def calculate_overhang_strain(pos: list, size: list, goal_config: dict) -> float
     unsupported_ratio = 1.0 - min(1.0, total_overlap_area / block_area)
     return float(np.clip(unsupported_ratio, 0.0, 1.0))
 
-
 # ==============================================================================
 # 2. CENTRALIZED COMPUTATION ENGINE
 # ==============================================================================
@@ -182,7 +181,6 @@ def compute_construction_metrics(
         "latest_strains": latest_strains
     }
 
-
 # ==============================================================================
 # 3. PURE PLOTTING FUNCTIONS
 # ==============================================================================
@@ -245,7 +243,6 @@ def plot_friction_heatmap(data: Dict[str, Any], show: bool = False):
     if show:
         plt.show()
 
-
 def plot_construction_sequence_strain(data: Dict[str, Any], show: bool = False):
     steps = data['steps']
     sequence = data['construction_sequence']
@@ -267,7 +264,6 @@ def plot_construction_sequence_strain(data: Dict[str, Any], show: bool = False):
 
     if show:
         plt.show()
-
 
 def plot_com_projection(data: Dict[str, Any], show: bool = False):
     ground_pts = data['ground_pts']
@@ -300,7 +296,6 @@ def plot_com_projection(data: Dict[str, Any], show: bool = False):
 
     if show:
         plt.show()
-
 
 def plot_construction_force_and_strain(data: Dict[str, Any], show: bool = False):
     steps = data['steps']
@@ -337,7 +332,6 @@ def plot_construction_force_and_strain(data: Dict[str, Any], show: bool = False)
 
     if show:
         plt.show()
-
 
 # ==============================================================================
 # 4. ENTRY POINT
