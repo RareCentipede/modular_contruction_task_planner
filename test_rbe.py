@@ -1,6 +1,6 @@
-import numpy as np
-from eas.core import World, Entities, Pose, load_domains
-from modular_construction_task_planner.block_domain import Object, PosEntity, Robot
+from yaml import safe_load
+
+from eas.config_parser_world_basic import parse_configs_to_world
 from modular_construction_task_planner.stability import (
     create_support_relation_graph,
     find_feasible_block_sequence,
@@ -10,98 +10,66 @@ from modular_construction_task_planner.stability import (
     generate_nice_colors
 )
 
-def run_test():
-    # 1. Register finite variable domains required by core.py
-    load_domains({
-        'pos': (None, 'pose_block1_init', 'pose_block2_init', 'pose_block3_init', 
-                'pose_block1_goal', 'pose_block2_goal', 'pose_block3_goal'),
-        'bool': (True, False),
-        'block': (None, 'block1', 'block2', 'block3'),
-        'robo_pos': ('robot_home',)
-    })
 
-    # 2. Define block dimensions [length, width, height]
-    dim = [1.0, 1.0, 1.0]
+def run_test(problem_name: str = "scaffolding_tower", problem_config_path: str = "configs/problem_configs/"):
+    # 1. Parse world definition and object states from config files
+    world = parse_configs_to_world(problem_name, problem_config_path)
 
-    # 3. Create block entities and assign goal pose references
-    b1 = Object(name='block1', dim=dim)
-    b2 = Object(name='block2', dim=dim)
-    b3 = Object(name='block3', dim=dim)
+    # 2. Load raw YAML configurations for initial and goal layouts
+    init_config = safe_load(open(f"{problem_config_path}/{problem_name}/init.yaml", 'r'))
+    goal_config = safe_load(open(f"{problem_config_path}/{problem_name}/goal.yaml", 'r'))
 
-    b1.goal.value = 'pose_block1_goal'
-    b2.goal.value = 'pose_block2_goal'
-    b3.goal.value = 'pose_block3_goal'
-
-    entities = Entities([b1, b2, b3])
-
-    # 4. Map poses (positions in world space)
-    # Staging/Initial positions (Z = 0.5 for center of 1x1x1 cube)
-    # Structure setup: block1 rests on ground, block2 on block1, block3 on block2
-    pose_dict = {
-        'pose_block1_init': Pose(position=[-2.0, 0.0, 0.5], orientation=[0, 0, 0]),
-        'pose_block2_init': Pose(position=[-2.0, 2.0, 0.5], orientation=[0, 0, 0]),
-        'pose_block3_init': Pose(position=[-2.0, -2.0, 0.5], orientation=[0, 0, 0]),
-
-        'pose_block1_goal': Pose(position=[0.0, 0.0, 0.5], orientation=[0, 0, 0]),
-        'pose_block2_goal': Pose(position=[0.0, 0.0, 1.5], orientation=[0, 0, 0]),
-        'pose_block3_goal': Pose(position=[0.0, 0.0, 2.5], orientation=[0, 0, 0]),
-    }
-
-    world = World(entities=entities, pose_dict=pose_dict)
-
-    # 5. Calculate support graph using stability.py
-    print("Computing support relation graph...")
+    # 3. Compute support relation graph using the world instance
+    print(f"Computing support graph for problem: {problem_name}...")
     ground_mesh, support_graph = create_support_relation_graph(
         world=world, 
         support_ratio_threshold=0.7, 
         verbose=True
     )
 
-    # 6. Topological sort to determine placement order
-    placement_sequence = find_feasible_block_sequence(support_graph)
-    print(f"\nFeasible Placement Sequence: {placement_sequence}")
+    # 4. Extract feasible placement sequence
+    sequence = find_feasible_block_sequence(support_graph)
+    if not sequence:
+        print("No valid block placement sequence found due to unstable support constraints.")
+        return
 
-    # 7. Format dataset dicts for visualization functions
-    init_data = {}
-    goal_data = {}
-    for obj in [b1, b2, b3]:
-        init_p = world.pose_dict[f"pose_{obj.name}_init"].position
-        goal_p = world.pose_dict[obj.goal.value].position # type: ignore
+    print(f"\nFeasible Placement Sequence: {sequence}")
 
-        init_data[obj.name] = {'position': init_p, 'size': obj.dim}
-        goal_data[obj.name] = {'position': goal_p, 'size': obj.dim}
+    # 5. Generate matching color palette based on block count
+    colors = generate_nice_colors(len(goal_config))
 
-    colors = generate_nice_colors(len(placement_sequence))
-
-    # 8. Display visual graph of support dependencies
+    # 6. Display visual graph of support dependencies
     print("\nDisplaying support graph...")
     visualize_support_node_graph(
         support_graph=support_graph,
         colors=colors,
-        title="Block Support Dependency Graph",
+        title=f"{problem_name} - Support Dependency Graph",
         show=True
     )
 
-    # 9. Visualize goal structure in 3D
+    # 7. Visualize target goal structure in 3D
     print("Displaying goal structure...")
     visualize_goal_structure(
-        goal_data=goal_data,
+        goal_data=goal_config,
         unique_colors=colors,
-        title="Goal Assembly Structure",
+        title=f"{problem_name} - Goal Structure",
         show=True
     )
 
-    # 10. Animate assembly sequence
-    print("Animating sequence...")
+    # 8. Animate construction sequence using parsed configs and sequence
+    print("Animating assembly sequence...")
     anim = animate_construction_sequence(
-        init_data=init_data,
-        goal_data=goal_data,
-        placement_sequence=placement_sequence,
+        init_data=init_config,
+        goal_data=goal_config,
+        placement_sequence=sequence,
         color_array=colors,
-        interval=1000,
+        interval=800,
         show=True,
-        title="StableLego_Assembly_Test"
+        title=problem_name
     )
 
 if __name__ == "__main__":
-    run_test()
+    # Test across parameterized problem configurations
+    problems = ["scaffolding_tower"]
+    for problem in problems:
+        run_test(problem_name=problem)
