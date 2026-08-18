@@ -1,0 +1,16 @@
+left_pillar:
+  position: [-3.0, 0.0, 1.0]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 2.0]
+right_pillar:
+  position: [-3.0, 2.0, 1.0]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 2.0]
+keystone:
+  position: [-3.0, -2.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 0.8]
+robot:
+  type: "robot"
+  position: [-10.0, 0.0, 0.0]
+  orientation: [0.0, 0.0, 0.0]

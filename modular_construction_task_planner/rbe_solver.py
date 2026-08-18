@@ -12,12 +12,11 @@ if TYPE_CHECKING:
 @dataclass
 class ContactPoint:
     position: np.ndarray  # 3D contact coordinate [x, y, z]
-    normal: np.ndarray    # Unit normal vector (pointing into supported object)
+    normal: np.ndarray    # Unit normal vector
     tangent1: np.ndarray  # First orthogonal friction vector
     tangent2: np.ndarray  # Second orthogonal friction vector
 
 def extract_object_pose_matrix(obj: "Object", world_poses: Dict[str, Pose]) -> np.ndarray:
-    """Extracts the 4x4 homogeneous transformation matrix for an Object."""
     pose_val = obj.at.value
     if pose_val in world_poses:
         return world_poses[pose_val].homogeneous
@@ -26,40 +25,53 @@ def extract_object_pose_matrix(obj: "Object", world_poses: Dict[str, Pose]) -> n
 def extract_contact_points_between_objects(
     obj_top: "Object",
     obj_bot: "Object",
-    world_poses: Dict[str, Pose]
+    world_poses: Dict[str, Pose],
+    tolerance: float = 0.05
 ) -> List[ContactPoint]:
-    """
-    Computes contact surface patches between two Object meshes in world space.
-    """
+    """Computes contact surface patches between two objects using 2D overlapping projections."""
     T_top = extract_object_pose_matrix(obj_top, world_poses)
     T_bot = extract_object_pose_matrix(obj_bot, world_poses)
 
-    # Transform meshes into world coordinates
-    mesh_top = obj_top.mesh.copy().apply_transform(T_top)
-    mesh_bot = obj_bot.mesh.copy().apply_transform(T_bot)
+    pos_top = T_top[:3, 3]
+    pos_bot = T_bot[:3, 3]
 
-    # Collision / Contact Query using Trimesh
-    collision_manager = trimesh.collision.CollisionManager()
-    collision_manager.add_object("bot", mesh_bot)
+    dim_top = obj_top.dim if obj_top.dim else [1.0, 1.0, 1.0]
+    dim_bot = obj_bot.dim if obj_bot.dim else [1.0, 1.0, 1.0]
 
-    is_collision, contacts = collision_manager.in_collision_single( # type: ignore
-        mesh_top, return_data=True
-    )
+    # Check vertical proximity (bottom of top object vs top of bot object)
+    z_bottom_top = pos_top[2] - dim_top[2] / 2.0
+    z_top_bot = pos_bot[2] + dim_bot[2] / 2.0
 
-    if not is_collision or not contacts:
+    if abs(z_bottom_top - z_top_bot) > tolerance:
         return []
 
-    contact_points = []
-    normal = np.array([0.0, 0.0, 1.0])  # Dominant support normal (+Z)
+    # Check XY overlap bounds
+    x_overlap = min(pos_top[0] + dim_top[0]/2, pos_bot[0] + dim_bot[0]/2) - max(pos_top[0] - dim_top[0]/2, pos_bot[0] - dim_bot[0]/2)
+    y_overlap = min(pos_top[1] + dim_top[1]/2, pos_bot[1] + dim_bot[1]/2) - max(pos_top[1] - dim_top[1]/2, pos_bot[1] - dim_bot[1]/2)
+
+    if x_overlap <= 0 or y_overlap <= 0:
+        return []
+
+    # Generate 4 corner contact points on the overlapping surface patch
+    min_x = max(pos_top[0] - dim_top[0]/2, pos_bot[0] - dim_bot[0]/2)
+    max_x = min(pos_top[0] + dim_top[0]/2, pos_bot[0] + dim_bot[0]/2)
+    min_y = max(pos_top[1] - dim_top[1]/2, pos_bot[1] - dim_bot[1]/2)
+    max_y = min(pos_top[1] + dim_top[1]/2, pos_bot[1] + dim_bot[1]/2)
+    z_contact = z_bottom_top
+
+    normal = np.array([0.0, 0.0, 1.0])
     tangent1 = np.array([1.0, 0.0, 0.0])
     tangent2 = np.array([0.0, 1.0, 0.0])
 
-    for contact_data in contacts:
-        # Extract contact point location
-        pt = contact_data.point
-        contact_points.append(ContactPoint(pt, normal, tangent1, tangent2))
+    pts = [
+        np.array([min_x, min_y, z_contact]),
+        np.array([max_x, min_y, z_contact]),
+        np.array([max_x, max_y, z_contact]),
+        np.array([min_x, max_y, z_contact]),
+    ]
 
-    return contact_points
+    return [ContactPoint(pt, normal, tangent1, tangent2) for pt in pts]
+
 
 def compute_stablelego_equilibrium(
     objects: List["Object"],
@@ -68,29 +80,22 @@ def compute_stablelego_equilibrium(
     default_mu: float = 0.5,
     gravity: float = 9.81
 ) -> Tuple[bool, Dict[str, float]]:
-    """
-    Evaluates static equilibrium for a set of placed Object entities.
-    Returns (is_stable, per_object_residuals).
-    """
-    # Filter only objects currently placed in the world (ignore held or unplaced objects)
-    active_objects = [o for o in objects if o.at.value is not None]
+    active_objects = [o for o in objects if o.at.value is not None and o.at.value in world_poses]
     N = len(active_objects)
     if N == 0:
         return True, {}
 
     all_contacts: List[Tuple[ContactPoint, "Object", float]] = []
 
-    # 1. Collect ground and inter-object contacts
+    # 1. Ground Contacts (Z near 0)
     for obj in active_objects:
         T_matrix = extract_object_pose_matrix(obj, world_poses)
         p_com = T_matrix[:3, 3]
-        half_height = obj.dim[2] / 2.0 if obj.dim else 0.05
+        half_height = obj.dim[2] / 2.0 if obj.dim else 0.5
 
-        # Ground contact condition (near Z=0)
-        if abs(p_com[2] - half_height) < 1e-3:
-            # Create 4 support points at base polygon corners
-            half_x = obj.dim[0] / 2.0 if obj.dim else 0.05
-            half_y = obj.dim[1] / 2.0 if obj.dim else 0.05
+        if abs(p_com[2] - half_height) < 0.05:
+            half_x = obj.dim[0] / 2.0 if obj.dim else 0.5
+            half_y = obj.dim[1] / 2.0 if obj.dim else 0.5
             corners = [
                 np.array([p_com[0] - half_x, p_com[1] - half_y, 0.0]),
                 np.array([p_com[0] + half_x, p_com[1] - half_y, 0.0]),
@@ -101,7 +106,7 @@ def compute_stablelego_equilibrium(
                 cp = ContactPoint(pt, np.array([0, 0, 1]), np.array([1, 0, 0]), np.array([0, 1, 0]))
                 all_contacts.append((cp, obj, default_mu))
 
-    # Collect pairwise object contacts
+    # 2. Inter-Object Contacts
     for i, top_obj in enumerate(active_objects):
         for j, bot_obj in enumerate(active_objects):
             if i != j:
@@ -111,14 +116,13 @@ def compute_stablelego_equilibrium(
 
     K = len(all_contacts)
     if K == 0:
-        return False, {"error": 1.0}
+        return False, {obj.name: 1.0 for obj in active_objects}
 
-    # 2. Variable Vector Setup: 5 variables per contact point [f_n, f_t1+, f_t1-, f_t2+, f_t2-]
     num_vars = 5 * K
     A_eq = np.zeros((6 * N, num_vars))
     b_eq = np.zeros(6 * N)
 
-    # 3. Construct Force Balance Equations
+    # 3. Construct Balance Matrices
     for idx, obj in enumerate(active_objects):
         T_matrix = extract_object_pose_matrix(obj, world_poses)
         p_com = T_matrix[:3, 3]
@@ -130,7 +134,6 @@ def compute_stablelego_equilibrium(
             if target_obj.name == obj.name:
                 col = 5 * k
 
-                # Force translational component
                 A_eq[6 * idx + 0, col + 1] = cp.tangent1[0]
                 A_eq[6 * idx + 0, col + 2] = -cp.tangent1[0]
                 A_eq[6 * idx + 0, col + 3] = cp.tangent2[0]
@@ -143,7 +146,6 @@ def compute_stablelego_equilibrium(
 
                 A_eq[6 * idx + 2, col + 0] = cp.normal[2]
 
-                # Torque component: (c - p_com) x Force
                 r = cp.position - p_com
                 t_n = np.cross(r, cp.normal)
                 t_t1 = np.cross(r, cp.tangent1)
@@ -171,21 +173,19 @@ def compute_stablelego_equilibrium(
         A_ub[2 * k + 1, col + 3] = 1.0
         A_ub[2 * k + 1, col + 4] = 1.0
 
-    # Objective: Minimize normal force sum
     c = np.zeros(num_vars)
     for k in range(K):
         c[5 * k] = 1.0
 
     bounds = [(0, None) for _ in range(num_vars)]
 
-    # 5. Solve Linear Program
     res = linprog(c, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq, bounds=bounds, method='highs')
 
     if res.success:
-        residuals = {
-            obj.name: float(np.linalg.norm(A_eq[6 * idx: 6 * idx + 6] @ res.x - b_eq[6 * idx: 6 * idx + 6]))
-            for idx, obj in enumerate(active_objects)
-        }
+        residuals = {}
+        for idx, obj in enumerate(active_objects):
+            err = np.linalg.norm(A_eq[6 * idx: 6 * idx + 6] @ res.x - b_eq[6 * idx: 6 * idx + 6])
+            residuals[obj.name] = float(err)
         return True, residuals
     else:
-        return False, {"error": 1.0}
+        return False, {obj.name: 1.0 for obj in active_objects}

@@ -1,0 +1,13 @@
+left_pillar:
+  position: [-0.9, 0.0, 1.0]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 2.0]
+right_pillar:
+  position: [0.9, 0.0, 1.0]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 2.0]
+keystone:
+  # Suspended via side-wall friction between pillars
+  position: [0.0, 0.0, 1.6]
+  orientation: [0.0, 0.0, 0.0]
+  size: [0.78, 1.0, 0.8]

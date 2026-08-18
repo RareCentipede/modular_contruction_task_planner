@@ -1,0 +1,20 @@
+base_left:
+  position: [-2.0, 0.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+base_right:
+  position: [-2.0, 2.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+mid_span:
+  position: [-2.0, -2.0, 0.25]
+  orientation: [0.0, 0.0, 0.0]
+  size: [3.0, 1.0, 0.5]
+top_heavy_load:
+  position: [-2.0, 4.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+robot:
+  type: "robot"
+  position: [-10.0, 0.0, 0.0]
+  orientation: [0.0, 0.0, 0.0]

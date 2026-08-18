@@ -1,0 +1,13 @@
+block1:
+  position: [0.0, 0.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+block2:
+  position: [0.0, 0.0, 1.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+block3:
+  # Overhanging horizontal beam
+  position: [0.75, 0.0, 2.25]
+  orientation: [0.0, 0.0, 0.0]
+  size: [2.0, 1.0, 0.5]
