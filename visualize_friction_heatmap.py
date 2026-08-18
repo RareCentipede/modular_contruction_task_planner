@@ -3,8 +3,9 @@ import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-from typing import List, Dict, cast
+from typing import List, Dict, Optional, cast
 from yaml import safe_load
+from scipy.spatial import ConvexHull
 
 from eas.config_parser_world_basic import parse_configs_to_world
 from modular_construction_task_planner.block_domain import Object
@@ -57,7 +58,9 @@ def calculate_overhang_strain(pos: list, size: list, goal_config: dict) -> float
     unsupported_ratio = 1.0 - min(1.0, total_overlap_area / block_area)
     return float(np.clip(unsupported_ratio, 0.0, 1.0))
 
-def plot_friction_heatmap(problem_name: str = "cantilever_bridge", problem_config_path: str = "configs/problem_configs/"):
+def plot_friction_heatmap(problem_name: str = "cantilever_bridge",
+                          problem_config_path: str = "configs/problem_configs/",
+                          show: bool = False):
     world = parse_configs_to_world(problem_name, problem_config_path)
     goal_config = safe_load(open(f"{problem_config_path}/{problem_name}/goal.yaml", 'r'))
     
@@ -128,7 +131,138 @@ def plot_friction_heatmap(problem_name: str = "cantilever_bridge", problem_confi
     ax.set_zlabel('Z [m]')
 
     plt.tight_layout()
-    plt.show()
+
+    if show:
+        plt.show()
+
+def plot_construction_sequence_strain(
+    problem_name: str = "scaffolding_tower", 
+    problem_config_path: str = "configs/problem_configs/",
+    construction_sequence: Optional[List[str]] = None,
+    show: bool = False
+):
+    goal_config = safe_load(open(f"{problem_config_path}/{problem_name}/goal.yaml", 'r'))
+    
+    # If no custom sequence provided, default to sorted block key order
+    if construction_sequence is None:
+        construction_sequence = [k for k in goal_config.keys() if 'position' in goal_config[k]]
+        # Sort sequence by Z height so base blocks are placed first
+        construction_sequence.sort(key=lambda k: goal_config[k]['position'][2])
+
+    steps = []
+    max_strains = []
+    mean_strains = []
+    latest_strains = []
+    active_config = {}
+
+    # Iterate step-by-step through the construction sequence
+    for idx, block_name in enumerate(construction_sequence, start=1):
+        if block_name in goal_config:
+            active_config[block_name] = goal_config[block_name]
+        
+        # Calculate strains for all blocks currently placed
+        current_strains = []
+        for name, data in active_config.items():
+            if 'position' in data:
+                s = calculate_overhang_strain(data['position'], data['size'], active_config)
+                current_strains.append(s)
+
+        steps.append(idx)
+        max_strains.append(max(current_strains) if current_strains else 0.0)
+        mean_strains.append(np.mean(current_strains) if current_strains else 0.0)
+        latest_strains.append(current_strains[-1] if current_strains else 0.0)
+
+    # Plot Line Chart
+    plt.figure(figsize=(9, 5))
+    plt.plot(steps, max_strains, color='#d95f02', marker='o', linewidth=2.5, label='Peak Overhang Strain Ratio')
+    plt.plot(steps, mean_strains, color='#7570b3', linestyle='--', marker='s', linewidth=1.5, label='Average Structure Strain Ratio')
+    plt.plot(steps, latest_strains, color='#1b9e77', linestyle=':', marker='^', linewidth=1.5, label='Latest Block Strain Ratio')
+
+    # Critical threshold indicator line
+    plt.axhline(y=0.7, color='r', linestyle=':', label='High Strain Warning Threshold (0.7)')
+
+    plt.title(f"Construction Sequence Strain Evolution: {problem_name}", fontsize=13, fontweight='bold', pad=12)
+    plt.xlabel("Construction Step (Block Placed)", fontweight='bold')
+    plt.ylabel("Strain Ratio [0.0 = Stable, 1.0 = Max Moment]", fontweight='bold')
+    plt.xticks(steps, [f"Step {s}\n({construction_sequence[s-1]})" for s in steps], rotation=30, ha='right', fontsize=9)
+    plt.ylim(-0.05, 1.05)
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.legend(loc='upper left')
+    
+    plt.tight_layout()
+
+    if show:
+        plt.show()
+
+def plot_com_projection(problem_name: str = "interlocking_pyramid",
+                        problem_config_path: str = "configs/problem_configs/",
+                        show: bool = False):
+    world = parse_configs_to_world(problem_name, problem_config_path)
+    goal_config = safe_load(open(f"{problem_config_path}/{problem_name}/goal.yaml", 'r'))
+
+    ground_points = []
+    total_mass = 0.0
+    weighted_com = np.zeros(2)
+
+    for name, data in goal_config.items():
+        if 'position' not in data:
+            continue
+        
+        pos = np.array(data['position'])
+        size = np.array(data['size'])
+        mass = data.get('mass', 1.0)
+
+        # 2D COM accumulation (X, Y)
+        weighted_com += pos[:2] * mass
+        total_mass += mass
+
+        # Ground contact footprint (Z close to base floor)
+        if abs(pos[2] - size[2] / 2.0) < 1e-2:
+            hx, hy = size[0] / 2.0, size[1] / 2.0
+            ground_points.extend([
+                [pos[0] - hx, pos[1] - hy],
+                [pos[0] + hx, pos[1] - hy],
+                [pos[0] + hx, pos[1] + hy],
+                [pos[0] - hx, pos[1] + hy],
+            ])
+
+    global_com = weighted_com / total_mass
+    ground_pts = np.array(ground_points)
+
+    plt.figure(figsize=(7, 7))
+    plt.title(f"Center of Mass Projection vs Ground Hull\n({problem_name})", fontsize=13, fontweight='bold')
+
+    # Draw support base convex hull
+    if len(ground_pts) >= 3:
+        hull = ConvexHull(ground_pts)
+        for simplex in hull.simplices:
+            plt.plot(ground_pts[simplex, 0], ground_pts[simplex, 1], 'k-', linewidth=2.0)
+        plt.fill(ground_pts[hull.vertices, 0], ground_pts[hull.vertices, 1], color='lightgray', alpha=0.5, label='Base Support Polygon')
+
+    # Plot individual block footprints
+    for name, data in goal_config.items():
+        if 'position' in data:
+            pos, sz = data['position'], data['size']
+            plt.scatter(pos[0], pos[1], c='blue', s=30, alpha=0.6)
+            plt.text(pos[0] + 0.05, pos[1] + 0.05, name, fontsize=8)
+
+    # Plot Global CoM
+    plt.scatter(global_com[0], global_com[1], c='red', s=180, marker='X', zorder=10, label=f'Global CoM ({global_com[0]:.2f}, {global_com[1]:.2f})')
+
+    plt.axhline(0, color='gray', linestyle='--', linewidth=0.5)
+    plt.axvline(0, color='gray', linestyle='--', linewidth=0.5)
+    plt.xlabel('X Coordinate [m]')
+    plt.ylabel('Y Coordinate [m]')
+    plt.axis('equal')
+    plt.grid(True, linestyle=':', alpha=0.6)
+    plt.legend(loc='upper right')
+    plt.tight_layout()
+    if show:
+        plt.show()
 
 if __name__ == "__main__":
-    plot_friction_heatmap("temple_facade")
+    problem_name = "scaffolding_tower"
+    plot_construction_sequence_strain(problem_name)
+    plot_friction_heatmap(problem_name)
+    plot_com_projection(problem_name)
+    plt.show()

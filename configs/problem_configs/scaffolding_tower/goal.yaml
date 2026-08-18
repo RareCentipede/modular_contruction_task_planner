@@ -66,11 +66,11 @@ block13:
 
 # --- Tier 5 Core Central Pillars (Z = 4.5, Height = 1.0) ---
 block15:
-  position: [0.0, -0.5, 4.5]
+  position: [0.0, -0.25, 4.5]
   orientation: [0.0, 0.0, 0.0]
   size: [0.5, 0.5, 1.0]
 block16:
-  position: [0.0, 0.5, 4.5]
+  position: [0.0, 0.25, 4.5]
   orientation: [0.0, 0.0, 0.0]
   size: [0.5, 0.5, 1.0]
 
