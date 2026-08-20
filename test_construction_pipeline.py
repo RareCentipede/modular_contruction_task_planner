@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 # Core import dependencies
 from eas.config_parser_world_basic import parse_configs_to_world
-from modular_construction_task_planner.block_domain import Object
+from modular_construction_task_planner.block_domain import Object, PickAction, PlaceAction, TransitAction, TransportAction
 from modular_construction_task_planner.ordered_landmarks_planner import OrderedLandmarksPlanner, HEURISTIC
 from modular_construction_task_planner.stability import (
     create_support_relation_graph,
@@ -19,6 +19,12 @@ from modular_construction_task_planner.rbe_solver import compute_stablelego_equi
 from modular_construction_task_planner.block_sequence_animator import TrimeshBlockAnimator
 from visualize_stability import compute_construction_metrics, plot_friction_heatmap, plot_construction_force_and_strain
 
+action_dict = {
+        'transit': TransitAction,
+        'transport': TransportAction,
+        'pick': PickAction,
+        'place': PlaceAction
+}
 
 def run_construction_testing_pipeline(problem_name: str = "arch", config_path: str = "configs/problem_configs/"):
     print(f"==================================================")
@@ -58,6 +64,26 @@ def run_construction_testing_pipeline(problem_name: str = "arch", config_path: s
     except ValueError as e:
         print(f" Error in sequence generation: {e}")
         return
+
+    # --------------------------------------------------------------------------
+    # 2. Symbolic Task Planning (OrderedLandmarksPlanner)
+    # --------------------------------------------------------------------------
+    print("\n2. Generating Plan using OrderedLandmarksPlanner...")
+    
+    # Instantiate and execute the OrderedLandmarksPlanner
+    planner = OrderedLandmarksPlanner(world, action_dict)
+    plan_solution = planner.run_stable_planner(support_graph, ground_mesh)
+
+    if plan_solution:
+        print(f" Landmark Plan Found! Steps: {len(plan_solution)}")
+        # Extract ordered sequence from the plan actions
+        placement_sequence = [action.args[0].name for action in plan_solution if hasattr(action, 'args')]
+    else:
+        print(" Landmark Planner returned no path. Falling back to topological graph sorting...")
+        ground_mesh, support_graph = create_support_relation_graph(world, support_ratio_threshold=0.5)
+        placement_sequence = find_feasible_block_sequence(support_graph)
+
+    print(f" Target Sequence: {placement_sequence}")
 
     # --------------------------------------------------------------------------
     # 3. Static Equilibrium Verification (rbe_solver)
