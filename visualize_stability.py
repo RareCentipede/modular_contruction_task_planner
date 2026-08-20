@@ -158,7 +158,7 @@ def compute_construction_metrics(
     ground_pts = np.array(ground_points)
     hull_simplices = []
     hull_vertices = []
-    
+
     if len(ground_pts) >= 3:
         hull = ConvexHull(ground_pts)
         hull_simplices = hull.simplices
@@ -175,7 +175,7 @@ def compute_construction_metrics(
     max_strains = []
     mean_strains = []
     latest_strains = []
-    
+
     active_config = {}
     active_objects = []
 
@@ -185,7 +185,7 @@ def compute_construction_metrics(
     for idx, block_name in enumerate(construction_sequence, start=1):
         if block_name in goal_config:
             active_config[block_name] = goal_config[block_name]
-        
+
         if block_name in obj_dict:
             obj = obj_dict[block_name]
             if obj.goal.value:
@@ -194,7 +194,7 @@ def compute_construction_metrics(
 
         # 1. Unpack 3-tuple from updated rbe_solver
         is_stable, residuals, object_forces = compute_stablelego_equilibrium(active_objects, world.pose_dict)
-        
+
         max_res = max(residuals.values()) if residuals else 0.0
 
         # 2. Extract maximum real contact normal force [N]

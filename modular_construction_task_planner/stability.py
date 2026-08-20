@@ -16,7 +16,7 @@ from shapely.ops import unary_union
 from typing import Dict, List, Tuple, cast, Optional
 from dataclasses import dataclass, field
 
-from eas.core import World
+from eas.core import Pose, World
 from modular_construction_task_planner.block_domain import Object
 
 @dataclass
@@ -238,7 +238,8 @@ def visualize_goal_structure(goal_data: dict, unique_colors: List[Tuple[float, f
             color = list(color) + [0.6]
 
         # Generate mesh representation
-        mesh = make_box_mesh(size, pos)
+        pose = Pose(position=pos, orientation=data['orientation'])  # Assuming no rotation for simplicity
+        mesh = make_box_mesh(size, pose.homogeneous)
         all_vertices.append(mesh.vertices)
 
         # Convert Trimesh faces into matplotlib Poly3DCollection elements
