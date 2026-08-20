@@ -1,0 +1,35 @@
+column_left:
+  position: [-2.5, -1.0, 0.5]
+  orientation: [0.0, 0.0, 0.0, 1.0]
+  size: [0.8, 0.8, 1.0]
+  mass: 8.0
+
+column_right:
+  position: [2.5, -1.0, 0.5]
+  orientation: [0.0, 0.0, 0.0, 1.0]
+  size: [0.8, 0.8, 1.0]
+  mass: 8.0
+
+diagonal_left:
+  position: [-1.2, -2.0, 0.15]
+  orientation: [0.0, 0.0, 0.0, 1.0]
+  size: [0.3, 0.6, 1.5]
+  mass: 2.5
+
+diagonal_right:
+  position: [1.2, -2.0, 0.15]
+  orientation: [0.0, 0.0, 0.0, 1.0]
+  size: [0.3, 0.6, 1.5]
+  mass: 2.5
+
+keystone:
+  position: [0.0, -2.0, 0.2]
+  orientation: [0.0, 0.0, 0.0, 1.0]
+  size: [1.0, 0.8, 0.4]
+  mass: 6.0
+
+robot:
+  position: [0.0, -20.0, 0.0]
+  orientation: [0.0, 0.0, 0.0, 1.0]
+  size: [0.5, 0.5, 1.5]
+  mass: 50.0  # kg

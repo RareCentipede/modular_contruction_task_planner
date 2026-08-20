@@ -1,0 +1,29 @@
+base_left:
+  position: [-2.0, 0.0, 0.25]
+  orientation: [0.0, 0.0, 0.0, 1.0]
+  size: [1.2, 1.0, 0.5]
+  mass: 10.0
+
+base_right:
+  position: [2.0, 0.0, 0.25]
+  orientation: [0.0, 0.0, 0.0, 1.0]
+  size: [1.2, 1.0, 0.5]
+  mass: 10.0
+
+strut_left:
+  position: [-1.0, 0.0, 1.2]
+  orientation: [0.0, 0.3826834, 0.0, 0.9238795]
+  size: [0.3, 0.8, 2.2]
+  mass: 3.0
+
+strut_right:
+  position: [1.0, 0.0, 1.2]
+  orientation: [0.0, -0.3826834, 0.0, 0.9238795]
+  size: [0.3, 0.8, 2.2]
+  mass: 3.0
+
+top_deck:
+  position: [0.0, 0.0, 2.1]
+  orientation: [0.0, 0.0, 0.0, 1.0]
+  size: [2.6, 1.0, 0.3]
+  mass: 5.0

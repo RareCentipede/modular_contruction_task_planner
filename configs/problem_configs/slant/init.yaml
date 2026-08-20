@@ -1,0 +1,36 @@
+# Staging area on the ground plane (z = half_height, zero rotation)
+base_left:
+  position: [-3.0, 0.0, 0.25]
+  orientation: [0.0, 0.0, 0.0, 1.0]
+  size: [1.0, 1.0, 0.5]
+  mass: 1.0
+
+base_right:
+  position: [3.0, 0.0, 0.25]
+  orientation: [0.0, 0.0, 0.0, 1.0]
+  size: [1.0, 1.0, 0.5]
+  mass: 1.0
+
+strut_left:
+  position: [-1.5, 0.0, 0.2]
+  orientation: [0.0, 0.0, 0.0, 1.0]
+  size: [0.4, 0.8, 2.0]
+  mass: 0.5
+
+strut_right:
+  position: [1.5, 0.0, 0.2]
+  orientation: [0.0, 0.0, 0.0, 1.0]
+  size: [0.4, 0.8, 2.0]
+  mass: 0.5
+
+bridge_deck:
+  position: [0.0, 0.0, 0.15]
+  orientation: [0.0, 0.0, 0.0, 1.0]
+  size: [3.2, 1.0, 0.3]
+  mass: 1.2
+
+robot:
+  position: [0.0, -2.0, 0.0]
+  orientation: [0.0, 0.0, 0.0, 1.0]
+  size: [1.0, 1.0, 1.5]
+  mass: 0.8
