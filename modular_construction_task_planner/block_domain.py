@@ -89,7 +89,7 @@ class Object(Entity):
     reachable_from: List[str] = field(default_factory=list)
     placeable_from: List[str] = field(default_factory=list)
     surfaces: List[Surface] = field(default_factory=list)
-    propagated_cost: float = 0.0
+    mass: float = 1.0
     dim: List[float] = field(default_factory=list) # [length, width, height]
     _mesh: Trimesh | None = None
 
@@ -169,16 +169,16 @@ def check_placement_stability(obj: Object,
     """
     # Store original position
     orig_at = obj.at.value
-    
+
     # Temporarily set object location
     obj.at.value = target_pose.name
-    
+
     # Evaluate global multi-body equilibrium
-    is_stable, _ = compute_stablelego_equilibrium(world_objects, world_poses)
-    
+    is_stable, _, _ = compute_stablelego_equilibrium(world_objects, world_poses)
+
     # Revert temporary assignment
     obj.at.value = orig_at
-    
+
     return is_stable
 
 # Action definitions

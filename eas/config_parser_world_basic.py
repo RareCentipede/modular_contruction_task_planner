@@ -132,7 +132,8 @@ def assign_entities_variable_values_and_create_pose_dict(init_config: Dict, goal
         obj_entity.at.value = pos_entity.name
         obj_entity.on.value = gnd_obj_entity.name
         obj_entity.dim = info['size']
-    
+        obj_entity.mass = info.get('mass', 1.0)  # Default mass if not specified
+
         pos_entity.occupied_by.value = obj_entity.name
         pos_entity.on.value = gnd_pos_entity.name
         pos_entity.clear.value = False

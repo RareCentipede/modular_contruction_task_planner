@@ -79,12 +79,11 @@ def compute_stablelego_equilibrium(
     default_mass: float = 1.0,
     default_mu: float = 0.5,
     gravity: float = 9.81
-) -> Tuple[bool, Dict[str, float]]:
+) -> Tuple[bool, Dict[str, float], Dict[str, float]]:
     active_objects = [o for o in objects if o.at.value is not None and o.at.value in world_poses]
     N = len(active_objects)
     if N == 0:
-        return True, {}
-
+        return True, {}, {}
     all_contacts: List[Tuple[ContactPoint, "Object", float]] = []
 
     # 1. Ground Contacts (Z near 0)
@@ -116,7 +115,7 @@ def compute_stablelego_equilibrium(
 
     K = len(all_contacts)
     if K == 0:
-        return False, {obj.name: 1.0 for obj in active_objects}
+        return False, {obj.name: 1.0 for obj in active_objects}, {obj.name: 0.0 for obj in active_objects}
 
     num_vars = 5 * K
     A_eq = np.zeros((6 * N, num_vars))
@@ -128,7 +127,7 @@ def compute_stablelego_equilibrium(
         p_com = T_matrix[:3, 3]
 
         # Gravity Wrench
-        b_eq[6 * idx + 2] = default_mass * gravity
+        b_eq[6 * idx + 2] = obj.mass * gravity
 
         for k, (cp, target_obj, _) in enumerate(all_contacts):
             if target_obj.name == obj.name:
@@ -181,11 +180,24 @@ def compute_stablelego_equilibrium(
 
     res = linprog(c, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq, bounds=bounds, method='highs')
 
+    # In rbe_solver.py, replace the final return section (lines 142-152):
+
     if res.success:
         residuals = {}
+        object_forces = {}
+
         for idx, obj in enumerate(active_objects):
+            # Compute static force balance error
             err = np.linalg.norm(A_eq[6 * idx: 6 * idx + 6] @ res.x - b_eq[6 * idx: 6 * idx + 6])
             residuals[obj.name] = float(err)
-        return True, residuals
+
+            # Sum normal forces (f_n at col = 5*k) acting on this object
+            obj_normal_force = 0.0
+            for k, (_, target_obj, _) in enumerate(all_contacts):
+                if target_obj.name == obj.name:
+                    obj_normal_force += res.x[5 * k]  # col + 0 is cp.normal
+            object_forces[obj.name] = float(obj_normal_force)
+
+        return True, residuals, object_forces
     else:
-        return False, {obj.name: 1.0 for obj in active_objects}
+        return False, {obj.name: 1.0 for obj in active_objects}, {obj.name: 0.0 for obj in active_objects}

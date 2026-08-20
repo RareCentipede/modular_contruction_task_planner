@@ -1,13 +1,16 @@
+import numpy as np
+import matplotlib.cm as cm
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+
 from typing import List, Dict, Any, Optional, Tuple, cast
 from yaml import safe_load
-import matplotlib.cm as cm
-import matplotlib.colors as mcolors
 from matplotlib.lines import Line2D
-import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-import numpy as np
 from scipy.spatial import ConvexHull
+from scipy.spatial.transform import Rotation as R
 
+from eas.core import Pose
 from eas.config_parser_world_basic import parse_configs_to_world
 from modular_construction_task_planner.block_domain import Object
 from modular_construction_task_planner.rbe_solver import compute_stablelego_equilibrium
@@ -17,13 +20,43 @@ from modular_construction_task_planner.stability import make_box_mesh
 # 1. CORE STRAIN METRIC (CALCULATION HELPER)
 # ==============================================================================
 
-def calculate_overhang_strain(pos: list, size: list, goal_config: dict) -> float:
+def calculate_overhang_strain(
+    pos: list, 
+    size: list, 
+    goal_config: dict, 
+    orientation: Optional[list] = None
+) -> float:
     com_x, com_y, com_z = pos[0], pos[1], pos[2]
     half_x, half_y, half_z = size[0] / 2.0, size[1] / 2.0, size[2] / 2.0
 
-    if com_z <= half_z + 0.1:
+    # 1. Ground Level Check (Only flat horizontal base blocks get 0.0 ground strain)
+    is_ground = com_z <= half_z + 0.1
+
+    # 2. Robust Tilt Strain Calculation via Matrix Transformed Normal Vector
+    tilt_strain = 0.0
+    if orientation is not None and len(orientation) in (3, 4):
+        try:
+            if len(orientation) == 3:
+                rot_matrix = R.from_euler('xyz', orientation).as_matrix()
+            else:
+                rot_matrix = R.from_quat(orientation).as_matrix()
+
+            # Local upward normal vector [0, 0, 1] rotated into world space
+            world_up_local = rot_matrix @ np.array([0.0, 0.0, 1.0])
+            
+            # Dot product with global Z-axis [0, 0, 1]
+            cos_theta = np.clip(np.abs(world_up_local[2]), 0.0, 1.0)
+            theta_rad = np.arccos(cos_theta)
+            
+            # Strain ratio = sin(theta): 0.0 at vertical (0 rad), ~0.707 at 45°
+            tilt_strain = float(np.sin(theta_rad))
+        except Exception:
+            tilt_strain = 0.0
+
+    if is_ground and tilt_strain < 1e-3:
         return 0.0
 
+    # 3. Find Supporting Blocks
     supporting_blocks = []
     for other_name, other_data in goal_config.items():
         if 'position' not in other_data:
@@ -33,25 +66,29 @@ def calculate_overhang_strain(pos: list, size: list, goal_config: dict) -> float
         bot_z = com_z - half_z
         top_other_z = other_pos[2] + other_size[2] / 2.0
 
-        if abs(bot_z - top_other_z) < 0.1:
+        if abs(bot_z - top_other_z) < 0.15:
             dx = abs(com_x - other_pos[0])
             dy = abs(com_y - other_pos[1])
             if dx < (half_x + other_size[0] / 2.0) and dy < (half_y + other_size[1] / 2.0):
                 supporting_blocks.append((other_pos, other_size))
 
+    # 4. Area Overhang Strain Calculation
     if not supporting_blocks:
-        return 1.0
+        area_strain = 1.0
+    else:
+        total_overlap_area = 0.0
+        block_area = size[0] * size[1]
 
-    total_overlap_area = 0.0
-    block_area = size[0] * size[1]
+        for s_pos, s_size in supporting_blocks:
+            x_overlap = max(0.0, min(com_x + half_x, s_pos[0] + s_size[0]/2.0) - max(com_x - half_x, s_pos[0] - s_size[0]/2.0))
+            y_overlap = max(0.0, min(com_y + half_y, s_pos[1] + s_size[1]/2.0) - max(com_y - half_y, s_pos[1] - s_size[1]/2.0))
+            total_overlap_area += (x_overlap * y_overlap)
 
-    for s_pos, s_size in supporting_blocks:
-        x_overlap = max(0.0, min(com_x + half_x, s_pos[0] + s_size[0]/2.0) - max(com_x - half_x, s_pos[0] - s_size[0]/2.0))
-        y_overlap = max(0.0, min(com_y + half_y, s_pos[1] + s_size[1]/2.0) - max(com_y - half_y, s_pos[1] - s_size[1]/2.0))
-        total_overlap_area += (x_overlap * y_overlap)
+        unsupported_ratio = 1.0 - min(1.0, total_overlap_area / block_area)
+        area_strain = float(np.clip(unsupported_ratio, 0.0, 1.0))
 
-    unsupported_ratio = 1.0 - min(1.0, total_overlap_area / block_area)
-    return float(np.clip(unsupported_ratio, 0.0, 1.0))
+    # Return the maximum of structural bending strain and support coverage deficit
+    return float(np.clip(max(area_strain, tilt_strain), 0.0, 1.0))
 
 # ==============================================================================
 # 2. CENTRALIZED COMPUTATION ENGINE
@@ -68,7 +105,7 @@ def compute_construction_metrics(
     """
     world = parse_configs_to_world(problem_name, problem_config_path)
     goal_config = safe_load(open(f"{problem_config_path}/{problem_name}/goal.yaml", 'r'))
-    
+
     all_objects = cast(List[Object], world.entities.get_entities(Object))
     obj_dict = {obj.name: obj for obj in all_objects}
 
@@ -78,15 +115,20 @@ def compute_construction_metrics(
             obj.at.value = obj.goal.value
 
     # 1. Full-Structure Heatmap & Equilibrium
-    is_full_stable, full_residuals = compute_stablelego_equilibrium(all_objects, world.pose_dict, default_mass=1000.0)
+    is_full_stable, full_residuals, full_contact_forces = compute_stablelego_equilibrium(all_objects, world.pose_dict)
     block_strains = {}
     block_meshes = {}
-    
+
     for name, data in goal_config.items():
-        if 'position' in data:
+        obj = world.entities.get_entities(name)
+        obj = cast(Object, obj)
+        goal_pose = world.pose_dict.get(obj.goal.value) if obj.goal.value else None
+
+        if goal_pose:
             pos, size = data['position'], data['size']
-            block_strains[name] = calculate_overhang_strain(pos, size, goal_config)
-            block_meshes[name] = make_box_mesh(size, pos)
+            obj.at.value = obj.goal.value
+            block_strains[name] = calculate_overhang_strain(pos, size, goal_config, data['orientation'])
+            block_meshes[name] = make_box_mesh(size, goal_pose.homogeneous)
 
     # 2. Ground Hull & Global Center of Mass (CoM)
     ground_points = []
@@ -137,6 +179,9 @@ def compute_construction_metrics(
     active_config = {}
     active_objects = []
 
+    # Inside compute_construction_metrics step-by-step loop:
+    max_contact_forces = []
+
     for idx, block_name in enumerate(construction_sequence, start=1):
         if block_name in goal_config:
             active_config[block_name] = goal_config[block_name]
@@ -147,21 +192,28 @@ def compute_construction_metrics(
                 obj.at.value = obj.goal.value
             active_objects.append(obj)
 
-        is_stable, residuals = compute_stablelego_equilibrium(active_objects, world.pose_dict)
+        # 1. Unpack 3-tuple from updated rbe_solver
+        is_stable, residuals, object_forces = compute_stablelego_equilibrium(active_objects, world.pose_dict)
+        
         max_res = max(residuals.values()) if residuals else 0.0
 
+        # 2. Extract maximum real contact normal force [N]
+        max_force = max(object_forces.values()) if object_forces else 0.0
+
         current_strains = [
-            calculate_overhang_strain(data['position'], data['size'], active_config) 
+            calculate_overhang_strain(data['position'], data['size'], active_config, data['orientation']) 
             for data in active_config.values() if 'position' in data
         ]
 
         steps.append(idx)
         stability_statuses.append(is_stable)
         max_residuals.append(max_res)
+        max_contact_forces.append(max_force)
         max_strains.append(max(current_strains) if current_strains else 0.0)
         mean_strains.append(float(np.mean(current_strains)) if current_strains else 0.0)
         latest_strains.append(current_strains[-1] if current_strains else 0.0)
 
+    # Return dictionary updated with max_contact_forces
     return {
         "problem_name": problem_name,
         "goal_config": goal_config,
@@ -178,7 +230,8 @@ def compute_construction_metrics(
         "max_residuals": max_residuals,
         "max_strains": max_strains,
         "mean_strains": mean_strains,
-        "latest_strains": latest_strains
+        "latest_strains": latest_strains,
+        "max_contact_forces": max_contact_forces
     }
 
 # ==============================================================================
@@ -197,7 +250,7 @@ def plot_friction_heatmap(data: Dict[str, Any], show: bool = False):
     for name, block_data in data['goal_config'].items():
         if 'position' not in block_data:
             continue
-        
+
         pos, size = block_data['position'], block_data['size']
         mesh = data['block_meshes'][name]
         all_verts.append(mesh.vertices)
@@ -211,18 +264,6 @@ def plot_friction_heatmap(data: Dict[str, Any], show: bool = False):
         poly.set_edgecolor('black')
         poly.set_linewidth(1.0)
         ax.add_collection3d(poly)
-
-        hx, hy, hz = size[0] / 2.0, size[1] / 2.0, size[2] / 2.0
-        x_lines = np.linspace(pos[0] - hx, pos[0] + hx, 3)
-        y_lines = np.linspace(pos[1] - hy, pos[1] + hy, 3)
-        z_lines = np.linspace(pos[2] - hz, pos[2] + hz, 3)
-
-        for x in x_lines:
-            for y in y_lines:
-                ax.plot([x, x], [y, y], [pos[2] - hz, pos[2] + hz], color=rgb_color, alpha=0.9, linewidth=1.5)
-        for x in x_lines:
-            for z in z_lines:
-                ax.plot([x, x], [pos[1] - hy, pos[1] + hy], [z, z], color=rgb_color, alpha=0.9, linewidth=1.5)
 
     sm = cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
@@ -302,30 +343,44 @@ def plot_construction_force_and_strain(data: Dict[str, Any], show: bool = False)
     sequence = data['construction_sequence']
     colors = ['#2ca02c' if stable else '#d62728' for stable in data['stability_statuses']]
 
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
 
-    ax1.plot(steps, data['max_residuals'], color='#1f77b4', linestyle='-', linewidth=2, label='Max Force Residual [N]')
-    for s, res, c in zip(steps, data['max_residuals'], colors):
-        ax1.scatter(s, res, color=c, s=80, zorder=5)
-
-    ax1.set_title(f"Construction Phase Physics Analysis: {data['problem_name']}", fontsize=13, fontweight='bold', pad=12)
-    ax1.set_ylabel("Max Force Residual [N]", fontweight='bold')
-    ax1.grid(True, linestyle='--', alpha=0.6)
-
-    legend_elements = [
-        Line2D([0], [0], color='#1f77b4', lw=2, label='Force Residual [N]'),
+    legend_elements_contact = [
+        Line2D([0], [0], color='#1f77b4', lw=2, label='Normal Reaction Force [N]'),
         Line2D([0], [0], marker='o', color='w', markerfacecolor='#2ca02c', markersize=9, label='Equilibrium Stable'),
         Line2D([0], [0], marker='o', color='w', markerfacecolor='#d62728', markersize=9, label='Unstable Step')
     ]
-    ax1.legend(handles=legend_elements, loc='upper left')
 
-    ax2.plot(steps, data['max_strains'], color='#d95f02', marker='s', linewidth=2, label='Max Overhang Strain Ratio')
-    ax2.axhline(y=0.7, color='r', linestyle=':', label='Warning Strain Threshold (0.7)')
-    ax2.set_xlabel("Construction Step (Block Placed)", fontweight='bold')
-    ax2.set_ylabel("Max Strain Ratio [0.0 - 1.0]", fontweight='bold')
-    ax2.set_ylim(-0.05, 1.05)
+    legend_elements_residual = [
+            Line2D([0], [0], color='#1f77b4', lw=2, label='Force Residual [N]'),
+            Line2D([0], [0], marker='o', color='w', markerfacecolor='#2ca02c', markersize=9, label='Equilibrium Stable'),
+            Line2D([0], [0], marker='o', color='w', markerfacecolor='#d62728', markersize=9, label='Unstable Step')
+        ]
+
+    ax1.plot(steps, data['max_contact_forces'], color='#1f77b4', linestyle='-', linewidth=2, label='Max Normal Reaction Force [N]')
+    for s, force, c in zip(steps, data['max_contact_forces'], colors):
+        ax1.scatter(s, force, color=c, s=80, zorder=5)
+    ax1.set_title(f"Construction Phase Force Analysis: {data['problem_name']}", fontsize=13, fontweight='bold', pad=12)
+    ax1.set_ylabel("Max Normal Reaction Force [N]", fontweight='bold')
+    ax1.grid(True, linestyle='--', alpha=0.6)
+    ax1.legend(handles=legend_elements_contact, loc='upper left')
+
+    ax2.plot(steps, data['max_residuals'], color='#1f77b4', linestyle='-', linewidth=2, label='Max Force Residual [N]')
+    for s, res, c in zip(steps, data['max_residuals'], colors):
+        ax2.scatter(s, res, color=c, s=80, zorder=5)
+
+    ax2.set_title(f"Construction Phase Physics Analysis: {data['problem_name']}", fontsize=13, fontweight='bold', pad=12)
+    ax2.set_ylabel("Max Force Residual [N]", fontweight='bold')
     ax2.grid(True, linestyle='--', alpha=0.6)
-    ax2.legend(loc='upper left')
+    ax2.legend(handles=legend_elements_residual, loc='upper left')
+
+    ax3.plot(steps, data['max_strains'], color='#d95f02', marker='s', linewidth=2, label='Max Overhang Strain Ratio')
+    ax3.axhline(y=0.7, color='r', linestyle=':', label='Warning Strain Threshold (0.7)')
+    ax3.set_xlabel("Construction Step (Block Placed)", fontweight='bold')
+    ax3.set_ylabel("Max Strain Ratio [0.0 - 1.0]", fontweight='bold')
+    ax3.set_ylim(-0.05, 1.05)
+    ax3.grid(True, linestyle='--', alpha=0.6)
+    ax3.legend(loc='upper left')
 
     plt.xticks(steps, [f"Step {s}\n({sequence[s-1]})" for s in steps], rotation=25, ha='right')
     plt.tight_layout()
@@ -338,7 +393,7 @@ def plot_construction_force_and_strain(data: Dict[str, Any], show: bool = False)
 # ==============================================================================
 
 if __name__ == "__main__":
-    problem_name = "cantilever_bridge"
+    problem_name = "a_frame"
 
     # Compute ALL data once
     computed_data = compute_construction_metrics(problem_name)

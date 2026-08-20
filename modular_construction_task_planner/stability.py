@@ -194,12 +194,12 @@ def get_contact_polygon(mesh_above: Trimesh, mesh_below: Trimesh, contact_z_tole
 
     return intersection_poly
 
-def make_box_mesh(size: list, position: list) -> trimesh.Trimesh:
+def make_box_mesh(size: list, transform: np.ndarray) -> trimesh.Trimesh:
     """Helper to generate a transformed Trimesh box given size and position."""
     mesh = trimesh.creation.box(extents=size)
     # The size[2] / 2 translation is skipped if your position coordinates 
     # are already absolute centers rather than bottom-centers.
-    mesh.apply_translation(position)
+    mesh.apply_transform(transform)
     return mesh
 
 def visualize_goal_structure(goal_data: dict, unique_colors: List[Tuple[float, float, float]],
