@@ -9,10 +9,10 @@ from typing import Tuple, Dict, cast, List, Any
 from scipy.spatial import KDTree
 from eas.core import (
     Optional, Pose, State, LinkedState,
-    Entity, StateStatus, World
+    Entity, StateStatus, World,
 )
 from modular_construction_task_planner.block_domain import (
-    Action, Object, PosEntity, Robot
+    Action, Object, PosEntity, Robot, load_world
 )
 from modular_construction_task_planner.stability import SupportNode, compute_placement_stability
 
@@ -34,6 +34,9 @@ ROBOT_WIDTH = 0.3
 class OrderedLandmarksPlanner:
     def __init__(self, world: World, action_dict: Dict[str, Action]) -> None:
         self.world: World = world
+
+        load_world(world)
+
         self.original_world = deepcopy(world)
         self.action_dict: Dict[str, Action] = action_dict
         self.support_graph: Dict[str, SupportNode] = {}
@@ -434,12 +437,13 @@ class OrderedLandmarksPlanner:
                     branch_params = {
                         'robot': self.robot,
                         'object': obj_entity_in_gripper,
-                        'target_pose': obj_goal_pos_entity
+                        'target_pose': obj_goal_pos_entity,
                     }
                     branches.append(branch_params)
 
             case "transit":
                 potential_target_objs = cast(List[Object], self.world.not_at_goal_entities)
+                print(f"Potential target objects for transit: {[obj.name if obj else 'None' for obj in potential_target_objs]}")
                 potential_target_objs = [obj for obj in potential_target_objs if obj.goal.value] # Only consider objects that still need to be placed
                 potential_target_pos_vals = [obj.reachable_from for obj in potential_target_objs]
 

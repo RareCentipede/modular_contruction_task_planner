@@ -195,6 +195,9 @@ class Action:
 
     def _type_check(self, entities: Dict[str, Entity]) -> bool:
         for ent_name, ent_type in self.params.items():
+            if type(entities[ent_name]) == list or type(entities[ent_name]) == List or type(entities[ent_name]) == Dict:
+                return True
+
             if type(entities[ent_name]) != ent_type:
                 raise TypeError(f"Parameter {ent_name} in {self.name} expected type {ent_type.__name__}, "
                                 f"got {type(entities[ent_name]).__name__}")

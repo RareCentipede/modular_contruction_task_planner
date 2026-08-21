@@ -26,6 +26,24 @@ action_dict = {
         'place': PlaceAction
 }
 
+def retrace_placement_sequence_from_goal_linked_state(goal_linked_state) -> List[str]:
+    """
+    Retrace the placement sequence from the goal linked state.
+    """
+    placement_sequence = []
+    current_state = goal_linked_state
+    parent = current_state.parent
+    while parent is not None:
+        action = current_state.action_from_parent
+        if action[0] == 'place':
+            print(action)
+            placement_sequence.append(action[1])
+        current_state = parent[1]
+        parent = current_state.parent
+
+    placement_sequence.reverse()  # Reverse to get the correct order
+    return placement_sequence
+
 def run_construction_testing_pipeline(problem_name: str = "arch", config_path: str = "configs/problem_configs/"):
     print(f"==================================================")
     print(f" Running Construction Pipeline Test: [{problem_name}]")
@@ -72,12 +90,12 @@ def run_construction_testing_pipeline(problem_name: str = "arch", config_path: s
     
     # Instantiate and execute the OrderedLandmarksPlanner
     planner = OrderedLandmarksPlanner(world, action_dict)
-    plan_solution = planner.run_stable_planner(support_graph, ground_mesh)
+    goal_linked_state = planner.run_stable_planner(support_graph, ground_mesh)
 
-    if plan_solution:
-        print(f" Landmark Plan Found! Steps: {len(plan_solution)}")
+    if goal_linked_state:
+        placement_sequence = retrace_placement_sequence_from_goal_linked_state(goal_linked_state)
+        print(f" Landmark Plan Found! Steps: {len(placement_sequence)}")
         # Extract ordered sequence from the plan actions
-        placement_sequence = [action.args[0].name for action in plan_solution if hasattr(action, 'args')]
     else:
         print(" Landmark Planner returned no path. Falling back to topological graph sorting...")
         ground_mesh, support_graph = create_support_relation_graph(world, support_ratio_threshold=0.5)
@@ -146,4 +164,4 @@ def run_construction_testing_pipeline(problem_name: str = "arch", config_path: s
 
 if __name__ == "__main__":
     # Change "arch" to any existing configuration folder name in your system
-    run_construction_testing_pipeline(problem_name="scaffolding_tower")
+    run_construction_testing_pipeline(problem_name="interlocking_pyramid")
