@@ -1,17 +1,20 @@
 baseleft:
-  position: [-1.0, 0.0, 0.5]
+  position: [-5.0, 0.0, 0.5]
   orientation: [0.0, 0.0, 0.0]
   size: [1.0, 1.0, 1.0]
 baseright:
   position: [1.0, 0.0, 0.5]
   orientation: [0.0, 0.0, 0.0]
   size: [1.0, 1.0, 1.0]
+  mass: 1.0
 midspan:
   position: [0.0, 0.0, 1.25]
   orientation: [0.0, 0.0, 0.0]
   size: [3.0, 1.0, 0.5]
+  mass: 1.0
 topheavyload:
   # Shifted to far right to create asymmetric torque
   position: [1.0, 0.0, 2.0]
   orientation: [0.0, 0.0, 0.0]
   size: [1.0, 1.0, 1.0]
+  mass: 5.0

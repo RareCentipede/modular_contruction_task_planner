@@ -393,7 +393,7 @@ def plot_construction_force_and_strain(data: Dict[str, Any], show: bool = False)
 # ==============================================================================
 
 if __name__ == "__main__":
-    problem_name = "truss_arch"
+    problem_name = "seesaw"
 
     # Compute ALL data once
     computed_data = compute_construction_metrics(problem_name)

@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 # Core import dependencies
 from eas.config_parser_world_basic import parse_configs_to_world
-from modular_construction_task_planner.block_domain import Object, PickAction, PlaceAction, TransitAction, TransportAction
+from modular_construction_task_planner.block_domain import Object, PickAction, PlaceAction, TransitAction, TransportAction, load_world
 from modular_construction_task_planner.ordered_landmarks_planner import OrderedLandmarksPlanner, HEURISTIC
 from modular_construction_task_planner.stability import (
     create_support_relation_graph,
@@ -84,10 +84,10 @@ def run_construction_testing_pipeline(problem_name: str = "arch", config_path: s
         return
 
     # --------------------------------------------------------------------------
-    # 2. Symbolic Task Planning (OrderedLandmarksPlanner)
+    # 3. Symbolic Task Planning (OrderedLandmarksPlanner)
     # --------------------------------------------------------------------------
-    print("\n2. Generating Plan using OrderedLandmarksPlanner...")
-    
+    print("\n3. Generating Plan using OrderedLandmarksPlanner...")
+
     # Instantiate and execute the OrderedLandmarksPlanner
     planner = OrderedLandmarksPlanner(world, action_dict)
     goal_linked_state = planner.run_stable_planner(support_graph, ground_mesh)
@@ -104,9 +104,9 @@ def run_construction_testing_pipeline(problem_name: str = "arch", config_path: s
     print(f" Target Sequence: {placement_sequence}")
 
     # --------------------------------------------------------------------------
-    # 3. Static Equilibrium Verification (rbe_solver)
+    # 4. Static Equilibrium Verification (rbe_solver)
     # --------------------------------------------------------------------------
-    print("\n3. Testing Structural Equilibrium with rbe_solver...")
+    print("\n4. Testing Structural Equilibrium with rbe_solver...")
 
     # Temporarily assign goal poses to test full-assembly equilibrium
     for obj in all_objects:
@@ -121,6 +121,7 @@ def run_construction_testing_pipeline(problem_name: str = "arch", config_path: s
     )
 
     print(f" Equilibrium Result: {'STABLE' if is_stable else 'UNSTABLE / INFEASIBLE'}")
+    print(f" Planning results: {'Stable' if placement_sequence != [] else 'Unstable'}")
     for name, res in residuals.items():
         print(f"   - {name}: Force Balance Error = {res:.6f}, Normal Force = {contact_forces.get(name, 0.0):.2f} N")
 
@@ -134,11 +135,12 @@ def run_construction_testing_pipeline(problem_name: str = "arch", config_path: s
 
     # A. 3D Goal Assembly Layout
     visualize_goal_structure(goal_data, block_colors, title=f"Goal Structure - {problem_name}", show=False)
-    
+
     # B. Topological Dependency Graph
     # visualize_support_node_graph(support_graph, colors=block_colors, title=f"Support Dependency Tree - {problem_name}", show=False)
 
     # C. Strain Heatmaps & Metrics
+    # Full stable does not mean there is a feasible construction plan.
     metrics_data = compute_construction_metrics(problem_name, config_path, construction_sequence=placement_sequence)
     plot_friction_heatmap(metrics_data, show=False)
     plot_construction_force_and_strain(metrics_data, show=False)
@@ -164,4 +166,4 @@ def run_construction_testing_pipeline(problem_name: str = "arch", config_path: s
 
 if __name__ == "__main__":
     # Change "arch" to any existing configuration folder name in your system
-    run_construction_testing_pipeline(problem_name="interlocking_pyramid")
+    run_construction_testing_pipeline(problem_name="seesaw")

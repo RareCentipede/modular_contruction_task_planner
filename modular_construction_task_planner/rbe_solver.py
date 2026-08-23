@@ -72,10 +72,13 @@ def extract_contact_points_between_objects(
 
     return [ContactPoint(pt, normal, tangent1, tangent2) for pt in pts]
 
+import numpy as np
+from scipy.optimize import linprog
+from typing import List, Dict, Tuple
 
 def compute_stablelego_equilibrium(
     objects: List["Object"],
-    world_poses: Dict[str, Pose],
+    world_poses: Dict[str, "Pose"],
     default_mass: float = 1.0,
     default_mu: float = 0.5,
     gravity: float = 9.81
@@ -84,34 +87,62 @@ def compute_stablelego_equilibrium(
     N = len(active_objects)
     if N == 0:
         return True, {}, {}
-    all_contacts: List[Tuple[ContactPoint, "Object", float]] = []
 
-    # 1. Ground Contacts (Z near 0)
+    obj_idx_map = {obj.name: idx for idx, obj in enumerate(active_objects)}
+    all_contacts: List[Tuple["ContactPoint", "Object", "Object", float]] = []
+
+    # --------------------------------------------------------------------------
+    # 1. Ground Contacts (Transformed to World Frame)
+    # --------------------------------------------------------------------------
     for obj in active_objects:
         T_matrix = extract_object_pose_matrix(obj, world_poses)
+        R = T_matrix[:3, :3]
         p_com = T_matrix[:3, 3]
         half_height = obj.dim[2] / 2.0 if obj.dim else 0.5
 
-        if abs(p_com[2] - half_height) < 0.05:
+        # Check if bottom face is near ground (Z=0)
+        min_z = p_com[2] - half_height
+        if min_z < 0.05:
             half_x = obj.dim[0] / 2.0 if obj.dim else 0.5
             half_y = obj.dim[1] / 2.0 if obj.dim else 0.5
-            corners = [
-                np.array([p_com[0] - half_x, p_com[1] - half_y, 0.0]),
-                np.array([p_com[0] + half_x, p_com[1] - half_y, 0.0]),
-                np.array([p_com[0] + half_x, p_com[1] + half_y, 0.0]),
-                np.array([p_com[0] - half_x, p_com[1] + half_y, 0.0]),
-            ]
-            for pt in corners:
-                cp = ContactPoint(pt, np.array([0, 0, 1]), np.array([1, 0, 0]), np.array([0, 1, 0]))
-                all_contacts.append((cp, obj, default_mu))
 
+            local_corners = [
+                np.array([-half_x, -half_y, -half_height]),
+                np.array([ half_x, -half_y, -half_height]),
+                np.array([ half_x,  half_y, -half_height]),
+                np.array([-half_x,  half_y, -half_height]),
+            ]
+
+            n_world = np.array([0.0, 0.0, 1.0])  # Ground normal always points +Z
+            t1_world = np.array([1.0, 0.0, 0.0])
+            t2_world = np.array([0.0, 1.0, 0.0])
+
+            for l_pt in local_corners:
+                w_pt = p_com + R @ l_pt
+                cp = ContactPoint(w_pt, n_world, t1_world, t2_world)
+                all_contacts.append((cp, obj, None, default_mu)) #type: ignore
+
+    # --------------------------------------------------------------------------
     # 2. Inter-Object Contacts
-    for i, top_obj in enumerate(active_objects):
-        for j, bot_obj in enumerate(active_objects):
-            if i != j:
+    # --------------------------------------------------------------------------
+    for i, obj_a in enumerate(active_objects):
+        for j, obj_b in enumerate(active_objects):
+            if i < j:
+                T_a = extract_object_pose_matrix(obj_a, world_poses)
+                T_b = extract_object_pose_matrix(obj_b, world_poses)
+
+                # Determine top vs bottom based on Z position
+                if T_a[2, 3] >= T_b[2, 3]:
+                    top_obj, bot_obj = obj_a, obj_b
+                else:
+                    top_obj, bot_obj = obj_b, obj_a
+
                 cps = extract_contact_points_between_objects(top_obj, bot_obj, world_poses)
                 for cp in cps:
-                    all_contacts.append((cp, top_obj, default_mu))
+                    # Enforce normal pointing from bot_obj TO top_obj
+                    if cp.normal[2] < 0:
+                        cp.normal = -cp.normal
+                    all_contacts.append((cp, top_obj, bot_obj, default_mu))
 
     K = len(all_contacts)
     if K == 0:
@@ -121,46 +152,111 @@ def compute_stablelego_equilibrium(
     A_eq = np.zeros((6 * N, num_vars))
     b_eq = np.zeros(6 * N)
 
-    # 3. Construct Balance Matrices
+    # --------------------------------------------------------------------------
+    # 3. Construct Unified Equilibrium System
+    # --------------------------------------------------------------------------
     for idx, obj in enumerate(active_objects):
-        T_matrix = extract_object_pose_matrix(obj, world_poses)
-        p_com = T_matrix[:3, 3]
+        m = getattr(obj, 'mass', default_mass)
+        b_eq[6 * idx + 2] = m * gravity  # Gravity acts in -Z
 
-        # Gravity Wrench
-        b_eq[6 * idx + 2] = obj.mass * gravity
+    for k, (cp, top_obj, bot_obj, _) in enumerate(all_contacts):
+        col = 5 * k
 
-        for k, (cp, target_obj, _) in enumerate(all_contacts):
-            if target_obj.name == obj.name:
-                col = 5 * k
+        v_n  = cp.normal
+        v_t1 = cp.tangent1
+        v_t2 = cp.tangent2
 
-                A_eq[6 * idx + 0, col + 1] = cp.tangent1[0]
-                A_eq[6 * idx + 0, col + 2] = -cp.tangent1[0]
-                A_eq[6 * idx + 0, col + 3] = cp.tangent2[0]
-                A_eq[6 * idx + 0, col + 4] = -cp.tangent2[0]
+        # A. Force/Torque on TOP OBJECT (+ Force)
+        if top_obj and top_obj.name in obj_idx_map:
+            top_idx = obj_idx_map[top_obj.name]
+            p_com_top = extract_object_pose_matrix(top_obj, world_poses)[:3, 3]
+            r_top = cp.position - p_com_top
 
-                A_eq[6 * idx + 1, col + 1] = cp.tangent1[1]
-                A_eq[6 * idx + 1, col + 2] = -cp.tangent1[1]
-                A_eq[6 * idx + 1, col + 3] = cp.tangent2[1]
-                A_eq[6 * idx + 1, col + 4] = -cp.tangent2[1]
+            # Linear Force Balance (+F)
+            A_eq[6 * top_idx + 0, col + 0] += v_n[0]
+            A_eq[6 * top_idx + 1, col + 0] += v_n[1]
+            A_eq[6 * top_idx + 2, col + 0] += v_n[2]
 
-                A_eq[6 * idx + 2, col + 0] = cp.normal[2]
+            A_eq[6 * top_idx + 0, col + 1] += v_t1[0]
+            A_eq[6 * top_idx + 0, col + 2] -= v_t1[0]
+            A_eq[6 * top_idx + 1, col + 1] += v_t1[1]
+            A_eq[6 * top_idx + 1, col + 2] -= v_t1[1]
+            A_eq[6 * top_idx + 2, col + 1] += v_t1[2]
+            A_eq[6 * top_idx + 2, col + 2] -= v_t1[2]
 
-                r = cp.position - p_com
-                t_n = np.cross(r, cp.normal)
-                t_t1 = np.cross(r, cp.tangent1)
-                t_t2 = np.cross(r, cp.tangent2)
+            A_eq[6 * top_idx + 0, col + 3] += v_t2[0]
+            A_eq[6 * top_idx + 0, col + 4] -= v_t2[0]
+            A_eq[6 * top_idx + 1, col + 3] += v_t2[1]
+            A_eq[6 * top_idx + 1, col + 4] -= v_t2[1]
+            A_eq[6 * top_idx + 2, col + 3] += v_t2[2]
+            A_eq[6 * top_idx + 2, col + 4] -= v_t2[2]
 
-                A_eq[6 * idx + 3: 6 * idx + 6, col + 0] = t_n
-                A_eq[6 * idx + 3: 6 * idx + 6, col + 1] = t_t1
-                A_eq[6 * idx + 3: 6 * idx + 6, col + 2] = -t_t1
-                A_eq[6 * idx + 3: 6 * idx + 6, col + 3] = t_t2
-                A_eq[6 * idx + 3: 6 * idx + 6, col + 4] = -t_t2
+            # Torque (+ r_top x F)
+            t_n  = np.cross(r_top, v_n)
+            t_t1 = np.cross(r_top, v_t1)
+            t_t2 = np.cross(r_top, v_t2)
 
-    # 4. Friction Pyramid Constraints
+            A_eq[6 * top_idx + 3, col + 0] += t_n[0]
+            A_eq[6 * top_idx + 4, col + 0] += t_n[1]
+            A_eq[6 * top_idx + 5, col + 0] += t_n[2]
+
+            A_eq[6 * top_idx + 3, col + 1] += t_t1[0]; A_eq[6 * top_idx + 3, col + 2] -= t_t1[0]
+            A_eq[6 * top_idx + 4, col + 1] += t_t1[1]; A_eq[6 * top_idx + 4, col + 2] -= t_t1[1]
+            A_eq[6 * top_idx + 5, col + 1] += t_t1[2]; A_eq[6 * top_idx + 5, col + 2] -= t_t1[2]
+
+            A_eq[6 * top_idx + 3, col + 3] += t_t2[0]; A_eq[6 * top_idx + 3, col + 4] -= t_t2[0]
+            A_eq[6 * top_idx + 4, col + 3] += t_t2[1]; A_eq[6 * top_idx + 4, col + 4] -= t_t2[1]
+            A_eq[6 * top_idx + 5, col + 3] += t_t2[2]; A_eq[6 * top_idx + 5, col + 4] -= t_t2[2]
+
+        # B. Force/Torque on BOTTOM OBJECT (- Force)
+        if bot_obj and bot_obj.name in obj_idx_map:
+            bot_idx = obj_idx_map[bot_obj.name]
+            p_com_bot = extract_object_pose_matrix(bot_obj, world_poses)[:3, 3]
+            r_bot = cp.position - p_com_bot
+
+            # Linear Force Balance (-F)
+            A_eq[6 * bot_idx + 0, col + 0] -= v_n[0]
+            A_eq[6 * bot_idx + 1, col + 0] -= v_n[1]
+            A_eq[6 * bot_idx + 2, col + 0] -= v_n[2]
+
+            A_eq[6 * bot_idx + 0, col + 1] -= v_t1[0]
+            A_eq[6 * bot_idx + 0, col + 2] += v_t1[0]
+            A_eq[6 * bot_idx + 1, col + 1] -= v_t1[1]
+            A_eq[6 * bot_idx + 1, col + 2] += v_t1[1]
+            A_eq[6 * bot_idx + 2, col + 1] -= v_t1[2]
+            A_eq[6 * bot_idx + 2, col + 2] += v_t1[2]
+
+            A_eq[6 * bot_idx + 0, col + 3] -= v_t2[0]
+            A_eq[6 * bot_idx + 0, col + 4] += v_t2[0]
+            A_eq[6 * bot_idx + 1, col + 3] -= v_t2[1]
+            A_eq[6 * bot_idx + 1, col + 4] += v_t2[1]
+            A_eq[6 * bot_idx + 2, col + 3] -= v_t2[2]
+            A_eq[6 * bot_idx + 2, col + 4] += v_t2[2]
+
+            # Torque (- r_bot x F)
+            t_n  = np.cross(r_bot, v_n)
+            t_t1 = np.cross(r_bot, v_t1)
+            t_t2 = np.cross(r_bot, v_t2)
+
+            A_eq[6 * bot_idx + 3, col + 0] -= t_n[0]
+            A_eq[6 * bot_idx + 4, col + 0] -= t_n[1]
+            A_eq[6 * bot_idx + 5, col + 0] -= t_n[2]
+
+            A_eq[6 * bot_idx + 3, col + 1] -= t_t1[0]; A_eq[6 * bot_idx + 3, col + 2] += t_t1[0]
+            A_eq[6 * bot_idx + 4, col + 1] -= t_t1[1]; A_eq[6 * bot_idx + 4, col + 2] += t_t1[1]
+            A_eq[6 * bot_idx + 5, col + 1] -= t_t1[2]; A_eq[6 * bot_idx + 5, col + 2] += t_t1[2]
+
+            A_eq[6 * bot_idx + 3, col + 3] -= t_t2[0]; A_eq[6 * bot_idx + 3, col + 4] += t_t2[0]
+            A_eq[6 * bot_idx + 4, col + 3] -= t_t2[1]; A_eq[6 * bot_idx + 4, col + 4] += t_t2[1]
+            A_eq[6 * bot_idx + 5, col + 3] -= t_t2[2]; A_eq[6 * bot_idx + 5, col + 4] += t_t2[2]
+
+    # --------------------------------------------------------------------------
+    # 4. Friction Pyramids
+    # --------------------------------------------------------------------------
     A_ub = np.zeros((2 * K, num_vars))
     b_ub = np.zeros(2 * K)
 
-    for k, (_, _, mu) in enumerate(all_contacts):
+    for k, (_, _, _, mu) in enumerate(all_contacts):
         col = 5 * k
         coeff = mu / np.sqrt(2.0)
 
@@ -180,24 +276,10 @@ def compute_stablelego_equilibrium(
 
     res = linprog(c, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq, bounds=bounds, method='highs')
 
-    # In rbe_solver.py, replace the final return section (lines 142-152):
-
     if res.success:
-        residuals = {}
-        object_forces = {}
-
-        for idx, obj in enumerate(active_objects):
-            # Compute static force balance error
-            err = np.linalg.norm(A_eq[6 * idx: 6 * idx + 6] @ res.x - b_eq[6 * idx: 6 * idx + 6])
-            residuals[obj.name] = float(err)
-
-            # Sum normal forces (f_n at col = 5*k) acting on this object
-            obj_normal_force = 0.0
-            for k, (_, target_obj, _) in enumerate(all_contacts):
-                if target_obj.name == obj.name:
-                    obj_normal_force += res.x[5 * k]  # col + 0 is cp.normal
-            object_forces[obj.name] = float(obj_normal_force)
-
+        residuals = {obj.name: float(np.linalg.norm(A_eq[6*idx:6*idx+6] @ res.x - b_eq[6*idx:6*idx+6])) for idx, obj in enumerate(active_objects)}
+        object_forces = {obj.name: float(sum(res.x[5*k] for k, (_, t_obj, b_obj, _) in enumerate(all_contacts) if \
+            (t_obj and t_obj.name == obj.name) or (b_obj and b_obj.name == obj.name))) for obj in active_objects}
         return True, residuals, object_forces
     else:
         return False, {obj.name: 1.0 for obj in active_objects}, {obj.name: 0.0 for obj in active_objects}

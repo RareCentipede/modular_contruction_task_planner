@@ -184,6 +184,8 @@ def check_placement_stability(obj: Object,
     # Revert temporary assignment
     obj.at.value = orig_at
 
+    print(f" Checking placement stability for {obj.name} at {target_pose.name}: {'Stable' if is_stable else 'Unstable'}")
+
     return is_stable
 
 # Action definitions
