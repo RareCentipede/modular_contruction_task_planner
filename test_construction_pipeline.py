@@ -37,7 +37,7 @@ def retrace_placement_sequence_from_goal_linked_state(goal_linked_state) -> List
         action = current_state.action_from_parent
         if action[0] == 'place':
             print(action)
-            placement_sequence.append(action[1])
+            placement_sequence.append(action[1][1])
         current_state = parent[1]
         parent = current_state.parent
 
@@ -134,7 +134,7 @@ def run_construction_testing_pipeline(problem_name: str = "arch", config_path: s
     print("\n4. Generating Structural Visualizations...")
 
     # A. 3D Goal Assembly Layout
-    visualize_goal_structure(goal_data, block_colors, title=f"Goal Structure - {problem_name}", show=False)
+    # visualize_goal_structure(goal_data, block_colors, title=f"Goal Structure - {problem_name}", show=False)
 
     # B. Topological Dependency Graph
     # visualize_support_node_graph(support_graph, colors=block_colors, title=f"Support Dependency Tree - {problem_name}", show=False)
@@ -159,7 +159,7 @@ def run_construction_testing_pipeline(problem_name: str = "arch", config_path: s
     #     placement_sequence=placement_sequence,
     #     color_array=block_colors
     # )
-    
+
     # # Run active 3D visualization window
     # animator.run()
 

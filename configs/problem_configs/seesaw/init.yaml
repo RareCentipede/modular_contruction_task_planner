@@ -2,18 +2,22 @@ baseleft:
   position: [-2.0, 0.0, 0.5]
   orientation: [0.0, 0.0, 0.0]
   size: [1.0, 1.0, 1.0]
+  mass: 1.0
 baseright:
   position: [-2.0, 2.0, 0.5]
   orientation: [0.0, 0.0, 0.0]
   size: [1.0, 1.0, 1.0]
+  mass: 1.0
 midspan:
   position: [-2.0, -2.0, 0.25]
   orientation: [0.0, 0.0, 0.0]
   size: [3.0, 1.0, 0.5]
+  mass: 1.0
 topheavyload:
   position: [-2.0, 4.0, 0.5]
   orientation: [0.0, 0.0, 0.0]
   size: [1.0, 1.0, 1.0]
+  mass: 5.0
 robot:
   type: "robot"
   position: [-10.0, 0.0, 0.0]

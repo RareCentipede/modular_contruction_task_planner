@@ -4,17 +4,18 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
 from typing import List, Dict, Any, Optional, Tuple, cast
+from trimesh import Trimesh
 from yaml import safe_load
 from matplotlib.lines import Line2D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from scipy.spatial import ConvexHull
 from scipy.spatial.transform import Rotation as R
 
-from eas.core import Pose
+from eas.core import Pose, World
 from eas.config_parser_world_basic import parse_configs_to_world
 from modular_construction_task_planner.block_domain import Object
 from modular_construction_task_planner.rbe_solver import compute_stablelego_equilibrium
-from modular_construction_task_planner.stability import make_box_mesh
+from modular_construction_task_planner.stability import SupportNode, compute_placement_stability, make_box_mesh, create_support_relation_graph
 
 # ==============================================================================
 # 1. CORE STRAIN METRIC (CALCULATION HELPER)
@@ -93,6 +94,46 @@ def calculate_overhang_strain(
 # ==============================================================================
 # 2. CENTRALIZED COMPUTATION ENGINE
 # ==============================================================================
+def evaluate_obj_stability(world: World, obj: Object, support_graph: Dict[str, SupportNode], ground_mesh: Trimesh,
+                           verbose: bool = False) -> Tuple[bool, float]:
+    """
+        Evaluate the stability of the branch by checking the support score of the target block after placing.
+        If the score is below the threshold, return a high cost to discourage exploring this branch.
+
+        Returns a tuple of whether the placement is stable and the support score.
+    """
+    branch_support_score = 0.0
+    obj_support_node = support_graph[obj.name]
+    supporting_objs = []
+    supp_names = []
+    sd = {}
+
+    for parent_name, (score, is_placed) in obj_support_node.supporting_objects.items():
+        if is_placed:
+            branch_support_score += score
+            parent_obj = world.entities.get_entities(parent_name)
+            parent_obj = cast(Object, parent_obj)
+            supporting_objs.append(parent_obj)
+            supp_names.append(parent_name)
+
+    is_stable = branch_support_score >= obj_support_node.support_threshold
+
+    if not is_stable:
+        overall_support_score = obj_support_node.support_combo_dict.get(tuple(supp_names), None)
+        branch_support_score = overall_support_score if overall_support_score else branch_support_score
+        if not overall_support_score and supp_names:
+            sd, overall_support_score = compute_placement_stability(obj, supporting_objs, [], ground_mesh, verbose)
+            branch_support_score = overall_support_score
+            obj_support_node.support_combo_dict.update({tuple(supp_names): overall_support_score})
+
+    if verbose:
+        print(f"Evaluating stability for object {obj.name} with supporting objects {supp_names}. Initial check: {'passed' if is_stable else 'not passed'}\n"
+                f"Individual support scores: {[supp_name + ': ' + str(score) for supp_name, (score, _) in support_graph[obj.name].supporting_objects.items()]}.\n"
+                f"Combined support score: {branch_support_score}. Threshold: {obj_support_node.support_threshold}.")
+        print(f"Support data: {sd}")
+
+    is_stable = branch_support_score >= obj_support_node.support_threshold
+    return is_stable, branch_support_score
 
 def compute_construction_metrics(
     problem_name: str,
@@ -100,8 +141,8 @@ def compute_construction_metrics(
     construction_sequence: Optional[List[str]] = None
 ) -> Dict[str, Any]:
     """
-    Executes all physics computations, LP equilibrium checks, CoM evaluations,
-    and sequence step strain evaluations in a single pass.
+        Executes all physics computations, LP equilibrium checks, CoM evaluations,
+        and sequence step strain evaluations in a single pass.
     """
     world = parse_configs_to_world(problem_name, problem_config_path)
     goal_config = safe_load(open(f"{problem_config_path}/{problem_name}/goal.yaml", 'r'))
@@ -181,6 +222,9 @@ def compute_construction_metrics(
 
     # Inside compute_construction_metrics step-by-step loop:
     max_contact_forces = []
+    support_scores = []
+
+    ground_mesh, support_graph = create_support_relation_graph(world, support_ratio_threshold=0.7)
 
     for idx, block_name in enumerate(construction_sequence, start=1):
         if block_name in goal_config:
@@ -205,6 +249,16 @@ def compute_construction_metrics(
             for data in active_config.values() if 'position' in data
         ]
 
+        support_score = evaluate_obj_stability(world, obj, support_graph, ground_mesh)[1]
+
+        obj_support_node = support_graph[block_name]
+        obj_support_node.current_support_score = support_score
+
+        for supported_name, supported_edge in obj_support_node.supported_objects.items():
+            obj_support_node.supported_objects[supported_name] = (supported_edge[0], True)
+            supported_obj_support_node = support_graph[supported_name]
+            supported_obj_support_node.supporting_objects[block_name] = (supported_edge[0], True)
+
         steps.append(idx)
         stability_statuses.append(is_stable)
         max_residuals.append(max_res)
@@ -212,6 +266,7 @@ def compute_construction_metrics(
         max_strains.append(max(current_strains) if current_strains else 0.0)
         mean_strains.append(float(np.mean(current_strains)) if current_strains else 0.0)
         latest_strains.append(current_strains[-1] if current_strains else 0.0)
+        support_scores.append(support_score)
 
     # Return dictionary updated with max_contact_forces
     return {
@@ -231,7 +286,8 @@ def compute_construction_metrics(
         "max_strains": max_strains,
         "mean_strains": mean_strains,
         "latest_strains": latest_strains,
-        "max_contact_forces": max_contact_forces
+        "max_contact_forces": max_contact_forces,
+        "support_scores": support_scores
     }
 
 # ==============================================================================
@@ -375,12 +431,14 @@ def plot_construction_force_and_strain(data: Dict[str, Any], show: bool = False)
     ax2.legend(handles=legend_elements_residual, loc='upper left')
 
     ax3.plot(steps, data['max_strains'], color='#d95f02', marker='s', linewidth=2, label='Max Overhang Strain Ratio')
+    ax3.plot(steps, data['support_scores'], color='#9467bd', marker='^', linestyle='--', linewidth=1.5, label='Support Score')
     ax3.axhline(y=0.7, color='r', linestyle=':', label='Warning Strain Threshold (0.7)')
     ax3.set_xlabel("Construction Step (Block Placed)", fontweight='bold')
     ax3.set_ylabel("Max Strain Ratio [0.0 - 1.0]", fontweight='bold')
     ax3.set_ylim(-0.05, 1.05)
     ax3.grid(True, linestyle='--', alpha=0.6)
     ax3.legend(loc='upper left')
+
 
     plt.xticks(steps, [f"Step {s}\n({sequence[s-1]})" for s in steps], rotation=25, ha='right')
     plt.tight_layout()

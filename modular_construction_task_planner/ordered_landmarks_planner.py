@@ -295,17 +295,17 @@ class OrderedLandmarksPlanner:
         return self.goal_linked_state
 
     def run_stable_planner(self, support_graph: Dict[str, SupportNode], ground_mesh: Trimesh,
-                           h: HEURISTIC = HEURISTIC.STABLE_DISCRETE, verbose: bool = False) -> Optional[LinkedState]:
+                           h: HEURISTIC = HEURISTIC.STABLE, verbose: bool = True) -> Optional[LinkedState]:
         if not self.support_graph:
             self.support_graph = support_graph
             self.original_support_graph = deepcopy(self.support_graph)
         self.ground_mesh = ground_mesh
 
         while self.current_linked_state.status == StateStatus.ALIVE:
-            self.branch_out(self.current_linked_state, h, forecast=True, verbose=verbose, stable_check=True)
+            self.branch_out(self.current_linked_state, h, forecast=False, verbose=verbose, stable_check=True)
             if not self.current_linked_state.branches_to_explore:
                 print("No branches, terminating")
-                return self.goal_linked_state
+                return self.current_linked_state
                 # print("No branches to explore, backtracking...")
                 # self.backtrack()
                 # continue
@@ -522,12 +522,12 @@ class OrderedLandmarksPlanner:
                             print(f"Branch for {action_name} object {obj_entity.name} is {'stable' if is_stable else 'unstable'} "
                                 f"with support score {support_score}.")
 
-                        if is_stable:
-                            cost = 1 - support_score
-                        else:
-                            support_node = self.support_graph[obj_entity.name]
-                            print(support_node)
-                            continue
+                        # if is_stable:
+                        cost = 1 - support_score
+                        # else:
+                        support_node = self.support_graph[obj_entity.name]
+                        print(support_node)
+                            # continue
                     case HEURISTIC.STABLE:
                         obj_entity = cast(Object, branch['object'])
                         is_stable, support_score = self.evaluate_obj_stability(obj_entity, self.support_graph, self.ground_mesh, verbose=verbose)
@@ -535,10 +535,10 @@ class OrderedLandmarksPlanner:
                             print(f"Branch for {action_name} object {obj_entity.name} is {'stable' if is_stable else 'unstable'} "
                                 f"with support score {support_score}.")
 
-                        if is_stable:
-                            cost = (1 - support_score) + np.linalg.norm(np.array(start_pos) - np.array(target_pos))
-                        else:
-                            continue
+                        # if is_stable:
+                        cost = (1 - support_score) + np.linalg.norm(np.array(start_pos) - np.array(target_pos))
+                        # else:
+                            # continue
                     case HEURISTIC.SIMPLE_COLLISION:
                         cost = self.simple_collision_heuristic(start_pos, target_pos)
                     case _:
