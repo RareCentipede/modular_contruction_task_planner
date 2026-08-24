@@ -122,6 +122,7 @@ def compute_placement_stability(object: Object | Trimesh,
     support_polys = []
     all_contact_vertices = []
     overall_support_area_ratio = 0.0
+    support_score = 0.0
 
     # Handle object type extraction
     mesh_above = object.mesh if isinstance(object, Object) else object

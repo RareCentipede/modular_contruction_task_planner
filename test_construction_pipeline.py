@@ -122,8 +122,6 @@ def run_construction_testing_pipeline(problem_name: str = "arch", config_path: s
 
     print(f" Equilibrium Result: {'STABLE' if is_stable else 'UNSTABLE / INFEASIBLE'}")
     print(f" Planning results: {'Stable' if placement_sequence != [] else 'Unstable'}")
-    for name, res in residuals.items():
-        print(f"   - {name}: Force Balance Error = {res:.6f}, Normal Force = {contact_forces.get(name, 0.0):.2f} N")
 
     # Reset entity states after full-structure check
     world.update_state()
@@ -166,4 +164,4 @@ def run_construction_testing_pipeline(problem_name: str = "arch", config_path: s
 
 if __name__ == "__main__":
     # Change "arch" to any existing configuration folder name in your system
-    run_construction_testing_pipeline(problem_name="seesaw")
+    run_construction_testing_pipeline(problem_name="shifted_tower")

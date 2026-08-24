@@ -72,21 +72,17 @@ def extract_contact_points_between_objects(
 
     return [ContactPoint(pt, normal, tangent1, tangent2) for pt in pts]
 
-import numpy as np
-from scipy.optimize import linprog
-from typing import List, Dict, Tuple
-
 def compute_stablelego_equilibrium(
     objects: List["Object"],
     world_poses: Dict[str, "Pose"],
     default_mass: float = 1.0,
     default_mu: float = 0.5,
     gravity: float = 9.81
-) -> Tuple[bool, Dict[str, float], Dict[str, float]]:
+) -> Tuple[bool, float, float]:
     active_objects = [o for o in objects if o.at.value is not None and o.at.value in world_poses]
     N = len(active_objects)
     if N == 0:
-        return True, {}, {}
+        return True, 0.0, 0.0
 
     obj_idx_map = {obj.name: idx for idx, obj in enumerate(active_objects)}
     all_contacts: List[Tuple["ContactPoint", "Object", "Object", float]] = []
@@ -120,7 +116,7 @@ def compute_stablelego_equilibrium(
             for l_pt in local_corners:
                 w_pt = p_com + R @ l_pt
                 cp = ContactPoint(w_pt, n_world, t1_world, t2_world)
-                all_contacts.append((cp, obj, None, default_mu)) #type: ignore
+                all_contacts.append((cp, obj, None, default_mu)) # type: ignore
 
     # --------------------------------------------------------------------------
     # 2. Inter-Object Contacts
@@ -146,7 +142,10 @@ def compute_stablelego_equilibrium(
 
     K = len(all_contacts)
     if K == 0:
-        return False, {obj.name: 1.0 for obj in active_objects}, {obj.name: 0.0 for obj in active_objects}
+        # No contacts: net force is downward gravity, net torque is zero
+        net_force = np.linalg.norm(sum(np.array([0.0, 0.0, -getattr(obj, 'mass', default_mass) * gravity]) for obj in active_objects)).item()
+        net_torque = np.linalg.norm(sum(np.array([0.0, 0.0, 0.0]) for obj in active_objects)).item()
+        return False, net_force, net_torque
 
     num_vars = 5 * K
     A_eq = np.zeros((6 * N, num_vars))
@@ -246,7 +245,7 @@ def compute_stablelego_equilibrium(
             A_eq[6 * bot_idx + 4, col + 1] -= t_t1[1]; A_eq[6 * bot_idx + 4, col + 2] += t_t1[1]
             A_eq[6 * bot_idx + 5, col + 1] -= t_t1[2]; A_eq[6 * bot_idx + 5, col + 2] += t_t1[2]
 
-            A_eq[6 * bot_idx + 3, col + 3] -= t_t2[0]; A_eq[6 * bot_idx + 3, col + 4] += t_t2[0]
+            A_eq[6 * bot_idx + 3, col + 3] -= t_t2[0]; A_eq[6 * bot_idx + 3, col + 4] -= t_t2[0]
             A_eq[6 * bot_idx + 4, col + 3] -= t_t2[1]; A_eq[6 * bot_idx + 4, col + 4] += t_t2[1]
             A_eq[6 * bot_idx + 5, col + 3] -= t_t2[2]; A_eq[6 * bot_idx + 5, col + 4] += t_t2[2]
 
@@ -270,16 +269,30 @@ def compute_stablelego_equilibrium(
 
     c = np.zeros(num_vars)
     for k in range(K):
-        c[5 * k] = 1.0
+        c[5 * k] = 1.0  # Minimize contact normal forces
 
     bounds = [(0, None) for _ in range(num_vars)]
 
+    # --------------------------------------------------------------------------
+    # 5. Solve LP & Compute Net Force Vector + Net Torque Vector
+    # --------------------------------------------------------------------------
     res = linprog(c, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq, bounds=bounds, method='highs')
 
+    net_force = 0.0
+    net_torque = 0.0
+
     if res.success:
-        residuals = {obj.name: float(np.linalg.norm(A_eq[6*idx:6*idx+6] @ res.x - b_eq[6*idx:6*idx+6])) for idx, obj in enumerate(active_objects)}
-        object_forces = {obj.name: float(sum(res.x[5*k] for k, (_, t_obj, b_obj, _) in enumerate(all_contacts) if \
-            (t_obj and t_obj.name == obj.name) or (b_obj and b_obj.name == obj.name))) for obj in active_objects}
-        return True, residuals, object_forces
+        # Calculate resulting wrench (F_contact - F_gravity) per object
+        for idx, obj in enumerate(active_objects):
+            wrench_result = A_eq[6 * idx: 6 * idx + 6] @ res.x - b_eq[6 * idx: 6 * idx + 6]
+            net_force += np.linalg.norm(wrench_result[0:3]).item()   # 3D Force Vector [Fx, Fy, Fz]
+            net_torque += np.linalg.norm(wrench_result[3:6]).item()  # 3D Torque Vector [Tx, Ty, Tz]
+
+        return True, net_force, net_torque
     else:
-        return False, {obj.name: 1.0 for obj in active_objects}, {obj.name: 0.0 for obj in active_objects}
+        # Unstable case: Return net uncompensated forces (pure gravity & zero contact reaction)
+        for idx, obj in enumerate(active_objects):
+            m = getattr(obj, 'mass', default_mass)
+            net_force += np.linalg.norm(np.array([0.0, 0.0, -m * gravity])).item()
+
+        return False, net_force, net_torque

@@ -212,7 +212,6 @@ def compute_construction_metrics(
 
     steps = []
     stability_statuses = []
-    max_residuals = []
     max_strains = []
     mean_strains = []
     latest_strains = []
@@ -221,7 +220,8 @@ def compute_construction_metrics(
     active_objects = []
 
     # Inside compute_construction_metrics step-by-step loop:
-    max_contact_forces = []
+    net_forces = []
+    net_torques = []
     support_scores = []
 
     ground_mesh, support_graph = create_support_relation_graph(world, support_ratio_threshold=0.7)
@@ -237,12 +237,7 @@ def compute_construction_metrics(
             active_objects.append(obj)
 
         # 1. Unpack 3-tuple from updated rbe_solver
-        is_stable, residuals, object_forces = compute_stablelego_equilibrium(active_objects, world.pose_dict)
-
-        max_res = max(residuals.values()) if residuals else 0.0
-
-        # 2. Extract maximum real contact normal force [N]
-        max_force = max(object_forces.values()) if object_forces else 0.0
+        is_stable, net_force, net_torque = compute_stablelego_equilibrium(active_objects, world.pose_dict)
 
         current_strains = [
             calculate_overhang_strain(data['position'], data['size'], active_config, data['orientation']) 
@@ -261,8 +256,9 @@ def compute_construction_metrics(
 
         steps.append(idx)
         stability_statuses.append(is_stable)
-        max_residuals.append(max_res)
-        max_contact_forces.append(max_force)
+
+        net_forces.append(net_force)
+        net_torques.append(net_torque)
         max_strains.append(max(current_strains) if current_strains else 0.0)
         mean_strains.append(float(np.mean(current_strains)) if current_strains else 0.0)
         latest_strains.append(current_strains[-1] if current_strains else 0.0)
@@ -282,11 +278,11 @@ def compute_construction_metrics(
         "construction_sequence": construction_sequence,
         "steps": steps,
         "stability_statuses": stability_statuses,
-        "max_residuals": max_residuals,
+        "net_forces": net_forces,
+        "net_torques": net_torques,
         "max_strains": max_strains,
         "mean_strains": mean_strains,
         "latest_strains": latest_strains,
-        "max_contact_forces": max_contact_forces,
         "support_scores": support_scores
     }
 
@@ -399,45 +395,34 @@ def plot_construction_force_and_strain(data: Dict[str, Any], show: bool = False)
     sequence = data['construction_sequence']
     colors = ['#2ca02c' if stable else '#d62728' for stable in data['stability_statuses']]
 
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
 
     legend_elements_contact = [
-        Line2D([0], [0], color='#1f77b4', lw=2, label='Normal Reaction Force [N]'),
+        Line2D([0], [0], color='#1f77b4', lw=2, label='Net Force per step [N]'),
+        Line2D([0], [0], color='#ff7f0e', lw=2, linestyle='--', label='Net Torque per step [N·m]'),
         Line2D([0], [0], marker='o', color='w', markerfacecolor='#2ca02c', markersize=9, label='Equilibrium Stable'),
         Line2D([0], [0], marker='o', color='w', markerfacecolor='#d62728', markersize=9, label='Unstable Step')
     ]
 
-    legend_elements_residual = [
-            Line2D([0], [0], color='#1f77b4', lw=2, label='Force Residual [N]'),
-            Line2D([0], [0], marker='o', color='w', markerfacecolor='#2ca02c', markersize=9, label='Equilibrium Stable'),
-            Line2D([0], [0], marker='o', color='w', markerfacecolor='#d62728', markersize=9, label='Unstable Step')
-        ]
-
-    ax1.plot(steps, data['max_contact_forces'], color='#1f77b4', linestyle='-', linewidth=2, label='Max Normal Reaction Force [N]')
-    for s, force, c in zip(steps, data['max_contact_forces'], colors):
+    ax1.plot(steps, data['net_forces'], color='#1f77b4', linestyle='-', linewidth=2, label='Net Force per step [N]')
+    ax1.plot(steps, data['net_torques'], color='#ff7f0e', linestyle='--', linewidth=2, label='Net Torque steps [N·m]')
+    for s, force, torque, c in zip(steps, data['net_forces'], data['net_torques'], colors):
         ax1.scatter(s, force, color=c, s=80, zorder=5)
+        ax1.scatter(s, torque, color=c, s=80, zorder=5)
+
     ax1.set_title(f"Construction Phase Force Analysis: {data['problem_name']}", fontsize=13, fontweight='bold', pad=12)
     ax1.set_ylabel("Max Normal Reaction Force [N]", fontweight='bold')
     ax1.grid(True, linestyle='--', alpha=0.6)
     ax1.legend(handles=legend_elements_contact, loc='upper left')
 
-    ax2.plot(steps, data['max_residuals'], color='#1f77b4', linestyle='-', linewidth=2, label='Max Force Residual [N]')
-    for s, res, c in zip(steps, data['max_residuals'], colors):
-        ax2.scatter(s, res, color=c, s=80, zorder=5)
-
-    ax2.set_title(f"Construction Phase Physics Analysis: {data['problem_name']}", fontsize=13, fontweight='bold', pad=12)
-    ax2.set_ylabel("Max Force Residual [N]", fontweight='bold')
+    ax2.plot(steps, data['max_strains'], color='#d95f02', marker='s', linewidth=2, label='Max Overhang Strain Ratio')
+    ax2.plot(steps, data['support_scores'], color='#9467bd', marker='^', linestyle='--', linewidth=1.5, label='Support Score')
+    ax2.axhline(y=0.7, color='r', linestyle=':', label='Warning Strain Threshold (0.7)')
+    ax2.set_xlabel("Construction Step (Block Placed)", fontweight='bold')
+    ax2.set_ylabel("Max Strain Ratio [0.0 - 1.0]", fontweight='bold')
+    ax2.set_ylim(-0.05, 1.05)
     ax2.grid(True, linestyle='--', alpha=0.6)
-    ax2.legend(handles=legend_elements_residual, loc='upper left')
-
-    ax3.plot(steps, data['max_strains'], color='#d95f02', marker='s', linewidth=2, label='Max Overhang Strain Ratio')
-    ax3.plot(steps, data['support_scores'], color='#9467bd', marker='^', linestyle='--', linewidth=1.5, label='Support Score')
-    ax3.axhline(y=0.7, color='r', linestyle=':', label='Warning Strain Threshold (0.7)')
-    ax3.set_xlabel("Construction Step (Block Placed)", fontweight='bold')
-    ax3.set_ylabel("Max Strain Ratio [0.0 - 1.0]", fontweight='bold')
-    ax3.set_ylim(-0.05, 1.05)
-    ax3.grid(True, linestyle='--', alpha=0.6)
-    ax3.legend(loc='upper left')
+    ax2.legend(loc='upper left')
 
 
     plt.xticks(steps, [f"Step {s}\n({sequence[s-1]})" for s in steps], rotation=25, ha='right')
@@ -451,14 +436,14 @@ def plot_construction_force_and_strain(data: Dict[str, Any], show: bool = False)
 # ==============================================================================
 
 if __name__ == "__main__":
-    problem_name = "seesaw"
+    problem_name = "shifted_tower"
 
     # Compute ALL data once
     computed_data = compute_construction_metrics(problem_name)
 
     # Plot without re-calculating physics/geometry
     plot_friction_heatmap(computed_data)
-    # plot_construction_sequence_strain(computed_data)
+    plot_construction_sequence_strain(computed_data)
     plot_com_projection(computed_data)
     plot_construction_force_and_strain(computed_data)
 
