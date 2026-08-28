@@ -339,6 +339,10 @@ def plot_friction_heatmap(data: Dict[str, Any], show: bool = False):
     if show:
         plt.show()
 
+    if SAVE:
+        plt.savefig(f"~/Documents/Thesis/final_paper/{data['problem_name']}/{data['problem_name']}_strain_heatmap.pdf", dpi=300)
+        print(f"Saved strain heatmap to ~/Documents/Thesis/final_paper/{data['problem_name']}_strain_heatmap.pdf")
+
 def plot_construction_sequence_strain(data: Dict[str, Any], show: bool = False):
     steps = data['steps']
     sequence = data['construction_sequence']
@@ -433,12 +437,16 @@ def plot_construction_force_and_strain(data: Dict[str, Any], show: bool = False)
     if show:
         plt.show()
 
+    if SAVE:
+        plt.savefig(f"~/Documents/Thesis/final_paper/{data['problem_name']}/{data['problem_name']}_phase_stability_analysis.pdf", dpi=300)
+        print(f"Saved phase stability analysis to ~/Documents/Thesis/final_paper/{data['problem_name']}_phase_stability_analysis.pdf")
+
 # ==============================================================================
 # 4. ENTRY POINT
 # ==============================================================================
-
+SAVE = False
 if __name__ == "__main__":
-    problem_name = "seesaw"
+    problem_name = "shifted_tower"
 
     # Compute ALL data once
     computed_data = compute_construction_metrics(problem_name)
