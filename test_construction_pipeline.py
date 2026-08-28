@@ -41,7 +41,7 @@ def retrace_placement_sequence_from_goal_linked_state(goal_linked_state) -> List
         current_state = parent[1]
         parent = current_state.parent
 
-    placement_sequence.reverse()  # Reverse to get the correct order
+    # placement_sequence.reverse()  # Reverse to get the correct order
     return placement_sequence
 
 def run_construction_testing_pipeline(problem_name: str = "arch", config_path: str = "configs/problem_configs/"):
@@ -164,4 +164,4 @@ def run_construction_testing_pipeline(problem_name: str = "arch", config_path: s
 
 if __name__ == "__main__":
     # Change "arch" to any existing configuration folder name in your system
-    run_construction_testing_pipeline(problem_name="shifted_tower")
+    run_construction_testing_pipeline(problem_name="leaning")

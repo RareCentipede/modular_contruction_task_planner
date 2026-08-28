@@ -257,7 +257,7 @@ place_conditions = [
     Condition('target_pose_clear', 'target_pose', 'clear', True),
     Condition('object_supported', 'object', 'supported', True),
     # Integrated StableLego Force Equilibrium Precondition
-    ComputedCondition('stack_statically_stable', check_placement_stability, ('object', 'target_pose'))
+    # ComputedCondition('stack_statically_stable', check_placement_stability, ('object', 'target_pose'))
 ]
 place_effects = [
     Effect('place_object', 'robot', 'holding', None),

@@ -10,4 +10,5 @@ keystone:
   # Suspended via side-wall friction between pillars
   position: [0.0, 0.0, 1.6]
   orientation: [0.0, 0.0, 0.0]
-  size: [0.78, 1.0, 0.8]
+  size: [0.8, 1.0, 0.8]
+  mass: 0.05

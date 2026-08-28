@@ -1,0 +1,22 @@
+cubeBottom:
+  position: [50.0, 0.0, 0.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+  mass: 1.0
+
+cubeTop:
+  position: [40.0, 0.0, 1.5]
+  orientation: [0.0, 0.0, 0.0]
+  size: [1.0, 1.0, 1.0]
+  mass: 1.0
+
+leaningBlock:
+  position: [30.75, 0.0, 0.82]
+  orientation: [0.0, -0.436, 0.0]  # Tilted ~25 degrees leaning against the stack
+  size: [0.4, 1.0, 1.8]
+  mass: 0.3
+
+robot:
+  type: "robot"
+  position: [-10.0, 0.0, 0.0]
+  orientation: [0.0, 0.0, 0.0]
