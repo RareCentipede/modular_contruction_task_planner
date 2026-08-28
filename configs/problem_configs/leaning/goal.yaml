@@ -11,7 +11,7 @@ cubeTop:
   mass: 1.0
 
 leaningBlock:
-  position: [0.88, 0.0, 0.82]
-  orientation: [0.0, -0.2, 0.0]  # Tilted ~25 degrees leaning against the stack
+  position: [1.0, 0.0, 0.82]
+  orientation: [0.0, -0.35, 0.0]  # Tilted ~25 degrees leaning against the stack
   size: [0.4, 1.0, 1.8]
-  mass: 0.3
+  mass: 0.5

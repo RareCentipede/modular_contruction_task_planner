@@ -223,6 +223,7 @@ def compute_construction_metrics(
     net_forces = []
     net_torques = []
     support_scores = []
+    block_support_scores = {}
 
     ground_mesh, support_graph = create_support_relation_graph(world, support_ratio_threshold=0.7)
 
@@ -263,6 +264,7 @@ def compute_construction_metrics(
         mean_strains.append(float(np.mean(current_strains)) if current_strains else 0.0)
         latest_strains.append(current_strains[-1] if current_strains else 0.0)
         support_scores.append(support_score)
+        block_support_scores[block_name] = support_score
 
     # Return dictionary updated with max_contact_forces
     return {
@@ -283,7 +285,8 @@ def compute_construction_metrics(
         "max_strains": max_strains,
         "mean_strains": mean_strains,
         "latest_strains": latest_strains,
-        "support_scores": support_scores
+        "support_scores": support_scores,
+        "block_support_scores": block_support_scores
     }
 
 # ==============================================================================
@@ -307,8 +310,8 @@ def plot_friction_heatmap(data: Dict[str, Any], show: bool = False):
         mesh = data['block_meshes'][name]
         all_verts.append(mesh.vertices)
 
-        strain = data['block_strains'][name]
-        rgb_color = cmap(norm(strain))[:3]
+        strain = 1-data['block_support_scores'][name]
+        rgb_color = cmap(strain)[:3]
 
         tris = mesh.vertices[mesh.faces]
         poly = Poly3DCollection(tris, alpha=0.5)
@@ -320,7 +323,7 @@ def plot_friction_heatmap(data: Dict[str, Any], show: bool = False):
     sm = cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
     cbar = fig.colorbar(sm, ax=ax, shrink=0.6, pad=0.1)
-    cbar.set_label('Overhang Bending Strain / Torque Ratio', fontweight='bold')
+    cbar.set_label('Inverse support score', fontweight='bold')
 
     flat = np.vstack(all_verts)
     max_range = (flat.max(axis=0) - flat.min(axis=0)).max() / 2.0
@@ -410,20 +413,19 @@ def plot_construction_force_and_strain(data: Dict[str, Any], show: bool = False)
         ax1.scatter(s, force, color=c, s=80, zorder=5)
         ax1.scatter(s, torque, color=c, s=80, zorder=5)
 
-    ax1.set_title(f"Construction Phase Force Analysis: {data['problem_name']}", fontsize=13, fontweight='bold', pad=12)
+    ax1.set_title(f"Construction Phase Stability Analysis: {data['problem_name']}", fontsize=13, fontweight='bold', pad=12)
     ax1.set_ylabel("Max Normal Reaction Force [N]", fontweight='bold')
     ax1.grid(True, linestyle='--', alpha=0.6)
     ax1.legend(handles=legend_elements_contact, loc='upper left')
 
-    ax2.plot(steps, data['max_strains'], color='#d95f02', marker='s', linewidth=2, label='Max Overhang Strain Ratio')
+    # ax2.plot(steps, data['max_strains'], color='#d95f02', marker='s', linewidth=2, label='Max Overhang Strain Ratio')
     ax2.plot(steps, data['support_scores'], color='#9467bd', marker='^', linestyle='--', linewidth=1.5, label='Support Score')
-    ax2.axhline(y=0.7, color='r', linestyle=':', label='Warning Strain Threshold (0.7)')
+    ax2.axhline(y=0.7, color='r', linestyle=':', label='Stability Threshold (0.7)')
     ax2.set_xlabel("Construction Step (Block Placed)", fontweight='bold')
     ax2.set_ylabel("Max Strain Ratio [0.0 - 1.0]", fontweight='bold')
     ax2.set_ylim(-0.05, 1.05)
     ax2.grid(True, linestyle='--', alpha=0.6)
-    ax2.legend(loc='upper left')
-
+    ax2.legend(loc='lower left')
 
     plt.xticks(steps, [f"Step {s}\n({sequence[s-1]})" for s in steps], rotation=25, ha='right')
     plt.tight_layout()
@@ -436,7 +438,7 @@ def plot_construction_force_and_strain(data: Dict[str, Any], show: bool = False)
 # ==============================================================================
 
 if __name__ == "__main__":
-    problem_name = "shifted_tower"
+    problem_name = "seesaw"
 
     # Compute ALL data once
     computed_data = compute_construction_metrics(problem_name)

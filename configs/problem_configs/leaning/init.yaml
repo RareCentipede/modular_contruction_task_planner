@@ -14,7 +14,7 @@ leaningBlock:
   position: [30.75, 0.0, 0.82]
   orientation: [0.0, -0.436, 0.0]  # Tilted ~25 degrees leaning against the stack
   size: [0.4, 1.0, 1.8]
-  mass: 0.3
+  mass: 0.2
 
 robot:
   type: "robot"
