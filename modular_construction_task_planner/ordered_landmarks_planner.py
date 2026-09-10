@@ -15,8 +15,9 @@ from modular_construction_task_planner.block_domain import (
     Action, Object, PosEntity, Robot, load_world
 )
 from modular_construction_task_planner.stability import SupportNode, compute_placement_stability
+from modular_construction_task_planner.rbe_solver import compute_stablelego_equilibrium
 
-HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION STABLE_DISCRETE STABLE STABLE_NAV')
+HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION STABLE_DISCRETE STABLE STABLE_NAV FB')
 """
     LAZY: Only considers the euclidean distance to the target for the preferred action.
     SIMPLE_COLLISION: Checks for collisions and adds lazy collision cost if applicable. Lazy collision cost is the arc length
@@ -26,6 +27,7 @@ HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION STABLE_DISCRETE STABLE STAB
     STABLE_DISCRETE: For place actions, just checks if the place action can be performed, use lazy cost.
     STABLE: For place actions, uses the stability score as a heuristic.
     STABLE_NAV: For place actions, uses the stability score as a heuristic and considers navigation.
+    FB: For place actions, uses the Force-Balance method from the RBE solver.
 """
 
 OBJ_WIDTH = 1.0
@@ -295,7 +297,7 @@ class OrderedLandmarksPlanner:
         return self.goal_linked_state
 
     def run_stable_planner(self, support_graph: Dict[str, SupportNode], ground_mesh: Trimesh,
-                           h: HEURISTIC = HEURISTIC.STABLE, verbose: bool = True) -> Optional[LinkedState]:
+                           h: HEURISTIC = HEURISTIC.STABLE, verbose: bool = False) -> Optional[LinkedState]:
         if not self.support_graph:
             self.support_graph = support_graph
             self.original_support_graph = deepcopy(self.support_graph)
@@ -320,6 +322,8 @@ class OrderedLandmarksPlanner:
             action.execute(action_params)
 
             self.world.update_state()
+            if additional_properties.get('verified') is None:
+                additional_properties['verified'] = False
             self.generate_new_linked_state(action_name, action_params, self.current_cost, additional_properties)
 
             if action_name == 'place':
@@ -526,10 +530,41 @@ class OrderedLandmarksPlanner:
                             print(f"Branch for {action_name} object {obj_entity.name} is {'stable' if is_stable else 'unstable'} "
                                 f"with support score {support_score} and start/goal poses: {start_pos}, {target_pos}.")
 
-                        # if is_stable:
                         cost = (1 - support_score)
-                        # else:
-                            # continue
+
+                        if not is_stable:
+                            goal_objects = self.world.at_goal_entities
+                            goal_objects = cast(List[Object], goal_objects)
+                            target_obj = deepcopy(cast(Object, branch['object']))
+                            target_obj.at.value = target_obj.goal.value
+                            goal_objects.append(target_obj)
+                            is_stable, residuals, contact_forces = compute_stablelego_equilibrium(
+                                    objects=goal_objects,
+                                    world_poses=self.world.pose_dict,
+                                    default_mass=1.0,
+                                    default_mu=0.5
+                            )
+                            if not is_stable:
+                                cost = float('inf')
+                            else:
+                                additional_properties['verified'] = True
+
+                    case HEURISTIC.FB:
+                        goal_objects = self.world.at_goal_entities
+                        goal_objects = cast(List[Object], goal_objects)
+                        target_obj = deepcopy(cast(Object, branch['object']))
+                        target_obj.at.value = target_obj.goal.value
+                        goal_objects.append(target_obj)
+                        is_stable, residuals, contact_forces = compute_stablelego_equilibrium(
+                                objects=goal_objects,
+                                world_poses=self.world.pose_dict,
+                                default_mass=1.0,
+                                default_mu=0.5
+                        )
+                        if not is_stable:
+                            cost = float('inf')
+                        else:
+                            cost = 0
                     case HEURISTIC.SIMPLE_COLLISION:
                         cost = self.simple_collision_heuristic(start_pos, target_pos)
                     case _:

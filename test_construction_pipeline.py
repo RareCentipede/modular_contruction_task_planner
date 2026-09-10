@@ -1,11 +1,13 @@
 import os
 import sys
+import time
 from typing import List, cast
 import numpy as np
 import matplotlib.pyplot as plt
 
 # Core import dependencies
 from eas.config_parser_world_basic import parse_configs_to_world
+from eas.core import World
 from modular_construction_task_planner.block_domain import Object, PickAction, PlaceAction, TransitAction, TransportAction, load_world
 from modular_construction_task_planner.ordered_landmarks_planner import OrderedLandmarksPlanner, HEURISTIC
 from modular_construction_task_planner.stability import (
@@ -44,6 +46,48 @@ def retrace_placement_sequence_from_goal_linked_state(goal_linked_state) -> List
     placement_sequence.reverse()  # Reverse to get the correct order
     return placement_sequence
 
+def validate_plan_stability(goal_linked_state, world: World) -> List[str]:
+    """
+    Retrace the placement sequence from the goal linked state.
+    """
+    stability_verdict = []
+    current_state = goal_linked_state
+    parent = current_state.parent
+    objs = world.entities.get_entities(Object)
+    objs = cast(List[Object], objs)
+    obj_at_state_keys = [f"{obj.name}_at" for obj in objs]
+    while parent is not None:
+        action = current_state.action_from_parent
+        if action[0] != 'place':
+            current_state = parent[1]
+            parent = current_state.parent
+            continue
+
+        if current_state.properties['verified']:
+            stability_verdict.append('Pre-verified')
+            current_state = parent[1]
+            parent = current_state.parent
+            continue
+
+        obj_pos_in_state = [current_state.state[key] for key in obj_at_state_keys]
+        for obj, pos in zip(objs, obj_pos_in_state):
+            obj.at.value = pos
+        is_stable, residuals, contact_forces = compute_stablelego_equilibrium(
+            objects=objs,
+            world_poses=world.pose_dict,
+            default_mass=1.0,
+            default_mu=0.5
+        )
+        if is_stable:
+            stability_verdict.append('Stable')
+        else:
+            stability_verdict.append('Unstable')
+            return stability_verdict  # Early exit on first unstable step
+        current_state = parent[1]
+        parent = current_state.parent
+        stability_verdict.reverse()  # Reverse to get the correct order
+    return stability_verdict
+
 def run_construction_testing_pipeline(problem_name: str = "arch", config_path: str = "configs/problem_configs/"):
     print(f"==================================================")
     print(f" Running Construction Pipeline Test: [{problem_name}]")
@@ -74,7 +118,7 @@ def run_construction_testing_pipeline(problem_name: str = "arch", config_path: s
     # 2. Structural Support Graph & Feasible Sequence Generation
     # --------------------------------------------------------------------------
     print("\n2. Computing Support Relation Graph...")
-    ground_mesh, support_graph = create_support_relation_graph(world, support_ratio_threshold=0.5)
+    ground_mesh, support_graph = create_support_relation_graph(world, support_ratio_threshold=0.7)
 
     try:
         placement_sequence = find_feasible_block_sequence(support_graph)
@@ -89,8 +133,16 @@ def run_construction_testing_pipeline(problem_name: str = "arch", config_path: s
     print("\n3. Generating Plan using OrderedLandmarksPlanner...")
 
     # Instantiate and execute the OrderedLandmarksPlanner
+    h = HEURISTIC.STABLE  # Choose the heuristic for planning
+    start_time = time.time()
     planner = OrderedLandmarksPlanner(world, action_dict)
-    goal_linked_state = planner.run_stable_planner(support_graph, ground_mesh)
+    goal_linked_state = planner.run_stable_planner(support_graph, ground_mesh, h=HEURISTIC.STABLE)
+    stability_verdict = []
+    if h == HEURISTIC.STABLE:
+        stability_verdict = validate_plan_stability(goal_linked_state, world) if goal_linked_state else []
+    print(f" Stability Verdict for each placement step: {stability_verdict}")
+    end_time = time.time()
+    print(f" Heuristic {h.name} Planning completed in {end_time - start_time:.2f} seconds.")
 
     if goal_linked_state:
         placement_sequence = retrace_placement_sequence_from_goal_linked_state(goal_linked_state)
@@ -164,4 +216,4 @@ def run_construction_testing_pipeline(problem_name: str = "arch", config_path: s
 
 if __name__ == "__main__":
     # Change "arch" to any existing configuration folder name in your system
-    run_construction_testing_pipeline(problem_name="seesaw")
+    run_construction_testing_pipeline(problem_name="shifted_tower")
