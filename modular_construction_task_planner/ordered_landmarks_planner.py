@@ -445,33 +445,24 @@ class OrderedLandmarksPlanner:
                 potential_target_objs = cast(List[Object], self.world.not_at_goal_entities)
                 print(f"Potential target objects for transit: {[obj.name if obj else 'None' for obj in potential_target_objs]}")
                 potential_target_objs = [obj for obj in potential_target_objs if obj.goal.value] # Only consider objects that still need to be placed
-                potential_target_pos_vals = [obj.reachable_from for obj in potential_target_objs]
+                potential_target_pos_vals = [obj.reachable_from[0] for obj in potential_target_objs]
 
-                for potential_target_pos_sublist, potential_obj in zip(potential_target_pos_vals, potential_target_objs):
-                    for target_pos in potential_target_pos_sublist:
-                        pos_entity = cast(PosEntity, self.world.entities.get_entities(target_pos))
-                        # print(f"Pos entity: {pos_entity.name if pos_entity else 'None'} for potential target object {potential_obj.name} at {potential_obj.at.value}")
-                        branch_params = {
-                            'robot': self.robot,
-                            'start_pose': current_pos_entity,
-                            'target_pose': pos_entity,
-                            'object': potential_obj
-                        }
-                        branches.append(branch_params)
+                for target_pos, potential_obj in zip(potential_target_pos_vals, potential_target_objs):
+                    pos_entity = cast(PosEntity, self.world.entities.get_entities(target_pos))
+                    # print(f"Pos entity: {pos_entity.name if pos_entity else 'None'} for potential target object {potential_obj.name} at {potential_obj.at.value}")
+                    branch_params = {
+                        'robot': self.robot,
+                        'start_pose': current_pos_entity,
+                        'target_pose': pos_entity,
+                        'object': potential_obj
+                    }
+                    branches.append(branch_params)
 
             case "transport":
                 obj_in_gripper = cast(str, self.robot.holding.value)
                 obj_entity_in_gripper = cast(Object, self.world.entities.get_entities(obj_in_gripper))
 
-                action_from_parent = cast(Tuple, self.current_linked_state.parent)[1].action_from_parent
-                action_from_parent = cast(Tuple[str, Tuple[str, ...]], action_from_parent)
-                side = action_from_parent[1][2].split('_')[-1]
-
-                if side not in self.pp_map:
-                    place_pos_id = current_pos_entity.name[-1]
-                    target_pos = f"{obj_entity_in_gripper.name}_place_target{place_pos_id}"
-                else:
-                    target_pos = obj_entity_in_gripper.placeable_from[self.pp_map[side]]
+                target_pos = f"{obj_entity_in_gripper.name}_place"
                 pos_entity = cast(PosEntity, self.world.entities.get_entities(target_pos))
                 # print(f"Pos entity: {pos_entity.name if pos_entity else 'None'}")
                 branch_params = {
@@ -533,10 +524,10 @@ class OrderedLandmarksPlanner:
                         is_stable, support_score = self.evaluate_obj_stability(obj_entity, self.support_graph, self.ground_mesh, verbose=verbose)
                         if verbose:
                             print(f"Branch for {action_name} object {obj_entity.name} is {'stable' if is_stable else 'unstable'} "
-                                f"with support score {support_score}.")
+                                f"with support score {support_score} and start/goal poses: {start_pos}, {target_pos}.")
 
                         # if is_stable:
-                        cost = (1 - support_score) + np.linalg.norm(np.array(start_pos) - np.array(target_pos))
+                        cost = (1 - support_score)
                         # else:
                             # continue
                     case HEURISTIC.SIMPLE_COLLISION:

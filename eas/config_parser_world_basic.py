@@ -68,9 +68,8 @@ def create_domains(init_config: Dict, goal_config: Dict) -> Dict[str, Tuple]:
         pos_var_domain.append(pos_name)
 
         if obj_name != "robot":
-            for side in sides:
-                pick_target_name = f'{obj_name}_pick_target_{side}'
-                robo_pos_var_domain.append(pick_target_name)
+            pick_target_name = f'{obj_name}_pick'
+            robo_pos_var_domain.append(pick_target_name)
             block_var_domain.append(obj_name)
         else:
             robot_pos_name = 'r_init_pos'
@@ -82,9 +81,8 @@ def create_domains(init_config: Dict, goal_config: Dict) -> Dict[str, Tuple]:
         pos_name = 'p' + str(idx)
         pos_var_domain.append(pos_name)
 
-        for side in sides:
-            place_target_name = f'{obj_name}_place_target_{side}'
-            robo_pos_var_domain.append(place_target_name)
+        place_target_name = f'{obj_name}_place'
+        robo_pos_var_domain.append(place_target_name)
         idx += 1
 
     pos_var_domain.append('g')
@@ -138,18 +136,11 @@ def assign_entities_variable_values_and_create_pose_dict(init_config: Dict, goal
         pos_entity.on.value = gnd_pos_entity.name
         pos_entity.clear.value = False
 
-        # Calculate base reachability targets and inward orientations on all four sides
-        side_data = compute_side_positions_and_orientations(info['position'], info['orientation'], approach_distance)
+        target_key = f'{obj_entity.name}_pick'
 
-        pick_target_labels = []
-        for side_name, data in side_data.items():
-            target_key = f'{obj_entity.name}_pick_target_{side_name}'
-
-            # Use the calculated inward-facing orientation instead of the original block orientation
-            pose_dict[target_key] = Pose(data['position'], data['orientation'])
-            pick_target_labels.append(target_key)
-
-        obj_entity.reachable_from = pick_target_labels
+        # Use the calculated inward-facing orientation instead of the original block orientation
+        pose_dict[target_key] = pose
+        obj_entity.reachable_from = [target_key]
 
         init_pos_vals.append(info['position'])
         pos_counter += 1
@@ -174,18 +165,11 @@ def assign_entities_variable_values_and_create_pose_dict(init_config: Dict, goal
                 obj_entity = cast(Object, entities.get_entities(obj_name))
                 obj_entity.goal.value = pos_entity.name
 
-                # Calculate placement approach base locations and inward orientations for the target
-                goal_side_data = compute_side_positions_and_orientations(info['position'], info['orientation'], approach_distance)
+                target_key = f'{obj_entity.name}_place'
 
-                place_target_labels = []
-                for side_name, data in goal_side_data.items():
-                    target_key = f'{obj_entity.name}_place_target_{side_name}'
-
-                    # Apply the adjusted look-at angle poses for the place configurations
-                    pose_dict[target_key] = Pose(data['position'], data['orientation'])
-                    place_target_labels.append(target_key)
-
-                obj_entity.placeable_from = place_target_labels
+                # Apply the adjusted look-at angle poses for the place configurations
+                pose_dict[target_key] = pose
+                obj_entity.placeable_from = [target_key]
 
     return pose_dict
 
