@@ -1,0 +1,370 @@
+block1:
+  type: dynamic
+  position:
+  - -11.69
+  - -5.6
+  - 0.375
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  color:
+  - 0.4
+  - 0.4
+  - 0.4
+  size:
+  - 0.62
+  - 0.8
+  - 0.75
+block2:
+  type: dynamic
+  position:
+  - -11.015
+  - -5.69
+  - 0.26
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  color:
+  - 0.2
+  - 0.6
+  - 0.4
+  size:
+  - 0.73
+  - 0.62
+  - 0.52
+block3:
+  type: dynamic
+  position:
+  - -10.405
+  - -5.715
+  - 0.215
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  color:
+  - 0.2
+  - 0.4
+  - 0.8
+  size:
+  - 0.49
+  - 0.57
+  - 0.43
+block4:
+  type: dynamic
+  position:
+  - -9.82
+  - -5.74
+  - 0.375
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  color:
+  - 0.6
+  - 0.3
+  - 0.7
+  size:
+  - 0.68
+  - 0.52
+  - 0.75
+block5:
+  type: dynamic
+  position:
+  - -9.115
+  - -5.665
+  - 0.245
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  color:
+  - 0.8
+  - 0.4
+  - 0.2
+  size:
+  - 0.73
+  - 0.67
+  - 0.49
+block6:
+  type: dynamic
+  position:
+  - -8.395
+  - -5.69
+  - 0.355
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  color:
+  - 0.3
+  - 0.7
+  - 0.7
+  size:
+  - 0.71
+  - 0.62
+  - 0.71
+block7:
+  type: dynamic
+  position:
+  - -7.76
+  - -5.615
+  - 0.315
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  color:
+  - 0.7
+  - 0.2
+  - 0.4
+  size:
+  - 0.56
+  - 0.77
+  - 0.63
+block8:
+  type: dynamic
+  position:
+  - -7.215
+  - -5.72
+  - 0.31
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  color:
+  - 0.5
+  - 0.6
+  - 0.2
+  size:
+  - 0.53
+  - 0.56
+  - 0.62
+block9:
+  type: dynamic
+  position:
+  - -6.665
+  - -5.685
+  - 0.305
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  color:
+  - 0.9
+  - 0.7
+  - 0.1
+  size:
+  - 0.57
+  - 0.63
+  - 0.61
+block10:
+  type: dynamic
+  position:
+  - -6.02
+  - -5.725
+  - 0.26
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  color:
+  - 0.1
+  - 0.5
+  - 0.9
+  size:
+  - 0.72
+  - 0.55
+  - 0.52
+block11:
+  type: dynamic
+  position:
+  - -5.46
+  - -5.61
+  - 0.2
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  color:
+  - 0.4
+  - 0.4
+  - 0.4
+  size:
+  - 0.4
+  - 0.78
+  - 0.4
+block12:
+  type: dynamic
+  position:
+  - -4.935
+  - -5.785
+  - 0.32
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  color:
+  - 0.2
+  - 0.6
+  - 0.4
+  size:
+  - 0.65
+  - 0.43
+  - 0.64
+block13:
+  type: dynamic
+  position:
+  - -4.305
+  - -5.62
+  - 0.29
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  color:
+  - 0.2
+  - 0.4
+  - 0.8
+  size:
+  - 0.61
+  - 0.76
+  - 0.58
+block14:
+  type: dynamic
+  position:
+  - -3.695
+  - -5.615
+  - 0.27
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  color:
+  - 0.6
+  - 0.3
+  - 0.7
+  size:
+  - 0.61
+  - 0.77
+  - 0.54
+block15:
+  type: dynamic
+  position:
+  - -3.065
+  - -5.63
+  - 0.345
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  color:
+  - 0.8
+  - 0.4
+  - 0.2
+  size:
+  - 0.65
+  - 0.74
+  - 0.69
+block16:
+  type: dynamic
+  position:
+  - -2.485
+  - -5.705
+  - 0.26
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  color:
+  - 0.3
+  - 0.7
+  - 0.7
+  size:
+  - 0.51
+  - 0.59
+  - 0.52
+block17:
+  type: dynamic
+  position:
+  - -1.97
+  - -5.635
+  - 0.345
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  color:
+  - 0.7
+  - 0.2
+  - 0.4
+  size:
+  - 0.52
+  - 0.73
+  - 0.69
+block18:
+  type: dynamic
+  position:
+  - -1.33
+  - -5.745
+  - 0.27
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  color:
+  - 0.5
+  - 0.6
+  - 0.2
+  size:
+  - 0.76
+  - 0.51
+  - 0.54
+block19:
+  type: dynamic
+  position:
+  - -0.635
+  - -5.78
+  - 0.39
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  color:
+  - 0.9
+  - 0.7
+  - 0.1
+  size:
+  - 0.63
+  - 0.44
+  - 0.78
+block20:
+  type: dynamic
+  position:
+  - -0.105
+  - -5.65
+  - 0.295
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  color:
+  - 0.1
+  - 0.5
+  - 0.9
+  size:
+  - 0.43
+  - 0.7
+  - 0.59
+robot:
+  type: robot
+  position:
+  - -15.0
+  - 0.0
+  - 0.0
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
