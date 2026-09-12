@@ -137,15 +137,14 @@ def evaluate_obj_stability(world: World, obj: Object, support_graph: Dict[str, S
 
 def compute_construction_metrics(
     problem_name: str,
-    problem_config_path: str = "configs/problem_configs/",
+    world: World,
+    goal_config: Dict[str, Any],
     construction_sequence: Optional[List[str]] = None
 ) -> Dict[str, Any]:
     """
         Executes all physics computations, LP equilibrium checks, CoM evaluations,
         and sequence step strain evaluations in a single pass.
     """
-    world = parse_configs_to_world(problem_name, problem_config_path)
-    goal_config = safe_load(open(f"{problem_config_path}/{problem_name}/goal.yaml", 'r'))
 
     all_objects = cast(List[Object], world.entities.get_entities(Object))
     obj_dict = {obj.name: obj for obj in all_objects}
@@ -448,8 +447,12 @@ SAVE = False
 if __name__ == "__main__":
     problem_name = "shifted_tower"
 
+    # Load the world and goal configuration
+    world = parse_configs_to_world(problem_name, "configs/problem_configs/")
+    goal_config = safe_load(open(f"configs/problem_configs/{problem_name}/goal.yaml", 'r'))
+
     # Compute ALL data once
-    computed_data = compute_construction_metrics(problem_name)
+    computed_data = compute_construction_metrics(problem_name, world, goal_config)
 
     # Plot without re-calculating physics/geometry
     plot_friction_heatmap(computed_data)

@@ -342,6 +342,7 @@ def generate_problem(
     seed: Optional[int] = None,
     output_dir: str = '../configs/problem_configs/',
     robot_position: Tuple[float, float, float] = (-15.0, 0.0, 0.0),
+    save: bool = False,
 ) -> Tuple[Dict, Dict]:
     """
         Main entry point. Returns (init_dict, goal_dict) and writes YAML files.
@@ -384,20 +385,21 @@ def generate_problem(
     }
 
     # --- Write files ---
-    problem_dir = os.path.join(output_dir, problem_name)
-    os.makedirs(problem_dir, exist_ok=True)
+    if save:
+        problem_dir = os.path.join(output_dir, problem_name)
+        os.makedirs(problem_dir, exist_ok=True)
 
-    goal_path = os.path.join(problem_dir, 'goal.yaml')
-    init_path = os.path.join(problem_dir, 'init.yaml')
+        goal_path = os.path.join(problem_dir, 'goal.yaml')
+        init_path = os.path.join(problem_dir, 'init.yaml')
 
-    with open(goal_path, 'w') as f:
-        yaml.dump(goal_dict, f, default_flow_style=False, sort_keys=False)
+        with open(goal_path, 'w') as f:
+            yaml.dump(goal_dict, f, default_flow_style=False, sort_keys=False)
 
-    with open(init_path, 'w') as f:
-        yaml.dump(init_dict, f, default_flow_style=False, sort_keys=False)
+        with open(init_path, 'w') as f:
+            yaml.dump(init_dict, f, default_flow_style=False, sort_keys=False)
 
-    print(f"  Written: {goal_path}")
-    print(f"  Written: {init_path}")
+        print(f"  Written: {goal_path}")
+        print(f"  Written: {init_path}")
 
     return init_dict, goal_dict
 

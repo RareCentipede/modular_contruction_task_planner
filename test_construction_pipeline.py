@@ -1,7 +1,8 @@
+import yaml
 import os
 import sys
 import time
-from typing import List, cast
+from typing import Dict, List, Optional, cast
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -88,7 +89,10 @@ def validate_plan_stability(goal_linked_state, world: World) -> List[str]:
         stability_verdict.reverse()  # Reverse to get the correct order
     return stability_verdict
 
-def run_construction_testing_pipeline(problem_name: str = "arch", config_path: str = "configs/problem_configs/"):
+def run_construction_testing_pipeline(problem_name: str = "arch", 
+                                      config_path: str = "configs/problem_configs/",
+                                      init_config: Optional[Dict] = None,
+                                      goal_config: Optional[Dict] = None):
     print(f"==================================================")
     print(f" Running Construction Pipeline Test: [{problem_name}]")
     print(f"==================================================")
@@ -96,16 +100,15 @@ def run_construction_testing_pipeline(problem_name: str = "arch", config_path: s
     # --------------------------------------------------------------------------
     # 1. World Initialization & Goal Parser
     # --------------------------------------------------------------------------
-    print("\n1. Initializing World & Goal configurations...")
-    world = parse_configs_to_world(problem_name, config_path)
-    goal_file = os.path.join(config_path, problem_name, "goal.yaml")
-    init_file = os.path.join(config_path, problem_name, "init.yaml")
-
-    import yaml
-    with open(goal_file, 'r') as f:
-        goal_data = yaml.safe_load(f)
-    with open(init_file, 'r') as f:
-        init_data = yaml.safe_load(f)
+    if not init_config and not goal_config:
+        print("\n1. Initializing World & Goal configurations...")
+        world = parse_configs_to_world(problem_name, config_path)
+        goal_file = os.path.join(config_path, problem_name, "goal.yaml")
+        with open(goal_file, 'r') as f:
+            goal_config = yaml.safe_load(f)
+    else:
+        print("\n1. Initializing World & Goal configurations from provided dictionaries...")
+        world = parse_configs_to_world(init_config, goal_config) # type: ignore
 
     all_objects = world.entities.get_entities(Object)
     all_objects = cast(List[Object], all_objects)
@@ -133,7 +136,7 @@ def run_construction_testing_pipeline(problem_name: str = "arch", config_path: s
     print("\n3. Generating Plan using OrderedLandmarksPlanner...")
 
     # Instantiate and execute the OrderedLandmarksPlanner
-    h = HEURISTIC.STABLE  # Choose the heuristic for planning
+    h = HEURISTIC.AO  # Choose the heuristic for planning
     start_time = time.time()
     planner = OrderedLandmarksPlanner(world, action_dict)
     goal_linked_state = planner.run_stable_planner(support_graph, ground_mesh, h=HEURISTIC.STABLE)
@@ -191,7 +194,7 @@ def run_construction_testing_pipeline(problem_name: str = "arch", config_path: s
 
     # C. Strain Heatmaps & Metrics
     # Full stable does not mean there is a feasible construction plan.
-    metrics_data = compute_construction_metrics(problem_name, config_path, construction_sequence=placement_sequence)
+    metrics_data = compute_construction_metrics(problem_name, world, goal_config, construction_sequence=placement_sequence) #type: ignore
     plot_friction_heatmap(metrics_data, show=False)
     plot_construction_force_and_strain(metrics_data, show=False)
     plt.show()
@@ -216,4 +219,4 @@ def run_construction_testing_pipeline(problem_name: str = "arch", config_path: s
 
 if __name__ == "__main__":
     # Change "arch" to any existing configuration folder name in your system
-    run_construction_testing_pipeline(problem_name="shifted_tower")
+    run_construction_testing_pipeline(problem_name="problem_01")

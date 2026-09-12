@@ -17,7 +17,7 @@ from modular_construction_task_planner.block_domain import (
 from modular_construction_task_planner.stability import SupportNode, compute_placement_stability
 from modular_construction_task_planner.rbe_solver import compute_stablelego_equilibrium
 
-HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION STABLE_DISCRETE STABLE STABLE_NAV FB')
+HEURISTIC = Enum('HEURISTIC', 'LAZY SIMPLE_COLLISION STABLE_DISCRETE STABLE STABLE_NAV FB AO')
 """
     LAZY: Only considers the euclidean distance to the target for the preferred action.
     SIMPLE_COLLISION: Checks for collisions and adds lazy collision cost if applicable. Lazy collision cost is the arc length
@@ -548,6 +548,15 @@ class OrderedLandmarksPlanner:
                                 cost = float('inf')
                             else:
                                 additional_properties['verified'] = True
+
+                    case HEURISTIC.AO:
+                        obj_entity = cast(Object, branch['object'])
+                        is_stable, support_score = self.evaluate_obj_stability(obj_entity, self.support_graph, self.ground_mesh, verbose=verbose)
+                        if verbose:
+                            print(f"Branch for {action_name} object {obj_entity.name} is {'stable' if is_stable else 'unstable'} "
+                                f"with support score {support_score} and start/goal poses: {start_pos}, {target_pos}.")
+
+                        cost = (1 - support_score)
 
                     case HEURISTIC.FB:
                         goal_objects = self.world.at_goal_entities
