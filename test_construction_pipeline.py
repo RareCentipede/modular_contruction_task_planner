@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 # Core import dependencies
 from eas.config_parser_world_basic import parse_configs_to_world
-from eas.core import World
+from eas.core import LinkedState, World
 from modular_construction_task_planner.block_domain import Object, PickAction, PlaceAction, TransitAction, TransportAction, load_world
 from modular_construction_task_planner.ordered_landmarks_planner import OrderedLandmarksPlanner, HEURISTIC
 from modular_construction_task_planner.stability import (
@@ -92,7 +92,9 @@ def validate_plan_stability(goal_linked_state, world: World) -> List[str]:
 def run_construction_testing_pipeline(problem_name: str = "arch", 
                                       config_path: str = "configs/problem_configs/",
                                       init_config: Optional[Dict] = None,
-                                      goal_config: Optional[Dict] = None):
+                                      goal_config: Optional[Dict] = None,
+                                      heuristic: HEURISTIC = HEURISTIC.AO,
+                                      show: bool = False):
     print(f"==================================================")
     print(f" Running Construction Pipeline Test: [{problem_name}]")
     print(f"==================================================")
@@ -128,7 +130,7 @@ def run_construction_testing_pipeline(problem_name: str = "arch",
         print(f" Feasible Block Placement Sequence: {placement_sequence}")
     except ValueError as e:
         print(f" Error in sequence generation: {e}")
-        return
+        return None, 0.0
 
     # --------------------------------------------------------------------------
     # 3. Symbolic Task Planning (OrderedLandmarksPlanner)
@@ -136,16 +138,16 @@ def run_construction_testing_pipeline(problem_name: str = "arch",
     print("\n3. Generating Plan using OrderedLandmarksPlanner...")
 
     # Instantiate and execute the OrderedLandmarksPlanner
-    h = HEURISTIC.AO  # Choose the heuristic for planning
     start_time = time.time()
     planner = OrderedLandmarksPlanner(world, action_dict)
-    goal_linked_state = planner.run_stable_planner(support_graph, ground_mesh, h=HEURISTIC.STABLE)
+    goal_linked_state = planner.run_stable_planner(support_graph, ground_mesh, h=heuristic)
     stability_verdict = []
-    if h == HEURISTIC.STABLE:
+    if heuristic == HEURISTIC.STABLE:
         stability_verdict = validate_plan_stability(goal_linked_state, world) if goal_linked_state else []
     print(f" Stability Verdict for each placement step: {stability_verdict}")
     end_time = time.time()
-    print(f" Heuristic {h.name} Planning completed in {end_time - start_time:.2f} seconds.")
+    time_taken = end_time - start_time
+    print(f" Heuristic {heuristic.name} Planning completed in {time_taken:.2f} seconds.")
 
     if goal_linked_state:
         placement_sequence = retrace_placement_sequence_from_goal_linked_state(goal_linked_state)
@@ -194,10 +196,11 @@ def run_construction_testing_pipeline(problem_name: str = "arch",
 
     # C. Strain Heatmaps & Metrics
     # Full stable does not mean there is a feasible construction plan.
-    metrics_data = compute_construction_metrics(problem_name, world, goal_config, construction_sequence=placement_sequence) #type: ignore
-    plot_friction_heatmap(metrics_data, show=False)
-    plot_construction_force_and_strain(metrics_data, show=False)
-    plt.show()
+    if show:
+        metrics_data = compute_construction_metrics(problem_name, world, goal_config, construction_sequence=placement_sequence) #type: ignore
+        plot_friction_heatmap(metrics_data, show=False)
+        plot_construction_force_and_strain(metrics_data, show=False)
+        plt.show()
     # plt.pause(2.0)
 
     # # --------------------------------------------------------------------------
@@ -216,6 +219,7 @@ def run_construction_testing_pipeline(problem_name: str = "arch",
     # # Run active 3D visualization window
     # animator.run()
 
+    return isinstance(goal_linked_state, LinkedState), time_taken
 
 if __name__ == "__main__":
     # Change "arch" to any existing configuration folder name in your system

@@ -20,6 +20,12 @@ from modular_construction_task_planner.stability import SupportNode, compute_pla
 # ==============================================================================
 # 1. CORE STRAIN METRIC (CALCULATION HELPER)
 # ==============================================================================
+plt.rcParams['ps.useafm'] = True
+plt.rcParams['pdf.use14corefonts'] = True
+plt.rcParams['axes.unicode_minus'] = False
+plt.rcParams.update({'font.size': 12, 'axes.labelsize': 12, 'axes.titlesize': 14, 'xtick.labelsize': 12, 'ytick.labelsize': 12})
+plt.tight_layout()
+FIGSIZE = (6, 4)
 
 def calculate_overhang_strain(
     pos: list, 
@@ -293,9 +299,9 @@ def compute_construction_metrics(
 # ==============================================================================
 
 def plot_friction_heatmap(data: Dict[str, Any], show: bool = False):
-    fig = plt.figure(figsize=(10, 8))
+    fig = plt.figure(figsize=(5, 4))
     ax = fig.add_subplot(111, projection='3d')
-    ax.set_title(f"Cantilever Moment Strain Heatmap: {data['problem_name']}\n(Structure Stable: {data['is_full_stable']})", fontsize=13, fontweight='bold')
+    ax.set_title(f"Strain Heatmap: {data['problem_name']}\n(Structure Stable: {data['is_full_stable']})", fontsize=14, fontweight='bold')
 
     cmap = cm.get_cmap('YlOrRd')
     norm = mcolors.Normalize(vmin=0.0, vmax=1.0)
@@ -339,14 +345,14 @@ def plot_friction_heatmap(data: Dict[str, Any], show: bool = False):
         plt.show()
 
     if SAVE:
-        plt.savefig(f"~/Documents/Thesis/final_paper/{data['problem_name']}/{data['problem_name']}_strain_heatmap.pdf", dpi=300)
-        print(f"Saved strain heatmap to ~/Documents/Thesis/final_paper/{data['problem_name']}_strain_heatmap.pdf")
+        plt.savefig(f"./plots/{data['problem_name']}/heatmap.pdf", dpi=300)
+        print(f"Saved strain heatmap to ./plots/{data['problem_name']}/phase_stability_analysis.pdf")
 
 def plot_construction_sequence_strain(data: Dict[str, Any], show: bool = False):
     steps = data['steps']
     sequence = data['construction_sequence']
 
-    plt.figure(figsize=(9, 5))
+    plt.figure(figsize=FIGSIZE)
     plt.plot(steps, data['max_strains'], color='#d95f02', marker='o', linewidth=2.5, label='Peak Overhang Strain Ratio')
     plt.plot(steps, data['mean_strains'], color='#7570b3', linestyle='--', marker='s', linewidth=1.5, label='Average Structure Strain Ratio')
     plt.plot(steps, data['latest_strains'], color='#1b9e77', linestyle=':', marker='^', linewidth=1.5, label='Latest Block Strain Ratio')
@@ -368,7 +374,7 @@ def plot_com_projection(data: Dict[str, Any], show: bool = False):
     ground_pts = data['ground_pts']
     global_com = data['global_com']
 
-    plt.figure(figsize=(7, 7))
+    plt.figure(figsize=FIGSIZE)
     plt.title(f"Center of Mass Projection vs Ground Hull\n({data['problem_name']})", fontsize=13, fontweight='bold')
 
     if len(ground_pts) >= 3:
@@ -401,7 +407,7 @@ def plot_construction_force_and_strain(data: Dict[str, Any], show: bool = False)
     sequence = data['construction_sequence']
     colors = ['#2ca02c' if stable else '#d62728' for stable in data['stability_statuses']]
 
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 6), sharex=True)
 
     legend_elements_contact = [
         Line2D([0], [0], color='#1f77b4', lw=2, label='Net Force per step [N]'),
@@ -416,7 +422,7 @@ def plot_construction_force_and_strain(data: Dict[str, Any], show: bool = False)
         ax1.scatter(s, force, color=c, s=80, zorder=5)
         ax1.scatter(s, torque, color=c, s=80, zorder=5)
 
-    ax1.set_title(f"Construction Phase Stability Analysis: {data['problem_name']}", fontsize=13, fontweight='bold', pad=12)
+    ax1.set_title(f"Construction Phase Stability Analysis: {data['problem_name']}", fontsize=14, fontweight='bold')
     ax1.set_ylabel("Max Normal Reaction Force [N]", fontweight='bold')
     ax1.grid(True, linestyle='--', alpha=0.6)
     ax1.legend(handles=legend_elements_contact, loc='upper left')
@@ -425,27 +431,27 @@ def plot_construction_force_and_strain(data: Dict[str, Any], show: bool = False)
     ax2.plot(steps, data['support_scores'], color='#9467bd', marker='^', linestyle='--', linewidth=1.5, label='Support Score')
     ax2.axhline(y=0.7, color='r', linestyle=':', label='Stability Threshold (0.7)')
     ax2.set_xlabel("Construction Step (Block Placed)", fontweight='bold')
-    ax2.set_ylabel("Max Strain Ratio [0.0 - 1.0]", fontweight='bold')
+    ax2.set_ylabel("Support score", fontweight='bold')
     ax2.set_ylim(-0.05, 1.05)
     ax2.grid(True, linestyle='--', alpha=0.6)
     ax2.legend(loc='lower left')
 
-    plt.xticks(steps, [f"Step {s}\n({sequence[s-1]})" for s in steps], rotation=25, ha='right')
+    plt.xticks(steps, [f"Step {s}" for s in steps], rotation=25, ha='right')
     plt.tight_layout()
 
     if show:
         plt.show()
 
     if SAVE:
-        plt.savefig(f"~/Documents/Thesis/final_paper/{data['problem_name']}/{data['problem_name']}_phase_stability_analysis.pdf", dpi=300)
-        print(f"Saved phase stability analysis to ~/Documents/Thesis/final_paper/{data['problem_name']}_phase_stability_analysis.pdf")
+        plt.savefig(f"./plots/{data['problem_name']}/phase_stability_analysis.pdf", dpi=300)
+        print(f"Saved phase stability analysis to ./plots/{data['problem_name']}/phase_stability_analysis.pdf")
 
 # ==============================================================================
 # 4. ENTRY POINT
 # ==============================================================================
-SAVE = False
+SAVE = True
 if __name__ == "__main__":
-    problem_name = "shifted_tower"
+    problem_name = "pressed"
 
     # Load the world and goal configuration
     world = parse_configs_to_world(problem_name, "configs/problem_configs/")
@@ -456,8 +462,8 @@ if __name__ == "__main__":
 
     # Plot without re-calculating physics/geometry
     plot_friction_heatmap(computed_data)
-    plot_construction_sequence_strain(computed_data)
-    plot_com_projection(computed_data)
+    # plot_construction_sequence_strain(computed_data)
+    # plot_com_projection(computed_data)
     plot_construction_force_and_strain(computed_data)
 
     plt.show()

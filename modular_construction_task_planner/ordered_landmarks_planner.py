@@ -71,6 +71,7 @@ class OrderedLandmarksPlanner:
         self.num_potential_solutions = factorial(len(blocks)-2)
         self.num_blocks = len(blocks)
         self.blocks_to_place = self.num_blocks
+        self.step_counter = 0
         # print(f"Blocks: {[block.name for block in blocks]}")
         # print(f"Number of blocks: {len(blocks)-2}")
         # for block in blocks:
@@ -331,6 +332,8 @@ class OrderedLandmarksPlanner:
                 obj_entity = cast(Object, action_params['object'])
                 obj_support_node = self.support_graph[obj_entity.name]
                 obj_support_node.current_support_score = support_score
+                self.step_counter += 1
+                print(f"Progress: {self.step_counter}/{self.num_blocks}.")
 
                 for supported_name, supported_edge in obj_support_node.supported_objects.items():
                     obj_support_node.supported_objects[supported_name] = (supported_edge[0], True)
@@ -447,7 +450,7 @@ class OrderedLandmarksPlanner:
 
             case "transit":
                 potential_target_objs = cast(List[Object], self.world.not_at_goal_entities)
-                print(f"Potential target objects for transit: {[obj.name if obj else 'None' for obj in potential_target_objs]}")
+                # print(f"Potential target objects for transit: {[obj.name if obj else 'None' for obj in potential_target_objs]}")
                 potential_target_objs = [obj for obj in potential_target_objs if obj.goal.value] # Only consider objects that still need to be placed
                 potential_target_pos_vals = [obj.reachable_from[0] for obj in potential_target_objs]
 
